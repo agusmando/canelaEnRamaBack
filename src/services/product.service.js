@@ -4,38 +4,40 @@ const {
   Pagination,
   PaginatedResponse,
 } = require("../utils/responseFormat");
-const { ErrorsEnum } = require("../errors/ErrorsEnum");
+const ErrorsEnum = require("../errors/ErrorsEnum");
+const AppError = require("../errors/AppError");
 
 const prisma = new PrismaClient();
 
-const getAllProducts = async (value, paginaActual, cantidadPorPagina) => {
-  const products = await prisma.product.findMany({
-    where: {
-      name: { contains: value },
+const getAllProductsService = async (value, currentPage, amountPerPage) => {
+  const where = {
+    name: {
+      contains: value,
     },
-  });
-
-  if (products.length === 0) {
+  };
+  const [totalElements, products] = await Promise.all([
+    prisma.product.count({
+      where,
+    }),
+    prisma.product.findMany({
+      where,
+      skip: (currentPage - 1) * amountPerPage,
+      take: amountPerPage,
+    }),
+  ]);
+  if (totalElements === 0) {
     throw new AppError(ErrorsEnum.NOT_FOUND);
   }
-  console.log(
-    new PaginatedResponse(
-      200,
-      "Productos obtenidos con éxito",
-      products,
-      paginaActual,
-      cantidadPorPagina
-    )
-  );
   return new PaginatedResponse(
     200,
     "Productos obtenidos con éxito",
-    productos,
-    paginaActual,
-    cantidadPorPagina
+    products,
+    currentPage,
+    amountPerPage,
+    totalElements
   );
 };
 
 module.exports = {
-  getAllProducts,
+  getAllProductsService,
 };

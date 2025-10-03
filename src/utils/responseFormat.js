@@ -7,13 +7,20 @@ class BaseResponse {
 }
 
 class PaginatedResponse extends BaseResponse {
-  constructor(statusCode, message, data, pagina, cantidadPorPagina) {
-    super(statusCode, message, {
+  constructor(
+    statusCode,
+    message,
+    data,
+    pagina,
+    cantidadPorPagina,
+    totalElementos
+  ) {
+    super(message, statusCode, {
       data,
       paginado: {
         pagina,
         cantidadPorPagina,
-        totalPaginas: Math.ceil(totalElementos / cantidadPorPagina),
+        totalElementos,
       },
     });
   }

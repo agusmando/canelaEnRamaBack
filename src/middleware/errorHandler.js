@@ -1,6 +1,6 @@
 const { BaseResponse } = require("../utils/responseFormat");
 
-const errorHandler = (req, res, next, err) => {
+const errorHandler = (err, req, res, next) => {
   if (err.statusCode && err.message) {
     res
       .status(err.statusCode)

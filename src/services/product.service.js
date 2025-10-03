@@ -15,16 +15,21 @@ const getAllProductsService = async (value, currentPage, amountPerPage) => {
       contains: value,
     },
   };
-  const [totalElements, products] = await Promise.all([
-    prisma.product.count({
-      where,
-    }),
-    prisma.product.findMany({
-      where,
-      skip: (currentPage - 1) * amountPerPage,
-      take: amountPerPage,
-    }),
-  ]);
+  try {
+    const [totalElements, products] = await Promise.all([
+      prisma.product.count({
+        where,
+      }),
+      prisma.product.findMany({
+        where,
+        skip: (currentPage - 1) * amountPerPage,
+        take: amountPerPage,
+      }),
+    ]);
+  } catch (error) {
+    console.error("Error fetching products:", error);
+    throw new AppError(ErrorsEnum.SERVER_ERROR);
+  }
   if (totalElements === 0) {
     throw new AppError(ErrorsEnum.NOT_FOUND);
   }
@@ -38,6 +43,31 @@ const getAllProductsService = async (value, currentPage, amountPerPage) => {
   );
 };
 
+const createProduct = async (productData) => {
+  try {
+    const newProduct = await prisma.product.create({
+      data: productData,
+    });
+    return new BaseResponse(201, "Producto creado con éxito", newProduct);
+  } catch (error) {
+    console.error("Error creating product:", error);
+    throw new AppError(ErrorsEnum.SERVER_ERROR);
+  }
+};
+
+const deleteProductService = async (productId) => {
+  try {
+    await prisma.product.delete({
+      where: { id: productId },
+    });
+    return new BaseResponse(204, "Producto eliminado con éxito", null);
+  } catch (error) {
+    throw new AppError(ErrorsEnum.NOT_FOUND);
+  }
+};
+
 module.exports = {
   getAllProductsService,
+  createProduct,
+  deleteProductService,
 };

@@ -2,12 +2,13 @@ const {
   baseResponse,
   paginatedResponse,
 } = require("../utils/responseFormat.js");
-const { getAllProductsService } = require("../services/product.service.js");
+const productService = require("../services/product.service.js");
 
 const getAllProducts = async (req, res, next) => {
   try {
     const { value = "", currentPage = 1, amountPerPage = 10 } = req.query;
-    const response = await getAllProductsService(
+    console.log(req.query);
+    const response = await productService.getAllProductsService(
       value,
       Number(currentPage),
       Number(amountPerPage)
@@ -18,6 +19,26 @@ const getAllProducts = async (req, res, next) => {
   }
 };
 
+const createProduct = async (req, res, next) => {
+  try {
+    const productData = req.body;
+    const response = await productService.createProduct(productData);
+    res.status(response.statusCode).json({ ...response });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const deleteProduct = async (req, res, next) => {
+  try {
+    const productId = req.params.id;
+    const response = await productService.deleteProductService(productId);
+    res.status(204).json({ ...reponse });
+  } catch (error) {}
+};
+
 module.exports = {
   getAllProducts,
+  createProduct,
+  deleteProduct,
 };

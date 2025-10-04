@@ -1,7 +1,7 @@
 class BaseResponse {
-  constructor(message = "", statusCode = 200, response = {}) {
-    this.message = message;
+  constructor(statusCode = 200, message = "", response = {}) {
     this.statusCode = statusCode;
+    this.message = message;
     this.response = response;
   }
 }
@@ -15,7 +15,7 @@ class PaginatedResponse extends BaseResponse {
     cantidadPorPagina,
     totalElementos
   ) {
-    super(message, statusCode, {
+    super(statusCode, message, {
       data,
       paginado: {
         pagina,

@@ -29,16 +29,29 @@ const createProduct = async (req, res, next) => {
   }
 };
 
+const getOneProduct = async (req, res, next) => {
+  try {
+    const productId = req.params.id;
+    const response = await productService.getOneProductService(productId);
+    res.status(response.statusCode).json({ ...response });
+  } catch (error) {
+    next(error);
+  }
+};
+
 const deleteProduct = async (req, res, next) => {
   try {
     const productId = req.params.id;
     const response = await productService.deleteProductService(productId);
-    res.status(204).json({ ...reponse });
-  } catch (error) {}
+    res.status(204).json({ ...response });
+  } catch (error) {
+    next(error);
+  }
 };
 
 module.exports = {
   getAllProducts,
   createProduct,
   deleteProduct,
+  getOneProduct,
 };

@@ -7,7 +7,9 @@ const {
 const ErrorsEnum = require("../errors/ErrorsEnum");
 const AppError = require("../errors/AppError");
 
-const prisma = new PrismaClient();
+const prisma = new PrismaClient({
+  log: ["query", "info", "warn", "error"],
+});
 
 const getAllProductsService = async (value, currentPage, amountPerPage) => {
   const where = {
@@ -15,8 +17,9 @@ const getAllProductsService = async (value, currentPage, amountPerPage) => {
       contains: value,
     },
   };
+  let totalElements, products;
   try {
-    const [totalElements, products] = await Promise.all([
+    [totalElements, products] = await Promise.all([
       prisma.product.count({
         where,
       }),
@@ -28,9 +31,9 @@ const getAllProductsService = async (value, currentPage, amountPerPage) => {
     ]);
   } catch (error) {
     console.error("Error fetching products:", error);
-    throw new AppError(ErrorsEnum.SERVER_ERROR);
+    throw new AppError(error || ErrorsEnum.SERVER_ERROR);
   }
-  if (totalElements === 0) {
+  if (totalElements === 0 || products.length === 0) {
     throw new AppError(ErrorsEnum.NOT_FOUND);
   }
   return new PaginatedResponse(
@@ -55,10 +58,26 @@ const createProduct = async (productData) => {
   }
 };
 
+const getOneProductService = async (productId) => {
+  let product;
+  try {
+    product = await prisma.product.findFirst({
+      where: { id: Number(productId) },
+    });
+  } catch (error) {
+    console.error("Error fetching products:", error);
+    throw new AppError(error || ErrorsEnum.SERVER_ERROR);
+  }
+  if (!product) {
+    throw new AppError(ErrorsEnum.NOT_FOUND);
+  }
+  return new BaseResponse(200, "Producto obtenido con éxito", product);
+};
+
 const deleteProductService = async (productId) => {
   try {
     await prisma.product.delete({
-      where: { id: productId },
+      where: { id: Number(productId) },
     });
     return new BaseResponse(204, "Producto eliminado con éxito", null);
   } catch (error) {
@@ -70,4 +89,5 @@ module.exports = {
   getAllProductsService,
   createProduct,
   deleteProductService,
+  getOneProductService,
 };

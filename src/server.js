@@ -50,7 +50,7 @@ getProducts("u", 1, 2);
 
 */
 
-const app = require("./app");
+import app from "./app.js";
 require("dotenv").config();
 
 const PORT = process.env.PORT || 8080;

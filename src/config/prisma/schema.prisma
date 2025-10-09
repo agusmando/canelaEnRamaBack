@@ -28,6 +28,7 @@ model Product {
   Tags        Tag[]
   tagsId      Int?
   OrderDetail OrderDetail[]
+  active      Boolean       @default(true)
 }
 
 model Order {

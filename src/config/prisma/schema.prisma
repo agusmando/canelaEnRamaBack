@@ -18,15 +18,14 @@ model Product {
   name        String
   description String?
   price       Float
-  Category    Category?     @relation(fields: [categoryId], references: [id])
-  categoryId  Int?
+  Category    Category     @relation(fields: [categoryId], references: [id])
+  categoryId  Int
   // Review      Review[]
   Inventory   Inventory[]
-  Supplier    Supplier?     @relation(fields: [supplierId], references: [id])
-  supplierId  Int?
+  Supplier    Supplier     @relation(fields: [supplierId], references: [id])
+  supplierId  Int
   // CartItem    CartItem[]
   Tags        Tag[]
-  tagsId      Int?
   OrderDetail OrderDetail[]
   active      Boolean       @default(true)
 }
@@ -63,13 +62,16 @@ model OrderDetail {
 model Category {
   id       Int       @id @default(autoincrement())
   name     String    @unique
+  description String?
   products Product[]
+  active   Boolean   @default(true)
 }
 
 model Tag {
   id      Int       @id @default(autoincrement())
   name    String    @unique
   Product Product[]
+  active  Boolean   @default(true)
 }
 
 // model Review {
@@ -99,8 +101,10 @@ model Supplier {
   id        Int       @id @default(autoincrement())
   name      String
   contact   String?
+  description String?
   createdAt DateTime  @default(now())
   products  Product[]
+  active    Boolean   @default(true)
 }
 
 // model Shipment {

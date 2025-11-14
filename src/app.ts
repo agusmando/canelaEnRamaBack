@@ -4,8 +4,8 @@ import rutas from "./routes/index.route.ts";
 import { errorHandler } from "./middleware/errorHandler.ts";
 
 const app = express();
-
 app.use(express.json());
+
 app.use(
   cors({
     origin: "http://localhost:3000",

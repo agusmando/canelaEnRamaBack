@@ -11,25 +11,21 @@ export class BaseResponse<T> {
 }
 
 export class PaginatedResponse<T> extends BaseResponse<T> {
-  data: T[] = [];
-  pagina: number = 1;
-  cantidadPorPagina: number = 10;
-  totalElementos: number = 0;
 
   constructor(
     statusCode: number,
     message: string,
-    data: T[],
+    content: T[],
     pagina: number,
     cantidadPorPagina: number,
     totalElementos: number
   ) {
     super(statusCode, message, {
-      data,
-      paginado: {
-        pagina,
-        cantidadPorPagina,
-        totalElementos,
+      content,
+      pagination: {
+        pagina: pagina || 1,
+        cantidadPorPagina: cantidadPorPagina || 10,
+        totalElementos: totalElementos || content.length,
       },
     });
   }

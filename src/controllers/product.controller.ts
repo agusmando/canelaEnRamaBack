@@ -4,12 +4,13 @@ const productService = new ProductService();
 
 const getAllProducts = async (req: any, res: any, next: any) => {
   try {
-    const { value = "", currentPage = 1, amountPerPage = 10 } = req.query;
+    const { value = "", currentPage = 1, amountPerPage = 10, detalle } = req.query;
     console.log(req.query);
-    const response = await productService.getAllProducts(
+    const response = await productService.getPaginatedProducts(
       value,
       Number(currentPage),
-      Number(amountPerPage)
+      Number(amountPerPage),
+      detalle
     );
     res.status(response.statusCode).json({ ...response });
   } catch (error) {

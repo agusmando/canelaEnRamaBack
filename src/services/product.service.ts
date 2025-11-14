@@ -1,30 +1,36 @@
-import { BaseResponse, PaginatedResponse } from "../utils/responseFormat";
+import { BaseResponse, PaginatedResponse } from "../utils/responseFormat.ts";
 
 import { PrismaClient } from "@prisma/client";
-import { ErrorsEnum } from "../errors/ErrorsEnum";
-import { AppError } from "../errors/AppError";
+import { ErrorsEnum } from "../errors/ErrorsEnum.ts";
+import { AppError } from "../errors/AppError.ts";
 
 export class ProductService {
+  private prisma: PrismaClient;
   constructor(
-    private prisma: any = new PrismaClient({
+  ) {
+    this.prisma = new PrismaClient({
       log: ["query", "info", "warn", "error"],
-    })
-  ) {}
-
-  getAllProducts: (
-    value: string,
+    });
+  }
+  
+  getPaginatedProducts: (
+    multipleReqParams: { searchCriteria: string, searchValue: string}[],
     currentPage: number,
-    amountPerPage: number
+    amountPerPage: number,
+    detalle: boolean
   ) => Promise<PaginatedResponse<any>> = async (
     value: string,
     currentPage: number,
-    amountPerPage: number
+    amountPerPage: number,
+    detalle: boolean = false
   ) => {
     const where = {
       name: {
         contains: value,
       },
-    };
+    }, 
+    skip = (currentPage - 1) * amountPerPage,
+    take = amountPerPage;
     let totalElements, products;
     try {
       [totalElements, products] = await Promise.all([
@@ -33,8 +39,18 @@ export class ProductService {
         }),
         this.prisma.product.findMany({
           where,
-          skip: (currentPage - 1) * amountPerPage,
-          take: amountPerPage,
+          skip,
+          take,
+          select: !detalle ? undefined : {
+            id: true,
+            name: true,
+            description: true,
+            price: true,
+            active: true,
+            Category: true,
+            Supplier: true,
+            Tags:  true,
+          },
         }),
       ]);
     } catch (error) {
@@ -59,7 +75,12 @@ export class ProductService {
   ) => {
     try {
       const newProduct = await this.prisma.product.create({
-        data: productData,
+        data: {
+          ...productData,
+          Tags: {
+            connect: productData.Tags.map((tag: any) => ({id: tag.id })),
+          }
+        }
       });
       return new BaseResponse(201, "Producto creado con éxito", newProduct);
     } catch (error) {
@@ -92,7 +113,7 @@ export class ProductService {
     try {
       await this.prisma.product.update({
         where: { id: Number(productId) },
-        data: { active: false },
+        data: ({ active: false } as any),
       });
       return new BaseResponse(200, "Producto dado de baja correctamente", {});
     } catch (error) {
@@ -105,7 +126,7 @@ export class ProductService {
     try {
       await this.prisma.product.update({
         where: { id: Number(productId) },
-        data: { active: false },
+        data: ({ active: true } as any),
       });
       return new BaseResponse(200, "Producto activado correctamente", {});
     } catch (error) {

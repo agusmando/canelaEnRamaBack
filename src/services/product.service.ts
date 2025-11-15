@@ -1,11 +1,13 @@
 import { BaseResponse, PaginatedResponse } from "../utils/responseFormat.ts";
-
 import { PrismaClient } from "@prisma/client";
 import { ErrorsEnum } from "../errors/ErrorsEnum.ts";
 import { AppError } from "../errors/AppError.ts";
+import { prismaQueryBuilder } from './../utils/prismaQueryBuilder.ts';
+import { productQueryMapping } from '../mappings/product.mapping.ts';
 
 export class ProductService {
   private prisma: PrismaClient;
+  //private searchCriteriaHandler: SearchCriteriaHandler;
   constructor(
   ) {
     this.prisma = new PrismaClient({
@@ -14,23 +16,20 @@ export class ProductService {
   }
   
   getPaginatedProducts: (
-    multipleReqParams: { searchCriteria: string, searchValue: string}[],
+    receivedDto: any[],
     currentPage: number,
     amountPerPage: number,
     detalle: boolean
   ) => Promise<PaginatedResponse<any>> = async (
-    value: string,
+    receivedDto: any[],
     currentPage: number,
     amountPerPage: number,
     detalle: boolean = false
   ) => {
-    const where = {
-      name: {
-        contains: value,
-      },
-    }, 
-    skip = (currentPage - 1) * amountPerPage,
-    take = amountPerPage;
+    const where = prismaQueryBuilder(receivedDto, productQueryMapping); 
+    const skip = (currentPage - 1) * amountPerPage
+    const take = amountPerPage;
+    console.log("Where clause:", where)
     let totalElements, products;
     try {
       [totalElements, products] = await Promise.all([
@@ -53,6 +52,7 @@ export class ProductService {
           },
         }),
       ]);
+      console.log("Total elements:", totalElements, products);
     } catch (error) {
       console.error("Error fetching products:", error);
       throw new AppError(ErrorsEnum.SERVER_ERROR);

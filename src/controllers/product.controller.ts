@@ -3,11 +3,10 @@ import { ProductService } from "../services/product.service.ts";
 const productService = new ProductService();
 
 const getAllProducts = async (req: any, res: any, next: any) => {
+  const { currentPage = 1, amountPerPage = 10, detalle } = req.query;
   try {
-    const { value = "", currentPage = 1, amountPerPage = 10, detalle } = req.query;
-    console.log(req.query);
     const response = await productService.getPaginatedProducts(
-      value,
+      req.query,
       Number(currentPage),
       Number(amountPerPage),
       detalle

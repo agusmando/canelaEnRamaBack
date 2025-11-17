@@ -27,6 +27,35 @@ const createProduct = async (req: any, res: any, next: any) => {
   }
 };
 
+const updateProduct = async (req: any, res: any, next: any) => {
+  try {
+    const productId: number = req.params.id;
+    const response = await productService.updateProduct(productId, req.body);
+    res.status(response.statusCode).json({ ...response });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const addProductTags = async (req: any, res: any, next: any) => {
+  try {
+    const productId: number = req.params.id;
+    const response = await productService.addProductTags(productId, req.body);
+    res.status(response.statusCode).json({ ...response });
+  } catch (error) {
+    next(error);
+  }
+};
+const removeProductTags = async (req: any, res: any, next: any) => {
+  try {
+    const productId: number = req.params.id;
+    const response = await productService.removeProductTags(productId, req.body);
+    res.status(response.statusCode).json({ ...response });
+  } catch (error) {
+    next(error);
+  }
+};
+
 const getOneProduct = async (req: any, res: any, next: any) => {
   try {
     const productId = req.params.id;
@@ -37,7 +66,7 @@ const getOneProduct = async (req: any, res: any, next: any) => {
   }
 };
 
-const deleteProduct = async (req: any, res: any, next: any) => {
+const deactivateProduct = async (req: any, res: any, next: any) => {
   try {
     const productId: number = req.params.id;
     const response = await productService.deactivateProduct(productId);
@@ -59,7 +88,10 @@ const activateProduct = async (req: any, res: any, next: any) => {
 export {
   getAllProducts,
   createProduct,
+  updateProduct,
   getOneProduct,
-  deleteProduct,
+  deactivateProduct,
   activateProduct,
+  addProductTags,
+  removeProductTags,
 };

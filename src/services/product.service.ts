@@ -1,9 +1,14 @@
+import { CreateProductDto } from './../dto/products/create-product.dto.ts';
+import { GetProductsDto } from './../dto/products/get-products.dto.ts';
+import { ProductDto } from '../dto/products/product.dto.ts';
 import { BaseResponse, PaginatedResponse } from "../utils/responseFormat.ts";
 import { PrismaClient } from "@prisma/client";
 import { ErrorsEnum } from "../errors/ErrorsEnum.ts";
 import { AppError } from "../errors/AppError.ts";
 import { prismaQueryBuilder } from './../utils/prismaQueryBuilder.ts';
 import { productQueryMapping } from '../mappings/product.mapping.ts';
+import { UpdateProductDto } from '../dto/products/update-product.dto.ts';
+import { UpdateProductTagDto } from '../dto/products/update-product-tag.dto.ts';
 
 export class ProductService {
   private prisma: PrismaClient;
@@ -16,12 +21,12 @@ export class ProductService {
   }
   
   getPaginatedProducts: (
-    receivedDto: any[],
+    receivedDto: GetProductsDto[],
     currentPage: number,
     amountPerPage: number,
     detalle: boolean
-  ) => Promise<PaginatedResponse<any>> = async (
-    receivedDto: any[],
+  ) => Promise<PaginatedResponse<ProductDto>> = async (  
+    receivedDto: GetProductsDto[],
     currentPage: number,
     amountPerPage: number,
     detalle: boolean = false
@@ -30,7 +35,7 @@ export class ProductService {
     const skip = (currentPage - 1) * amountPerPage
     const take = amountPerPage;
     console.log("Where clause:", where)
-    let totalElements, products;
+    let totalElements, products ;
     try {
       [totalElements, products] = await Promise.all([
         this.prisma.product.count({
@@ -63,22 +68,22 @@ export class ProductService {
     return new PaginatedResponse(
       200,
       "Productos obtenidos con éxito",
-      products,
+      products as ProductDto[],
       currentPage,
       amountPerPage,
       totalElements
     );
   };
 
-  createProduct: (productData: any) => Promise<BaseResponse<any>> = async (
-    productData: any
+  createProduct: (productData: CreateProductDto) => Promise<BaseResponse<ProductDto>> = async (
+    productData: CreateProductDto
   ) => {
     try {
       const newProduct = await this.prisma.product.create({
         data: {
           ...productData,
           Tags: {
-            connect: productData.Tags.map((tag: any) => ({id: tag.id })),
+            connect: productData.Tags?.map((tag: any) => ({id: tag.id })),
           }
         }
       });
@@ -89,7 +94,7 @@ export class ProductService {
     }
   };
 
-  getOneProduct: (productId: number) => Promise<BaseResponse<any>> = async (
+  getOneProduct: (productId: number) => Promise<BaseResponse<ProductDto>> = async (
     productId: number
   ) => {
     let product;
@@ -107,7 +112,96 @@ export class ProductService {
     return new BaseResponse(200, "Producto obtenido con éxito", product);
   };
 
-  deactivateProduct: (productId: number) => Promise<BaseResponse<any>> = async (
+  updateProduct: (productId: number, productData: UpdateProductDto) => Promise<BaseResponse<ProductDto>> = async (
+    productId: number, 
+    productData: UpdateProductDto
+  ) => {
+    try {
+      const updatedProduct = await this.prisma.product.update({
+        where: { id: Number(productId) },
+        data: ({ 
+          ...productData,
+          Tags: {
+            connect: productData.tags?.map((tag: any) => ({id: tag.id })),
+          }
+        } as any),
+        select: {
+          id: true,
+          name: true,
+          description: true,
+          price: true,
+          active: true,
+          Tags: true,
+          Category: true,
+          Supplier: true  
+        }
+      });
+      return new BaseResponse(200, "Producto editado correctamente", updatedProduct);
+    } catch (error) {
+      throw new AppError(ErrorsEnum.NOT_FOUND);
+    }
+  };
+
+  addProductTags: (productId: number, tagData: UpdateProductTagDto) => Promise<BaseResponse<ProductDto>> = async (
+    productId: number, 
+    tagData: UpdateProductTagDto
+  ) => {
+    try {
+      console.log(tagData);
+      const updatedProduct = await this.prisma.product.update({
+        where: { id: Number(productId) },
+        data: ({
+          Tags: {
+            connect: tagData.tagsId.map((tagId: any) => ({ id: tagId.id })),
+          }
+        } as any),
+        select: {
+          id: true,
+          name: true,
+          description: true,
+          price: true,
+          active: true,
+          Tags: true,
+          Category: true,
+          Supplier: true  
+        }
+      });
+      return new BaseResponse(200, "Producto editado correctamente", updatedProduct);
+    } catch (error) {
+      throw new AppError(ErrorsEnum.NOT_FOUND);
+    }
+  };
+  
+  removeProductTags: (productId: number, tagData: UpdateProductTagDto) => Promise<BaseResponse<ProductDto>> = async (
+    productId: number, 
+    tagData: UpdateProductTagDto
+  ) => {
+    try {
+      const updatedProduct = await this.prisma.product.update({
+        where: { id: Number(productId) },
+        data: ({ 
+          Tags: {
+            disconnect: tagData.tagsId.map((tag: any) => ({id: tag.id })),
+          }
+        } as any),
+        select: {
+          id: true,
+          name: true,
+          description: true,
+          price: true,
+          active: true,
+          Tags: true,
+          Category: true,
+          Supplier: true  
+        }
+      });
+      return new BaseResponse(200, "Producto editado correctamente", updatedProduct);
+    } catch (error) {
+      throw new AppError(ErrorsEnum.NOT_FOUND);
+    }
+  };
+
+  deactivateProduct: (productId: number) => Promise<BaseResponse<{}>> = async (
     productId: number
   ) => {
     try {
@@ -120,7 +214,8 @@ export class ProductService {
       throw new AppError(ErrorsEnum.NOT_FOUND);
     }
   };
-  activateProduct: (productId: number) => Promise<BaseResponse<any>> = async (
+  
+  activateProduct: (productId: number) => Promise<BaseResponse<{}>> = async (
     productId: number
   ) => {
     try {

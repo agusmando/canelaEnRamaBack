@@ -11,13 +11,14 @@ export class GenericControllerImpl<T, U, V> implements GenericControllerInterfac
       this.service = new GenericServiceImpl(controllerName);
   }
   async findAll(req: any, res: any, next: any) {
-    const { currentPage = 1, amountPerPage = 10, detalle } = req.query;
+    const { currentPage = 1, amountPerPage = 10, paginate = false, detalle = false } = req.query;
     try {
-      const response = await this.service.getPaginatedElements(
+      const response = await this.service.getListedElements(
       req.query as any,
+      paginate as boolean,
       Number(currentPage),
       Number(amountPerPage),
-        detalle as any
+        detalle as boolean
       );
       res.status(response.statusCode).json({ ...response });
     } catch (error) {

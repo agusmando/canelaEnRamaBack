@@ -1,7 +1,7 @@
 import { PrismaClient } from "@prisma/client";
 import { prismaQueryBuilder } from "../utils/prismaQueryBuilder.ts";
 import { prismaCreateEntityBuilder } from "../utils/prismaCreateEntityBuilder.ts";
-import { BaseResponse } from "../utils/responseFormat.ts";
+import { BaseResponse, PaginatedResponse } from "../utils/responseFormat.ts";
 import type GenericServiceInterface from "./generic-service.interface.ts";
 import { AppError } from "../errors/AppError.ts";
 import { ErrorsEnum } from "../errors/ErrorsEnum.ts";
@@ -18,7 +18,7 @@ export class GenericServiceImpl<T, U, V> implements GenericServiceInterface<T, U
   constructor(controllerName: string) {
     this.controllerName = controllerName;
     this.prismaName = controllerName.toLowerCase();
-    this.mappingPromise = mappingSelector(controllerName);
+    this.mappingPromise = mappingSelector(controllerName) as any;
     this.prisma = new PrismaClient({
       log: ["query", "info", "warn", "error"],
     });
@@ -36,42 +36,54 @@ export class GenericServiceImpl<T, U, V> implements GenericServiceInterface<T, U
     return this.model;
   }
 
-  async getPaginatedElements(
+  async getListedElements(
     receivedDto: T[],
+    paginate: boolean = false,
     currentPage: number = 1,
     amountPerPage: number = 10,
     detalle: boolean = false
-  ): Promise<BaseResponse<T[]>> {
+  ): Promise<BaseResponse<T[]> | PaginatedResponse<T[]>> {
     //Recibe las reglas de mapeo para construir el query
     const mapping = this.mappingPromise
       ? await this.mappingPromise.search
       : undefined;
     const where = prismaQueryBuilder(receivedDto, mapping);
-
+    
     let totalElements, entityList;
     try {
       const model = await this.ensureModel("search");
+      let query: {where: any, select?: any, take?: number, skip?: number} = { where: { ...where } };
       let select: Record<string, boolean> = {};
+      let pagination = {}
 
       //Permite armar el select dinámicamente según si se solicita el detalle
       if (detalle && mapping) {
+        let amount = 0;
         Object.keys(mapping).forEach((key: string) => {
           const field = mapping[key]?.field;
           if (field) {
+            amount ++;
             select[field] = true;
           }
         });
+        if (amount > 0) {
+            query = { ...query, select: {...select} };
+        }
       }
 
+      if (paginate) {
+        pagination = {
+            take: Number(amountPerPage),
+            skip: (Number(currentPage) - 1) * Number(amountPerPage),
+        }
+        query = { ...query, ...pagination };
+      }
+
+      console.log('query', query,);
       //Busca los elementos con paginación
       [totalElements, entityList] = await Promise.all([
         model.count({ where }),
-        model.findMany({
-          where,
-          take: Number(amountPerPage),
-          skip: (Number(currentPage) - 1) * Number(amountPerPage),
-          select,
-        }),
+        model.findMany(query),
       ]);
     } catch (error) {
       console.error("Error fetching entities:", error);
@@ -80,11 +92,22 @@ export class GenericServiceImpl<T, U, V> implements GenericServiceInterface<T, U
     if (totalElements === 0 || entityList.length === 0) {
       throw new AppError(ErrorsEnum.NOT_FOUND);
     }
-    return new BaseResponse(
-      200,
-      "Entidades obtenidas con éxito",
-      entityList as T[]
-    );
+    if (paginate) {
+        return new PaginatedResponse<T[]>(
+            200,
+            "Entidades obtenidas con éxito",
+            entityList,
+            currentPage,
+            amountPerPage,
+            totalElements
+        )
+    } else {
+        return new BaseResponse<T[]>(
+            200,
+            "Entidades obtenidas con éxito",
+            entityList
+        );
+    }
   }
   async findOne(id: number): Promise<BaseResponse<T>> {
     let entity;

@@ -2,8 +2,9 @@ import { BaseResponse } from "../utils/responseFormat.ts";
 
 
 export default interface GenericServiceInterface<T, U, V> {
-    getPaginatedElements(
+    getListedElements(
         receivedDto: T[],
+        paginate: boolean,
         currentPage: number,
         amountPerPage: number,
         detalle: boolean): Promise<BaseResponse<T[]>>;

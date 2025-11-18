@@ -8,8 +8,8 @@ export const prismaQueryBuilder = (receivedDto: any, mappingRules: any) => {
         if (value === undefined || value === null || value === '') continue;
         
         const config = mappingRules[key];
-        if (!config) continue; // campo no permitido
-
+        if (!config || !config.type) continue; // campo no permitido
+   
         console.log('test', key, value, config)
 
         if (config.type === 'string') {

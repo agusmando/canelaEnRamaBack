@@ -1,97 +1,35 @@
+import { CreateProductDto } from "../dto/products/create-product.dto.ts";
+import { ProductDto } from "../dto/products/product.dto.ts";
+import { UpdateProductDto } from "../dto/products/update-product.dto.ts";
 import { ProductService } from "../services/product.service.ts";
+import { GenericControllerImpl } from "./generic-controller-impl.controller.ts";
 
 const productService = new ProductService();
 
-const getAllProducts = async (req: any, res: any, next: any) => {
-  const { currentPage = 1, amountPerPage = 10, detalle } = req.query;
-  try {
-    const response = await productService.getPaginatedProducts(
-      req.query,
-      Number(currentPage),
-      Number(amountPerPage),
-      detalle
-    );
-    res.status(response.statusCode).json({ ...response });
-  } catch (error) {
-    next(error);
+export class ProductController extends GenericControllerImpl<ProductDto, CreateProductDto, UpdateProductDto> {
+  constructor() {
+    super("product");
   }
-};
 
-const createProduct = async (req: any, res: any, next: any) => {
-  try {
-    const productData = req.body;
-    const response = await productService.createProduct(productData);
-    res.status(response.statusCode).json({ ...response });
-  } catch (error) {
-    next(error);
-  }
-};
+  async addProductTags(req: any, res: any, next: any) {
+    try {
+      const productId: number = req.params.id;
+      const response = await productService.addProductTags(productId, req.body);
+      res.status(response.statusCode).json({ ...response });
+    } catch (error) {
+      next(error);
+    }
+  };
 
-const updateProduct = async (req: any, res: any, next: any) => {
-  try {
-    const productId: number = req.params.id;
-    const response = await productService.updateProduct(productId, req.body);
-    res.status(response.statusCode).json({ ...response });
-  } catch (error) {
-    next(error);
-  }
-};
+  async removeProductTags(req: any, res: any, next: any) {
+    try {
+      const productId: number = req.params.id;
+      const response = await productService.removeProductTags(productId, req.body);
+      res.status(response.statusCode).json({ ...response });
+    } catch (error) {
+      next(error);
+    }
+  };
 
-const addProductTags = async (req: any, res: any, next: any) => {
-  try {
-    const productId: number = req.params.id;
-    const response = await productService.addProductTags(productId, req.body);
-    res.status(response.statusCode).json({ ...response });
-  } catch (error) {
-    next(error);
-  }
-};
-const removeProductTags = async (req: any, res: any, next: any) => {
-  try {
-    const productId: number = req.params.id;
-    const response = await productService.removeProductTags(productId, req.body);
-    res.status(response.statusCode).json({ ...response });
-  } catch (error) {
-    next(error);
-  }
-};
 
-const getOneProduct = async (req: any, res: any, next: any) => {
-  try {
-    const productId = req.params.id;
-    const response = await productService.getOneProduct(productId);
-    res.status(response.statusCode).json({ ...response });
-  } catch (error) {
-    next(error);
-  }
-};
-
-const deactivateProduct = async (req: any, res: any, next: any) => {
-  try {
-    const productId: number = req.params.id;
-    const response = await productService.deactivateProduct(productId);
-    res.status(response.statusCode).json({ ...response });
-  } catch (error) {
-    next(error);
-  }
-};
-const activateProduct = async (req: any, res: any, next: any) => {
-  try {
-    const productId: number = req.params.id;
-    const response = await productService.activateProduct(productId);
-    res.status(response.statusCode).json({ ...response });
-  } catch (error) {
-    next(error);
-  }
-};
-
-export {
-  getAllProducts,
-  createProduct,
-  updateProduct,
-  getOneProduct,
-  deactivateProduct,
-  activateProduct,
-  addProductTags,
-  removeProductTags,
-};
+}

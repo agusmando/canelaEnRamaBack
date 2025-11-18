@@ -1,13 +1,10 @@
-import express from "express";
-const router = express.Router();
-import {
-  getAllTags,
-  createTag,
-  updateTag,
-  getOneTag,
-} from "../controllers/tag.controller.ts";
+// import express from "express";
+// import { TagController } from "../controllers/tag.controller.ts";
+// const router = express.Router();
 
-router.route("/").get(getAllTags).post(createTag);
-router.route("/:id").get(getOneTag).put(updateTag)
+// const tagsController = new TagController()
 
-export default router;
+// router.route("/").get(tagsController.findAll).post(tagsController.create);
+// router.route("/:id").get(tagsController.findOne).put(tagsController.update)
+
+// export default router;

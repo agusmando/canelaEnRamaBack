@@ -2,7 +2,7 @@ import { CreateProductDto } from "../dto/products/create-product.dto.ts";
 import { ProductDto } from "../dto/products/product.dto.ts";
 import { UpdateProductDto } from "../dto/products/update-product.dto.ts";
 import { ProductService } from "../services/product.service.ts";
-import { GenericControllerImpl } from "./generic-controller-impl.controller.ts";
+import { GenericControllerImpl } from "./generic-impl.controller.ts";
 
 const productService = new ProductService();
 

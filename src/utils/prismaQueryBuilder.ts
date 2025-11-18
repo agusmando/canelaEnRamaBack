@@ -26,6 +26,15 @@ export const prismaQueryBuilder = (receivedDto: any, mappingRules: any) => {
             };
         }
 
+        if (config.type === 'numberRange') {
+            if (config.operation === 'gte') {
+                where[config.field] = { ...where[config.field], gte: Number(value) };
+            }
+            if (config.operation === 'lte') {
+                where[config.field] = { ...where[config.field], lte: Number(value) };
+            }
+        }
+
         // ARRAY DE STRINGS
         if (config.type === "stringArray") {
             where[config.field] = {};

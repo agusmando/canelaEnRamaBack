@@ -7,7 +7,7 @@ import { ErrorsEnum } from "../errors/ErrorsEnum.ts";
 import { AppError } from "../errors/AppError.ts";
 import { UpdateProductDto } from '../dto/products/update-product.dto.ts';
 import { UpdateProductTagDto } from '../dto/products/update-product-tag.dto.ts';
-import { GenericServiceImpl } from './generic-service.service.ts';
+import { GenericServiceImpl } from './generic-impl.service.ts';
 
 export class ProductService extends GenericServiceImpl<ProductDto, CreateProductDto, UpdateProductDto> {
   protected prisma: PrismaClient;

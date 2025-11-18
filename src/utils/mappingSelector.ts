@@ -12,8 +12,10 @@ export default function mappingSelector(entity: string) {
                 search: import('../mappings/tags/tag-search.mapping.ts').then(module => module.tagSearchQueryMapping),
                 // create: import('../mappings/products/products-create.mapping.ts').then(module => module.productCreateMapping)
             }
-        // case 'category':
-        //     return import('../mappings/category.mapping.ts').then(module => module.categoryQueryMapping);
+        case 'category':
+            return {
+                search: import('../mappings/category/category-search.mappings.ts').then(module => module.categorySearchQueryMapping),
+            }
     }
 
     // throw new Error(`No mapping found for entity: ${entity}`);

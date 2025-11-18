@@ -1,4 +1,4 @@
-import { GenericServiceImpl } from "../services/generic-service.service.ts";
+import { GenericServiceImpl } from "../services/generic-impl.service.ts";
 import type GenericControllerInterface from "./generic-controller.interface.ts";
 
 export class GenericControllerImpl<T, U, V> implements GenericControllerInterface {

@@ -32,23 +32,22 @@ model Product {
 }
 
 model Order {
-  id          Int           @id @default(autoincrement())
-  productId   Int
-  quantity    Int
+  id          Int       @id @default(autoincrement())
+  createdAt   DateTime  @default(now())
   totalPrice  Float
-  createdAt   DateTime      @default(now())
-  orderDetail OrderDetail[]
-  // Shipment    Shipment[]
+  details     OrderDetail[]
 }
-
 model OrderDetail {
-  id        Int     @id @default(autoincrement())
-  productId Int
-  Product   Product @relation(fields: [productId], references: [id])
-  Order     Order?  @relation(fields: [orderId], references: [id])
-  orderId   Int?
-}
+  id         Int      @id @default(autoincrement())
+  orderId    Int
+  productId  Int
+  quantity   Int
+  unitPrice  Float
+  subtotal   Float
 
+  Order      Order    @relation(fields: [orderId], references: [id])
+  Product    Product  @relation(fields: [productId], references: [id])
+}
 // model User {
 //   id        Int      @id @default(autoincrement())
 //   email     String   @unique

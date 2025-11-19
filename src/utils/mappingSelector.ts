@@ -16,6 +16,10 @@ export default function mappingSelector(entity: string) {
             return {
                 search: import('../mappings/category/category-search.mappings.ts').then(module => module.categorySearchQueryMapping),
             }
+        case 'supplier':
+            return {
+                search: import('../mappings/suppliers/suppliers-search.mapping.ts').then(module => module.supplierSearchQueryMapping),
+            }
     }
 
     // throw new Error(`No mapping found for entity: ${entity}`);

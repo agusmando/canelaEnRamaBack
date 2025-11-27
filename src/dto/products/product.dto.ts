@@ -1,4 +1,5 @@
 import { CategoryDto } from "../category/category.dto.ts";
+import { InventoryDto } from "../inventory/inventory.dto.ts";
 import { SupplierDto } from "../supplier/supplier.dto.ts";
 import { TagDto } from "../tags/tag.dto.ts";
 
@@ -12,6 +13,7 @@ export class ProductDto {
     category?: CategoryDto;
     categoryId?: number;
     tags?: (TagDto | {  id: number })[];
+    inventory?: InventoryDto[];
 
     constructor(
         name: string, 
@@ -22,7 +24,8 @@ export class ProductDto {
         supplierId: number, 
         category: CategoryDto, 
         categoryId: number, 
-        tags?: (TagDto | {id: number})[]
+        tags?: (TagDto | {id: number})[],
+        inventory: InventoryDto[] = []
     ) {
         this.name = name;
         this.description = description;
@@ -33,5 +36,6 @@ export class ProductDto {
         this.category = category;
         this.categoryId = categoryId;
         this.tags = tags;
+        this.inventory = inventory;
     }
 }

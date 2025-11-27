@@ -1,53 +1,55 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+// ./src/config/prisma/schema.prisma
 
 generator client {
   provider = "prisma-client-js"
+  // Si tienes previewFeatures raros, quítalos por ahora
 }
 
 datasource db {
   provider  = "postgresql"
-  url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
+  url       = env("DATABASE_URL") // Puerto 6543 (Pooler)
+  directUrl = env("DIRECT_URL")   // Puerto 5432 (Directo)
 }
 
 model Product {
-  id          Int           @id @default(autoincrement())
-  name        String
-  description String?
-  price       Float
-  Category    Category     @relation(fields: [categoryId], references: [id])
-  categoryId  Int
+  id           Int     @id @default(autoincrement())
+  name         String
+  description  String?
+  price        Float
+  active       Boolean @default(true)
+  currentStock Int     @default(0)
+
+  Category   Category @relation(fields: [categoryId], references: [id])
+  categoryId Int
   // Review      Review[]
-  Inventory   Inventory[]
-  Supplier    Supplier     @relation(fields: [supplierId], references: [id])
+
+  Supplier    Supplier        @relation(fields: [supplierId], references: [id])
   supplierId  Int
+  movements   StockMovement[]
   // CartItem    CartItem[]
   Tags        Tag[]
   OrderDetail OrderDetail[]
-  active      Boolean       @default(true)
 }
 
 model Order {
-  id          Int       @id @default(autoincrement())
-  createdAt   DateTime  @default(now())
-  totalPrice  Float
-  details     OrderDetail[]
+  id         Int           @id @default(autoincrement())
+  createdAt  DateTime      @default(now())
+  totalPrice Float
+  details    OrderDetail[]
 }
-model OrderDetail {
-  id         Int      @id @default(autoincrement())
-  orderId    Int
-  productId  Int
-  quantity   Int
-  unitPrice  Float
-  subtotal   Float
 
-  Order      Order    @relation(fields: [orderId], references: [id])
-  Product    Product  @relation(fields: [productId], references: [id])
+model OrderDetail {
+  id        Int   @id @default(autoincrement())
+  orderId   Int
+  productId Int
+  quantity  Int
+  unitPrice Float
+  subtotal  Float
+
+  Order   Order   @relation(fields: [orderId], references: [id])
+  Product Product @relation(fields: [productId], references: [id])
 }
+
 // model User {
 //   id        Int      @id @default(autoincrement())
 //   email     String   @unique
@@ -60,11 +62,11 @@ model OrderDetail {
 // }
 
 model Category {
-  id       Int       @id @default(autoincrement())
-  name     String    @unique
+  id          Int       @id @default(autoincrement())
+  name        String    @unique
   description String?
-  products Product[]
-  active   Boolean   @default(true)
+  products    Product[]
+  active      Boolean   @default(true)
 }
 
 model Tag {
@@ -87,24 +89,33 @@ model Tag {
 //   user    User    @relation(fields: [userId], references: [id])
 // }
 
-model Inventory {
-  id        Int      @id @default(autoincrement())
+model StockMovement {
+  id        Int          @id @default(autoincrement())
   productId Int
+  // Cantidad que se movió (ej: +10 o -5)
   quantity  Int
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  // Útil para saber por qué cambió (Venta, Reabastecimiento, Merma, Devolución)
+  type      MovementType
+  createdAt DateTime     @default(now())
+  product   Product      @relation(fields: [productId], references: [id])
+}
 
-  product Product @relation(fields: [productId], references: [id])
+// Enum para categorizar los movimientos
+enum MovementType {
+  IN // Entrada de proveedor
+  OUT // Venta
+  ADJUSTMENT // Corrección de inventario
+  RETURN // Devolución de cliente
 }
 
 model Supplier {
-  id        Int       @id @default(autoincrement())
-  name      String
-  contact   String?
+  id          Int       @id @default(autoincrement())
+  name        String
+  contact     String?
   description String?
-  createdAt DateTime  @default(now())
-  products  Product[]
-  active    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  products    Product[]
+  active      Boolean   @default(true)
 }
 
 // model Shipment {

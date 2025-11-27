@@ -7,4 +7,5 @@ export const productSearchQueryMapping = {
     category: {field: 'Category', type: 'object', childField: 'name'},
     tags: {field: 'Tags', type: 'relationArray', childField: 'name'},
     supplier: {field: 'Supplier', type: 'object', childField: 'name'},
+    inventory: {field: 'Inventory', type: 'relationArray', childField: 'quantity'},
 }

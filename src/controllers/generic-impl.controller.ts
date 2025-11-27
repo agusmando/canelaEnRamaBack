@@ -27,8 +27,8 @@ export class GenericControllerImpl<T, U, V> implements GenericControllerInterfac
   }
   async findOne(req: any, res: any, next: any) {
     try {
-      const productId = req.params.id;
-      const response = await this.service.findOne(Number(productId));
+      const objectId = req.params.id;
+      const response = await this.service.findOne(Number(objectId));
       res.status(response.statusCode).json({ ...response });
     } catch (error) {
       next(error);
@@ -36,8 +36,8 @@ export class GenericControllerImpl<T, U, V> implements GenericControllerInterfac
   };
   async create(req: any, res: any, next: any) {
     try {
-      const productData = req.body;
-      const response = await this.service.create(productData);
+      const data = req.body;
+      const response = await this.service.create(data);
       res.status(response.statusCode).json({ ...response });
     } catch (error) {
       next(error);
@@ -45,8 +45,8 @@ export class GenericControllerImpl<T, U, V> implements GenericControllerInterfac
   };
   async update(req: any, res: any, next: any) {
     try {
-      const productId = req.params.id;
-      const response = await this.service.update(Number(productId), req.body);
+      const objectId = req.params.id;
+      const response = await this.service.update(Number(objectId), req.body);
       res.status(response.statusCode).json({ ...response });
     } catch (error) {
       next(error);
@@ -54,8 +54,8 @@ export class GenericControllerImpl<T, U, V> implements GenericControllerInterfac
   };
   async deactivate(req: any, res: any, next: any) {
     try {
-      const productId = req.params.id;
-      const response = await this.service.deactivate(Number(productId));
+      const objectId = req.params.id;
+      const response = await this.service.deactivate(Number(objectId));
       res.status(response.statusCode).json({ ...response });
     } catch (error) {
       next(error);
@@ -64,8 +64,8 @@ export class GenericControllerImpl<T, U, V> implements GenericControllerInterfac
 
   async activate(req: any, res: any, next: any) {
     try {
-      const productId = req.params.id;
-      const response = await this.service.activate(Number(productId));
+      const objectId = req.params.id;
+      const response = await this.service.activate(Number(objectId));
       res.status(response.statusCode).json({ ...response });
     } catch (error) {
       next(error);

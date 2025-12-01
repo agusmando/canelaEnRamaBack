@@ -1,12 +1,13 @@
 export class CreateInventoryDto {
     // productId: number;
     quantity: number;
+    type: string;
 
     constructor(
-        // productId: number,
-        quantity: number 
+        quantity: number,
+        type: string
     ) {
-        // this.productId = productId;
         this.quantity = quantity;
+        this.type = type;
     }
 }

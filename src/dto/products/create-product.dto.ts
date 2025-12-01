@@ -8,15 +8,17 @@ export class CreateProductDto {
     supplierId: number;
     categoryId: number;
     Tags?: {id: number}[];
-    Inventory: CreateInventoryDto[];
+    currentStock: number; 
+    movements: CreateInventoryDto[];
 
-    constructor(name: string, description: string, price: number, categoryId: number, supplierId: number, Tags?: {id: number}[], Inventory: CreateInventoryDto[] = []) {
+    constructor(name: string, description: string, price: number, categoryId: number, supplierId: number, currentStock: number, Tags?: {id: number}[], movements: CreateInventoryDto[] = []) {
         this.name = name;
         this.description = description;
         this.price = price;
         this.categoryId = categoryId;
         this.supplierId = supplierId;
         this.Tags = Tags;
-        this.Inventory = Inventory;
+        this.currentStock = currentStock;
+        this.movements = movements;
     }
 }

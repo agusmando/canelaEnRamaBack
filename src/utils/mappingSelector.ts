@@ -5,7 +5,8 @@ export default function mappingSelector(entity: string) {
         case 'product':
             return {
                 search: import('../mappings/products/product-search.mapping.ts').then(module => module.productSearchQueryMapping),
-                create: import('../mappings/products/products-create.mapping.ts').then(module => module.productCreateMapping)
+                create: import('../mappings/products/products-create.mapping.ts').then(module => module.productCreateMapping),
+                update: import('../mappings/products/product-update.mapping.ts').then(module => module.productUpdateMapping)
             }
         case 'tag':
             return {

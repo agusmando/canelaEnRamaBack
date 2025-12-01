@@ -1,16 +1,20 @@
-import { PrismaClient } from "@prisma/client";
+// import { PrismaClient } from "@prisma/client";
+import Prisma from "@prisma/client";
 import { prismaQueryBuilder } from "../utils/prismaQueryBuilder.ts";
 import { prismaCreateEntityBuilder } from "../utils/prismaCreateEntityBuilder.ts";
+import { prismaUpdateEntityBuilder } from "../utils/prismaUpdateEntityBuilder.ts";
 import { BaseResponse, PaginatedResponse } from "../utils/responseFormat.ts";
 import type GenericServiceInterface from "./generic-service.interface.ts";
 import { AppError } from "../errors/AppError.ts";
 import { ErrorsEnum } from "../errors/ErrorsEnum.ts";
 import mappingSelector from "../utils/mappingSelector.ts";
 
+const { PrismaClient } = Prisma;
+
 export class GenericServiceImpl<T, U, V> implements GenericServiceInterface<T, U, V> {
-  protected prisma: PrismaClient;
+  protected prisma;
   private mappingPromise:
-    | { search: Promise<any>; create: Promise<any> }
+    | { search: Promise<any>; create: Promise<any>; update: Promise<any> }
     | undefined;
   private prismaName: string;
   protected controllerName: string;
@@ -24,7 +28,7 @@ export class GenericServiceImpl<T, U, V> implements GenericServiceInterface<T, U
     });
   }
 
-  private async ensureModel(type: "search" | "create" = "search") {
+  private async ensureModel(type: "search" | "create" | "update" = "search") {
     if (this.model) return this.model;
     const mapping = this.mappingPromise
       ? await this.mappingPromise[type]
@@ -161,13 +165,15 @@ export class GenericServiceImpl<T, U, V> implements GenericServiceInterface<T, U
   async update(id: number, data: V): Promise<BaseResponse<T>> {
     try {
         const mapping = this.mappingPromise
-            ? await this.mappingPromise.create
+            ? await this.mappingPromise.update
             : undefined;
-        const model = await this.ensureModel("create");
+        const model = await this.ensureModel("update");
 
+        const updateData = prismaUpdateEntityBuilder(data, mapping);
+        console.log('updateData', updateData);
         const updatedProduct = await model.update({
             where: { id: Number(id) },
-            data,
+            data: updateData,
         });
         return new BaseResponse(
             200,

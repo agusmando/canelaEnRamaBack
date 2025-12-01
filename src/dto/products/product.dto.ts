@@ -13,7 +13,7 @@ export class ProductDto {
     category?: CategoryDto;
     categoryId?: number;
     tags?: (TagDto | {  id: number })[];
-    inventory?: InventoryDto[];
+    currentStock: string;
 
     constructor(
         name: string, 
@@ -24,8 +24,8 @@ export class ProductDto {
         supplierId: number, 
         category: CategoryDto, 
         categoryId: number, 
+        currentStock: string,
         tags?: (TagDto | {id: number})[],
-        inventory: InventoryDto[] = []
     ) {
         this.name = name;
         this.description = description;
@@ -36,6 +36,6 @@ export class ProductDto {
         this.category = category;
         this.categoryId = categoryId;
         this.tags = tags;
-        this.inventory = inventory;
+        this.currentStock = currentStock;
     }
 }

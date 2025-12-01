@@ -6,14 +6,18 @@ export class UpdateProductDto {
     active: boolean;
     category: string;
     tags: TagDto[];
-    quantity: number;
+    movementType: string;
+    currentStock?: number;
+    stockIncrement?: number;
 
-    constructor(name: string, description: string, active: boolean, category: string, tags: TagDto[], quantity: number) {
+    constructor(name: string, description: string, active: boolean, category: string, tags: TagDto[], movementType: string,currentStock?: number,  stockIncrement?: number) {
         this.name = name;
         this.description = description;
         this.active = active;
         this.category = category;
         this.tags = tags;
-        this.quantity = quantity;
+        this.currentStock = currentStock;
+        this.movementType = movementType;
+        this.stockIncrement = stockIncrement
     }
 }

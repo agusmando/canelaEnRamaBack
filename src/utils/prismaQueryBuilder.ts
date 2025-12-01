@@ -15,6 +15,10 @@ export const prismaQueryBuilder = (receivedDto: any, mappingRules: any) => {
         if (config.type === 'string') {
             where[config.field] = { contains: value, mode: 'insensitive' };  
         }
+        
+        if (config.type === 'number') {
+            where[config.field] = Number(value);
+        }
 
         if (config.type === 'boolean') {
             where[config.field] = value === 'true' || value === true;

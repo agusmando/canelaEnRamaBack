@@ -10,7 +10,7 @@ export const productSearchQueryMapping = {
   active: { field: "active", type: "boolean" },
   category: { field: "Category", type: "object", childField: "name" },
   tags: { field: "Tags", type: "relationArray", childField: "name" },
-  supplier: { field: "Supplier", type: "object", childField: "name" },
+  brand: { field: "Brand", type: "object", childField: "name" },
   currentStock: { field: "currentStock", type: "number" },
   minStock: { field: "currentStock", operation: "gte", type: "numberRange" },
   maxStock: { field: "currentStock", operation: "lte", type: "numberRange" },

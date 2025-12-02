@@ -1,7 +1,7 @@
 export class UpdateProductTagDto {
-    tagsId: {id: number}[]
+  tagsId: { id: number }[];
 
-    constructor( tagsId: {id: number}[] ) {
-        this.tagsId = tagsId
-    }
+  constructor(tagsId: { id: number }[]) {
+    this.tagsId = tagsId;
+  }
 }

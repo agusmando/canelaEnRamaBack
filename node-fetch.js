@@ -87,7 +87,6 @@ async function main() {
     // ==========================
     // 5) PRODUCT
     // ==========================
-    console.log(catFrutosSecos, catHarinas);
     const prodMani = await create("product", {
       name: "Maní tostado",
       description: "Maní natural sin sal",
@@ -116,11 +115,14 @@ async function main() {
     // 6) RELACIONES: Supplier ↔ Brands
     // ==========================
     await update(`supplier/${suppIndias.response.id}/brands`, {
-      brandIds: [brandNature.response.id, brandLaCosecha.response.id],
+      brandsId: [
+        { id: brandNature.response.id },
+        { id: brandLaCosecha.response.id },
+      ],
     });
 
     await update(`supplier/${suppAgroSanJuan.response.id}/brands`, {
-      brandIds: [brandLaCosecha.response.id],
+      brandsId: [{ id: brandLaCosecha.response.id }],
     });
 
     // ==========================

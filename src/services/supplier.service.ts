@@ -30,7 +30,6 @@ export class SupplierService extends GenericServiceImpl<
     brandData: UpdateSupplierBrandDto
   ) => {
     try {
-      console.log(brandData);
       const updatedSupplier = await this.prisma.supplier.update({
         where: { id: Number(supplierId) },
         data: {

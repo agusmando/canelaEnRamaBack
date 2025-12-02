@@ -18,6 +18,7 @@ model Product {
   price        Float
   active       Boolean @default(true)
   currentStock Int     @default(0)
+  measure      String
 
   Category   Category @relation(fields: [categoryId], references: [id])
   categoryId Int

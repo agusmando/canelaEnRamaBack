@@ -1,5 +1,5 @@
 import { CategoryDto } from "../category/category.dto.ts";
-import { InventoryDto } from "../inventory/inventory.dto.ts";
+import { MovementDto } from "../movement/movement.dto.ts";
 import { SupplierDto } from "../supplier/supplier.dto.ts";
 import { TagDto } from "../tags/tag.dto.ts";
 

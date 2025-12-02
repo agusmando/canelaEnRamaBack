@@ -1,4 +1,4 @@
-export class InventoryDto {
+export class MovementDto {
     id: number;
     productId: number;
     quantity: number;

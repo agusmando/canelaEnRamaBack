@@ -1,4 +1,4 @@
-export class CreateInventoryDto {
+export class CreateMovementDto {
     // productId: number;
     quantity: number;
     type: string;

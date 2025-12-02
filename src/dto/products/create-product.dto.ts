@@ -1,4 +1,4 @@
-import { CreateInventoryDto } from "../inventory/create-inventory.dto.ts";
+import { CreateMovementDto } from "../movement/create-movement.dto.ts";
 
 export class CreateProductDto {
     name: string;
@@ -9,9 +9,9 @@ export class CreateProductDto {
     categoryId: number;
     Tags?: {id: number}[];
     currentStock: number; 
-    movements: CreateInventoryDto[];
+    movements: CreateMovementDto[];
 
-    constructor(name: string, description: string, price: number, categoryId: number, supplierId: number, currentStock: number, Tags?: {id: number}[], movements: CreateInventoryDto[] = []) {
+    constructor(name: string, description: string, price: number, categoryId: number, supplierId: number, currentStock: number, Tags?: {id: number}[], movements: CreateMovementDto[] = []) {
         this.name = name;
         this.description = description;
         this.price = price;

@@ -59,6 +59,7 @@ model Brand {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  active    Boolean  @default(true)
 }
 
 model Order {
@@ -100,10 +101,10 @@ model Category {
 }
 
 model Tag {
-  id      Int       @id @default(autoincrement())
-  name    String    @unique
-  Product Product[]
-  active  Boolean   @default(true)
+  id       Int       @id @default(autoincrement())
+  name     String    @unique
+  products Product[]
+  active   Boolean   @default(true)
 }
 
 // model Review {

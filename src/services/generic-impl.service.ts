@@ -40,7 +40,6 @@ export class GenericServiceImpl<T, U, V>
     const mapping = this.mappingPromise
       ? await this.mappingPromise[type]
       : undefined;
-    console.log(mapping, this.prismaName);
     const modelName = mapping?.modelName || this.prismaName;
     const m = (this.prisma as any)[modelName];
     if (!m) throw new AppError(ErrorsEnum.SERVER_ERROR);

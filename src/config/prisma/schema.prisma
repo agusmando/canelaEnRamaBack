@@ -28,8 +28,9 @@ model Product {
   categoryId Int
   // Review      Review[]
 
-  Supplier    Supplier        @relation(fields: [supplierId], references: [id])
-  supplierId  Int
+  Brand   Brand @relation(fields: [brandId], references: [id])
+  brandId Int
+
   movements   StockMovement[]
   // CartItem    CartItem[]
   Tags        Tag[]
@@ -45,7 +46,20 @@ enum MeasureType {
   CC // Centímetro cuadrado
 }
 
-// Considerar agregar marca
+model Brand {
+  id          Int     @id @default(autoincrement())
+  name        String
+  description String?
+
+  // Many-to-many: suppliers <-> brands
+  suppliers Supplier[]
+
+  // One-to-many: brand -> products
+  products Product[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
 
 model Order {
   id         Int           @id @default(autoincrement())
@@ -125,13 +139,14 @@ enum MovementType {
 }
 
 model Supplier {
-  id          Int       @id @default(autoincrement())
+  id          Int      @id @default(autoincrement())
   name        String
   contact     String?
   description String?
-  createdAt   DateTime  @default(now())
-  products    Product[]
-  active      Boolean   @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  active      Boolean  @default(true)
+  brands      Brand[]
 }
 
 // model Shipment {

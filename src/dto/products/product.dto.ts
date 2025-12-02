@@ -10,7 +10,7 @@ export class ProductDto {
   price: number;
   profitMargin: number;
   supplier?: SupplierDto;
-  supplierId?: number;
+  brandId?: number;
   category?: CategoryDto;
   categoryId?: number;
   tags?: (TagDto | { id: number })[];
@@ -24,11 +24,11 @@ export class ProductDto {
     price: number,
     profitMargin: number,
     supplier: SupplierDto,
-    supplierId: number,
-    category: CategoryDto,
+    brandId: number,
     categoryId: number,
     currentStock: string,
     finalPrice: number,
+    category?: CategoryDto,
     tags?: (TagDto | { id: number })[]
   ) {
     this.name = name;
@@ -37,7 +37,7 @@ export class ProductDto {
     this.price = price;
     this.profitMargin = profitMargin;
     this.supplier = supplier;
-    this.supplierId = supplierId;
+    this.brandId = brandId;
     this.category = category;
     this.categoryId = categoryId;
     this.tags = tags;

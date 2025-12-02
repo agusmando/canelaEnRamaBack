@@ -16,6 +16,21 @@ export default function mappingSelector(entity: string) {
           "../mappings/products/product-post-procesing.mapping.ts"
         ).then((module) => module.productPostProcessingQueryMapping),
       };
+    case "brand":
+      return {
+        search: import("../mappings/brand/brand-search.mapping.ts").then(
+          (module) => module.brandSearchQueryMapping
+        ),
+        create: import("../mappings/brand/brand-create.mapping.ts").then(
+          (module) => module.brandCreateMapping
+        ),
+        update: import("../mappings/brand/brand-update.mapping.ts").then(
+          (module) => module.brandUpdateMapping
+        ),
+        // post: import(
+        //   "../mappings/brand/brand-post-procesing.mapping.ts"
+        // ).then((module) => module.brandPostProcessingQueryMapping),
+      };
     case "tag":
       return {
         search: import("../mappings/tags/tag-search.mapping.ts").then(
@@ -34,6 +49,12 @@ export default function mappingSelector(entity: string) {
         search: import(
           "../mappings/suppliers/suppliers-search.mapping.ts"
         ).then((module) => module.supplierSearchQueryMapping),
+        create: import("../mappings/suppliers/supplier-create.mapping.ts").then(
+          (module) => module.supplierCreateMapping
+        ),
+        update: import("../mappings/suppliers/supplier-update.mapping.ts").then(
+          (module) => module.supplierUpdateMapping
+        ),
       };
     case "stockMovement":
       return {

@@ -1,12 +1,18 @@
 export class CreateSupplierDto {
-    name: string;
-    contact?: string;
+  name: string;
+  contact?: string;
+  description?: string;
+  brands: { id: number }[];
 
-    constructor(
-        name: string, 
-        contact: string,
-    ) {
-        this.name = name;
-        this.contact = contact;
-    }
+  constructor(
+    name: string,
+    brands: { id: number }[],
+    contact?: string,
+    description?: string
+  ) {
+    this.name = name;
+    this.contact = contact;
+    this.description = description;
+    this.brands = brands;
+  }
 }

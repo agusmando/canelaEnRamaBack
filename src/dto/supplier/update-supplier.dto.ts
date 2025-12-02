@@ -1,17 +1,23 @@
-export class UpdateSupplierDto {
-    name: string;
-    contact?: string;
-    active: boolean;
+import { BrandDto } from "../brand/brand.dto.ts";
 
-    constructor(
-        id: number, 
-        name: string, 
-        contact: string,
-        active: boolean
-        
-    ) {
-        this.name = name;
-        this.contact = contact;
-        this.active = active
-    }
+export class UpdateSupplierDto {
+  name: string;
+  contact?: string;
+  description?: string;
+  active: boolean;
+  brands: BrandDto[];
+
+  constructor(
+    name: string,
+    active: boolean,
+    brands: BrandDto[],
+    contact?: string,
+    description?: string
+  ) {
+    this.name = name;
+    this.contact = contact;
+    this.brands = brands;
+    this.description = description;
+    this.active = active;
+  }
 }

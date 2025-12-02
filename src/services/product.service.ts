@@ -46,7 +46,7 @@ export class ProductService extends GenericServiceImpl<
           active: true,
           Tags: true,
           Category: true,
-          Supplier: true,
+          Brand: true,
         },
       });
       return new BaseResponse(
@@ -82,7 +82,7 @@ export class ProductService extends GenericServiceImpl<
           active: true,
           Tags: true,
           Category: true,
-          Supplier: true,
+          Brand: true,
         },
       });
       return new BaseResponse(

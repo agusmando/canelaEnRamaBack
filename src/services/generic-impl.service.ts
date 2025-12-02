@@ -11,17 +11,24 @@ import mappingSelector from "../utils/mappingSelector.ts";
 
 const { PrismaClient } = Prisma;
 
-export class GenericServiceImpl<T, U, V> implements GenericServiceInterface<T, U, V> {
+export class GenericServiceImpl<T, U, V>
+  implements GenericServiceInterface<T, U, V>
+{
   protected prisma;
   private mappingPromise:
-    | { search: Promise<any>; create: Promise<any>; update: Promise<any> }
+    | {
+        search: Promise<any>;
+        create: Promise<any>;
+        update: Promise<any>;
+        post: Promise<any>;
+      }
     | undefined;
   private prismaName: string;
   protected controllerName: string;
   private model: any | undefined;
   constructor(controllerName: string) {
     this.controllerName = controllerName;
-    this.prismaName = controllerName.toLowerCase();
+    this.prismaName = controllerName;
     this.mappingPromise = mappingSelector(controllerName) as any;
     this.prisma = new PrismaClient({
       log: ["query", "info", "warn", "error"],
@@ -33,6 +40,7 @@ export class GenericServiceImpl<T, U, V> implements GenericServiceInterface<T, U
     const mapping = this.mappingPromise
       ? await this.mappingPromise[type]
       : undefined;
+    console.log(mapping, this.prismaName);
     const modelName = mapping?.modelName || this.prismaName;
     const m = (this.prisma as any)[modelName];
     if (!m) throw new AppError(ErrorsEnum.SERVER_ERROR);
@@ -51,14 +59,19 @@ export class GenericServiceImpl<T, U, V> implements GenericServiceInterface<T, U
     const mapping = this.mappingPromise
       ? await this.mappingPromise.search
       : undefined;
+    const postMapping = this.mappingPromise
+      ? await this.mappingPromise.post
+      : undefined;
     const where = prismaQueryBuilder(receivedDto, mapping);
-    
+
     let totalElements, entityList;
     try {
       const model = await this.ensureModel("search");
-      let query: {where: any, select?: any, take?: number, skip?: number} = { where: { ...where } };
+      let query: { where: any; select?: any; take?: number; skip?: number } = {
+        where: { ...where },
+      };
       let select: Record<string, boolean> = {};
-      let pagination = {}
+      let pagination = {};
 
       //Permite armar el select dinámicamente según si se solicita el detalle
       if (detalle && mapping) {
@@ -66,29 +79,36 @@ export class GenericServiceImpl<T, U, V> implements GenericServiceInterface<T, U
         Object.keys(mapping).forEach((key: string) => {
           const field = mapping[key]?.field;
           if (field) {
-            amount ++;
+            amount++;
             select[field] = true;
           }
         });
         if (amount > 0) {
-            query = { ...query, select: {...select} };
+          query = { ...query, select: { ...select } };
         }
       }
 
       if (paginate) {
         pagination = {
-            take: Number(amountPerPage),
-            skip: (Number(currentPage) - 1) * Number(amountPerPage),
-        }
+          take: Number(amountPerPage),
+          skip: (Number(currentPage) - 1) * Number(amountPerPage),
+        };
         query = { ...query, ...pagination };
       }
 
-      console.log('query', query,);
       //Busca los elementos con paginación
       [totalElements, entityList] = await Promise.all([
         model.count({ where }),
         model.findMany(query),
       ]);
+
+      //Post processing mapping
+      if (postMapping && entityList && entityList.length > 0) {
+        entityList = entityList.map((entity: any) => {
+          const newEntity: any = postMapping(entity);
+          return newEntity;
+        });
+      }
     } catch (error) {
       console.error("Error fetching entities:", error);
       throw new AppError(ErrorsEnum.SERVER_ERROR);
@@ -97,20 +117,20 @@ export class GenericServiceImpl<T, U, V> implements GenericServiceInterface<T, U
       throw new AppError(ErrorsEnum.NOT_FOUND);
     }
     if (paginate) {
-        return new PaginatedResponse<T[]>(
-            200,
-            "Entidades obtenidas con éxito",
-            entityList,
-            currentPage,
-            amountPerPage,
-            totalElements
-        )
+      return new PaginatedResponse<T[]>(
+        200,
+        "Entidades obtenidas con éxito",
+        entityList,
+        currentPage,
+        amountPerPage,
+        totalElements
+      );
     } else {
-        return new BaseResponse<T[]>(
-            200,
-            "Entidades obtenidas con éxito",
-            entityList
-        );
+      return new BaseResponse<T[]>(
+        200,
+        "Entidades obtenidas con éxito",
+        entityList
+      );
     }
   }
   async findOne(id: number): Promise<BaseResponse<T>> {
@@ -119,6 +139,9 @@ export class GenericServiceImpl<T, U, V> implements GenericServiceInterface<T, U
     try {
       const mapping = this.mappingPromise
         ? await this.mappingPromise.search
+        : undefined;
+      const postMapping = this.mappingPromise
+        ? await this.mappingPromise.post
         : undefined;
       const model = await this.ensureModel("search");
       let select: Record<string, boolean> = {};
@@ -135,6 +158,10 @@ export class GenericServiceImpl<T, U, V> implements GenericServiceInterface<T, U
         where: { id: Number(id) },
         select,
       });
+      //Post processing mapping
+      if (postMapping && entity) {
+        entity = postMapping(entity);
+      }
     } catch (error) {
       console.error("Error fetching entity:", error);
       throw new AppError(ErrorsEnum.SERVER_ERROR);
@@ -149,12 +176,20 @@ export class GenericServiceImpl<T, U, V> implements GenericServiceInterface<T, U
       const mapping = this.mappingPromise
         ? await this.mappingPromise.create
         : undefined;
+      const postMapping = this.mappingPromise
+        ? await this.mappingPromise.post
+        : undefined;
       const model = await this.ensureModel("create");
 
       const createData = prismaCreateEntityBuilder(data as any, mapping);
-      const newEntity = await model.create({
+      let newEntity = await model.create({
         data: createData,
       });
+
+      //Post processing mapping
+      if (postMapping && newEntity) {
+        newEntity = postMapping(newEntity);
+      }
 
       return new BaseResponse(201, "Entidad creada con éxito", newEntity);
     } catch (error) {
@@ -164,35 +199,45 @@ export class GenericServiceImpl<T, U, V> implements GenericServiceInterface<T, U
   }
   async update(id: number, data: V): Promise<BaseResponse<T>> {
     try {
-        const mapping = this.mappingPromise
-            ? await this.mappingPromise.update
-            : undefined;
-        const model = await this.ensureModel("update");
+      const mapping = this.mappingPromise
+        ? await this.mappingPromise.update
+        : undefined;
+      const postMapping = this.mappingPromise
+        ? await this.mappingPromise.post
+        : undefined;
+      const model = await this.ensureModel("update");
 
-        const updateData = prismaUpdateEntityBuilder(data, mapping);
-        console.log('updateData', updateData);
-        const updatedProduct = await model.update({
-            where: { id: Number(id) },
-            data: updateData,
-        });
-        return new BaseResponse(
-            200,
-            "Entidad editada correctamente",
-            updatedProduct
-        );
+      const updateData = prismaUpdateEntityBuilder(data, mapping);
+      let updatedProduct = await model.update({
+        where: { id: Number(id) },
+        data: updateData,
+      });
+      //Post processing mapping
+      if (postMapping && updatedProduct) {
+        updatedProduct = postMapping(updatedProduct);
+      }
+
+      return new BaseResponse(
+        200,
+        "Entidad editada correctamente",
+        updatedProduct
+      );
     } catch (error) {
       throw new AppError(ErrorsEnum.NOT_FOUND);
     }
   }
   async deactivate(id: number): Promise<BaseResponse<T>> {
     try {
-        const mapping = this.mappingPromise
-            ? await this.mappingPromise.create
-            : undefined;
-        const model = await this.ensureModel("create");
+      // const mapping = this.mappingPromise
+      //   ? await this.mappingPromise.create
+      //   : undefined;
+      // const postMapping = this.mappingPromise
+      //   ? await this.mappingPromise.post
+      //   : undefined;
+      const model = await this.ensureModel("create");
       await model.update({
         where: { id: Number(id) },
-        data: ({ active: false } as any),
+        data: { active: false } as any,
       });
       return new BaseResponse(200, "Entidad dada de baja correctamente", {});
     } catch (error) {
@@ -201,14 +246,17 @@ export class GenericServiceImpl<T, U, V> implements GenericServiceInterface<T, U
   }
   async activate(id: number): Promise<BaseResponse<T>> {
     try {
-        const mapping = this.mappingPromise
-            ? await this.mappingPromise.create
-            : undefined;
-        const model = await this.ensureModel("create");
-        await model.update({
-            where: { id: Number(id) },
-            data: ({ active: true } as any),
-        });
+      // const mapping = this.mappingPromise
+      //   ? await this.mappingPromise.create
+      //   : undefined;
+      // const postMapping = this.mappingPromise
+      //   ? await this.mappingPromise.post
+      //   : undefined;
+      const model = await this.ensureModel("create");
+      await model.update({
+        where: { id: Number(id) },
+        data: { active: true } as any,
+      });
       return new BaseResponse(200, "Entidad activada correctamente", {});
     } catch (error) {
       throw new AppError(ErrorsEnum.NOT_FOUND);

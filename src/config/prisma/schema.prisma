@@ -8,17 +8,21 @@ generator client {
 datasource db {
   provider  = "postgresql"
   url       = env("DATABASE_URL") // Puerto 6543 (Pooler)
-  directUrl = env("DIRECT_URL")   // Puerto 5432 (Directo)
+  directUrl = env("DIRECT_URL") // Puerto 5432 (Directo)
 }
 
 model Product {
-  id           Int     @id @default(autoincrement())
-  name         String
-  description  String?
-  price        Float
-  active       Boolean @default(true)
-  currentStock Int     @default(0)
-  measure      String
+  id            Int         @id @default(autoincrement())
+  name          String
+  description   String?
+  price         Float
+  active        Boolean     @default(true)
+  currentStock  Int         @default(0)
+  profitMargin  Float       @default(0.45)
+  measure       MeasureType
+  contentAmount Int         @default(0) // Por ejemplo un frasco de 60cc, 150ml, 360g, etc
+  onRequest     Boolean     @default(false) // Si el producto se trae por encargo
+  requestTime   String      @default("") // Fecha estimada de entrega
 
   Category   Category @relation(fields: [categoryId], references: [id])
   categoryId Int
@@ -31,6 +35,17 @@ model Product {
   Tags        Tag[]
   OrderDetail OrderDetail[]
 }
+
+enum MeasureType {
+  KG // Kilogramo
+  U // Unidad
+  L // Litro
+  ML // Mililitro
+  G // Gramo
+  CC // Centímetro cuadrado
+}
+
+// Considerar agregar marca
 
 model Order {
   id         Int           @id @default(autoincrement())

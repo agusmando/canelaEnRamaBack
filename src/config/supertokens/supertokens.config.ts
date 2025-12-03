@@ -6,9 +6,14 @@ import ThirdParty from "supertokens-node/recipe/thirdparty";
 import Dashboard from "supertokens-node/recipe/dashboard"; // Usa el paquete de backend aquí
 import UserRoles from "supertokens-node/recipe/userroles"; // Usa el paquete de backend aquí
 import UserMetadata from "supertokens-node/recipe/usermetadata";
+import Prisma from "@prisma/client";
 
 dotenv.config();
 
+const { PrismaClient } = Prisma;
+const prisma = new PrismaClient({
+  log: ["query", "info", "warn", "error"],
+});
 export const initSupertokens = () =>
   supertokens.init({
     framework: "express",
@@ -32,7 +37,33 @@ export const initSupertokens = () =>
       UserRoles.init(),
       UserMetadata.init(),
       EmailPassword.init(), // initializes signin / sign up features
-      ThirdParty.init(),
+      ThirdParty.init({
+        override: {
+          functions: (orig) => ({
+            ...orig,
+            signInUp: async (input: any) => {
+              const resp = await orig.signInUp(input);
+
+              if (resp.status === "OK") {
+                const { user } = resp;
+                console.log(user, resp);
+                await prisma.user.create({
+                  data: {
+                    supertokensId: user.id,
+                    email: user.emails[0],
+                    avatarUrl:
+                      resp.rawUserInfoFromProvider.fromUserInfoAPI?.picture ||
+                      "",
+                    //falta pedir el nombre cuando uno le da permiso a la creación de cuentas con google
+                  },
+                });
+              }
+
+              return resp;
+            },
+          }),
+        },
+      }),
       Session.init({
         exposeAccessTokenToFrontendInCookieBasedAuth: true,
       }), // initializes session features

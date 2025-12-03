@@ -11,7 +11,13 @@ export const requireRole = (allowedRoles: string[]) => {
   return async (req: any, res: any, next: any) => {
     // Primero aseguramos que verifySession ya corrió y existe la sesión
     if (!req.session) {
-      return new BaseResponse(401, "Unauthorized: No session found", {});
+      const response = new BaseResponse(
+        401,
+        "Unauthorized: No session found",
+        {}
+      );
+
+      return res.status(response.statusCode).json({ ...response });
     }
 
     const userId = req.session.getUserId();
@@ -19,13 +25,16 @@ export const requireRole = (allowedRoles: string[]) => {
 
     // Obtenemos los roles del usuario
     const { roles } = await UserRoles.getRolesForUser(tenantId, userId);
-
-    console.log(roles);
     // Verificamos si el usuario tiene al menos uno de los roles permitidos
-    const hasRole = roles.some((role) => allowedRoles.includes(role));
+    const hasRole = allowedRoles.toString() == roles.toString();
 
     if (!hasRole) {
-      return new BaseResponse(403, "Forbidden: Insufficient permissions", {});
+      const response = new BaseResponse(
+        403,
+        "Forbidden: Insufficient permissions",
+        {}
+      );
+      return res.status(response.statusCode).json({ ...response });
     }
 
     next();

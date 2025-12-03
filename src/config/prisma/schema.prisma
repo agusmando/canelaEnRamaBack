@@ -62,36 +62,6 @@ model Brand {
   active    Boolean  @default(true)
 }
 
-model Order {
-  id         Int           @id @default(autoincrement())
-  createdAt  DateTime      @default(now())
-  totalPrice Float
-  details    OrderDetail[]
-}
-
-model OrderDetail {
-  id        Int   @id @default(autoincrement())
-  orderId   Int
-  productId Int
-  quantity  Int
-  unitPrice Float
-  subtotal  Float
-
-  Order   Order   @relation(fields: [orderId], references: [id])
-  Product Product @relation(fields: [productId], references: [id])
-}
-
-// model User {
-//   id        Int      @id @default(autoincrement())
-//   email     String   @unique
-//   name      String?
-//   password  String
-//   createdAt DateTime @default(now())
-//   updatedAt DateTime @updatedAt
-//   Review    Review[]
-//   cart      cart[]
-// }
-
 model Category {
   id          Int       @id @default(autoincrement())
   name        String    @unique
@@ -106,19 +76,6 @@ model Tag {
   products Product[]
   active   Boolean   @default(true)
 }
-
-// model Review {
-//   id        Int      @id @default(autoincrement())
-//   productId Int
-//   userId    Int
-//   rating    Int
-//   comment   String?
-//   createdAt DateTime @default(now())
-//   updatedAt DateTime @updatedAt
-
-//   product Product @relation(fields: [productId], references: [id])
-//   user    User    @relation(fields: [userId], references: [id])
-// }
 
 model StockMovement {
   id        Int          @id @default(autoincrement())
@@ -149,6 +106,58 @@ model Supplier {
   active      Boolean  @default(true)
   brands      Brand[]
 }
+
+model Order {
+  id         Int           @id @default(autoincrement())
+  createdAt  DateTime      @default(now())
+  totalPrice Float
+  details    OrderDetail[]
+}
+
+model OrderDetail {
+  id        Int   @id @default(autoincrement())
+  orderId   Int
+  productId Int
+  quantity  Int
+  unitPrice Float
+  subtotal  Float
+
+  Order   Order   @relation(fields: [orderId], references: [id])
+  Product Product @relation(fields: [productId], references: [id])
+}
+
+model User {
+  id            Int      @id @default(autoincrement())
+  supertokensId String   @unique // vínculo con SuperTokens
+  email         String?  @unique // opcional, ST ya almacena su email
+  name          String?
+  avatarUrl     String?
+  role          UserRole @default(CONSUMER)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Ejemplo: si después quieres órdenes:
+  // orders        Order[]
+}
+
+enum UserRole {
+  ADMIN
+  EMPLOYEE
+  CONSUMER
+}
+
+// model Review {
+//   id        Int      @id @default(autoincrement())
+//   productId Int
+//   userId    Int
+//   rating    Int
+//   comment   String?
+//   createdAt DateTime @default(now())
+//   updatedAt DateTime @updatedAt
+
+//   product Product @relation(fields: [productId], references: [id])
+//   user    User    @relation(fields: [userId], references: [id])
+// }
 
 // model Shipment {
 //   id        Int       @id @default(autoincrement())

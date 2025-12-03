@@ -1,8 +1,14 @@
 import express from "express";
 import { SupplierController } from "../controllers/supplier.controller.ts";
+import { isAuthenticated, requireRole } from "../middleware/auth.middleware.ts";
 const router = express.Router();
 
 const supplierController = new SupplierController();
+
+const staff = ["Admin", "Employee"];
+
+router.use(isAuthenticated);
+router.use(requireRole(staff));
 
 router
   .route("/")

@@ -1,8 +1,14 @@
 import express from "express";
 import { MovementController } from "../controllers/movement.controller.ts";
+import { isAuthenticated, requireRole } from "../middleware/auth.middleware.ts";
 const router = express.Router();
 
 const movementController = new MovementController();
+
+const staff = ["Admin", "Employee"];
+
+router.use(isAuthenticated);
+router.use(requireRole(staff));
 
 router
   .route("/")

@@ -1,24 +1,51 @@
 import express from "express";
 import { BrandController } from "../controllers/brand.controller.ts";
+import { isAuthenticated, requireRole } from "../middleware/auth.middleware.ts";
 const router = express.Router();
 
 const brandController = new BrandController();
 
+const staff = ["Admin", "Employee"];
+
 router
   .route("/")
   .get(brandController.findAll.bind(brandController))
-  .post(brandController.create.bind(brandController));
+  .post(
+    isAuthenticated,
+    requireRole(staff),
+    brandController.create.bind(brandController)
+  );
 router
   .route("/:id")
   .get(brandController.findOne.bind(brandController))
-  .put(brandController.update.bind(brandController));
+  .put(
+    isAuthenticated,
+    requireRole(staff),
+    brandController.update.bind(brandController)
+  );
 router
   .route("/:id/products")
-  .put(brandController.addBrandProducts.bind(brandController))
-  .delete(brandController.removeBrandProductsTags.bind(brandController));
+  .put(
+    isAuthenticated,
+    requireRole(["Admin"]),
+    brandController.addBrandProducts.bind(brandController)
+  )
+  .delete(
+    isAuthenticated,
+    requireRole(["Admin"]),
+    brandController.removeBrandProductsTags.bind(brandController)
+  );
 router
   .route("/:id/active/")
-  .delete(brandController.deactivate.bind(brandController))
-  .put(brandController.activate.bind(brandController));
+  .delete(
+    isAuthenticated,
+    requireRole(staff),
+    brandController.deactivate.bind(brandController)
+  )
+  .put(
+    isAuthenticated,
+    requireRole(staff),
+    brandController.activate.bind(brandController)
+  );
 
 export default router;

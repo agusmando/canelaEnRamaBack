@@ -36,30 +36,88 @@ export const initSupertokens = () =>
       Dashboard.init(),
       UserRoles.init(),
       UserMetadata.init(),
-      EmailPassword.init(), // initializes signin / sign up features
-      ThirdParty.init({
+      EmailPassword.init({
+        // ... otras configuraciones ...
         override: {
-          functions: (orig) => ({
-            ...orig,
-            signInUp: async (input: any) => {
-              const resp = await orig.signInUp(input);
+          functions: (original) => ({
+            ...original,
+            async signUp(input) {
+              const response = await original.signUp(input);
 
-              if (resp.status === "OK") {
-                const { user } = resp;
-                console.log(user, resp);
-                await prisma.user.create({
-                  data: {
-                    supertokensId: user.id,
-                    email: user.emails[0],
-                    avatarUrl:
-                      resp.rawUserInfoFromProvider.fromUserInfoAPI?.picture ||
-                      "",
-                    //falta pedir el nombre cuando uno le da permiso a la creación de cuentas con google
+              if (response.status === "OK") {
+                const email = response.user.emails[0];
+                const fullName = "";
+                const avatarUrl = "";
+
+                console.log({
+                  response,
+                });
+
+                // Aquí agregas tu lógica para guardar los datos en la base de datos
+                await prisma.user.upsert({
+                  where: { supertokensId: response.user.id },
+                  update: {
+                    email,
+                    name: fullName,
+                    avatarUrl,
+                  },
+                  create: {
+                    supertokensId: response.user.id,
+                    email,
+                    name: fullName,
+                    avatarUrl,
                   },
                 });
               }
 
-              return resp;
+              return response;
+            },
+          }),
+        },
+      }),
+      ThirdParty.init({
+        signInAndUpFeature: {
+          providers: [
+            {
+              config: {
+                thirdPartyId: "google",
+              },
+            },
+          ],
+        },
+        override: {
+          functions: (original) => ({
+            ...original,
+            async signInUp(input) {
+              const response = await original.signInUp(input);
+
+              if (response.status === "OK") {
+                const rawInfo =
+                  response.rawUserInfoFromProvider.fromUserInfoAPI;
+
+                const email = response.user.emails[0];
+                const firstName = rawInfo?.given_name || "";
+                const lastName = rawInfo?.family_name || "";
+                const fullName = firstName + " " + lastName;
+                const avatarUrl = rawInfo?.picture || "";
+
+                await prisma.user.upsert({
+                  where: { supertokensId: response.user.id },
+                  update: {
+                    email,
+                    name: firstName + " " + lastName,
+                    avatarUrl,
+                  },
+                  create: {
+                    supertokensId: response.user.id,
+                    email,
+                    name: fullName,
+                    avatarUrl,
+                  },
+                });
+              }
+
+              return response;
             },
           }),
         },

@@ -1,11 +1,50 @@
 import fetch from "node-fetch";
+import dotenv from "dotenv";
+
+dotenv.config();
 
 const BASE_URL = "http://localhost:8080/api";
+let headers = { "Content-Type": "application/json" };
+
+async function login() {
+  const email = process.env.LOGIN_CREDENTIALS;
+  const password = process.env.LOGIN_PASSWORD;
+  const res = await fetch(`${BASE_URL}/auth/signin`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({
+      formFields: [
+        { id: "email", value: email },
+        { id: "password", value: password },
+      ],
+    }),
+  });
+  // Clone the response if you need to consume the body multiple times
+  const clonedResponse = res.clone();
+
+  // Consume the body as JSON
+  const data = await res.json();
+
+  // If needed, consume the cloned response body as text for logging or error handling
+  const rawText = await clonedResponse.text();
+  if (data.status !== "OK") {
+    const error = await res.text();
+    throw new Error(`Error POST /auth/signin: ${error}`);
+  } else {
+    console.log("🌱 Login exitoso");
+    const accessToken = res.headers.get("st-access-token");
+    headers = {
+      ...headers,
+      Authorization: `Bearer ${accessToken}`,
+    };
+  }
+}
 
 async function create(endpoint, body) {
+  console.log(headers);
   const res = await fetch(`${BASE_URL}/${endpoint}`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers,
     body: JSON.stringify(body),
   });
 
@@ -20,7 +59,7 @@ async function create(endpoint, body) {
 async function update(endpoint, body) {
   const res = await fetch(`${BASE_URL}/${endpoint}`, {
     method: "PUT",
-    headers: { "Content-Type": "application/json" },
+    headers,
     body: JSON.stringify(body),
   });
 
@@ -36,6 +75,7 @@ async function main() {
   try {
     console.log("🌱 Iniciando seed...");
 
+    await login();
     // ==========================
     // 1) TAGS
     // ==========================

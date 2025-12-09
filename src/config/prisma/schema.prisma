@@ -31,11 +31,15 @@ model Product {
   Brand   Brand @relation(fields: [brandId], references: [id])
   brandId Int
 
-  movements   StockMovement[]
+  movements     StockMovement[]
   // CartItem    CartItem[]
-  Tags        Tag[]
-  OrderDetail OrderDetail[]
+  Tags          Tag[]
+  OrderDetail   OrderDetail[]
   // offers      Offer[]
+  // Mixes de los que este producto es componente
+  isComponentOf Dependency[]    @relation("Dependencies")
+  // Componentes de este producto si es un Mix
+  // hasComponents Dependency[]    @relation("Mixes")
 }
 
 enum MeasureType {
@@ -45,6 +49,19 @@ enum MeasureType {
   ML // Mililitro
   G // Gramo
   CC // Centímetro cuadrado
+}
+
+model Dependency {
+  id        Int     @id @default(autoincrement())
+  // mixId     Int
+  productId Int
+  quantity  Float
+  active    Boolean @default(true)
+
+  // El producto que es el Mix/Combo
+  // mixProduct       Product @relation("Mixes", fields: [mixId], references: [id])
+  // El producto que es el Componente
+  componentProduct Product @relation("Dependencies", fields: [productId], references: [id])
 }
 
 // Construir cuando tenga órdenes y carrito listos

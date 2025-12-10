@@ -14,7 +14,6 @@ export class CreateProductDto {
   onRequest?: boolean;
   requestTime?: string;
   contentAmount?: number;
-
   hasComponents?: { productId: number; quantity: number }[];
 
   constructor(

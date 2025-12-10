@@ -98,7 +98,8 @@ export class ProductService extends GenericServiceImpl<
           Tags: true,
           Category: true,
           Brand: true,
-          hasComponents: finalPrice != createData.price,
+          isComponentOf: true,
+          hasComponents: true,
         },
       });
       return new BaseResponse(200, "Producto creado correctamente", product);
@@ -112,22 +113,98 @@ export class ProductService extends GenericServiceImpl<
     data: UpdateProductDto
   ): Promise<BaseResponse<ProductDto>> {
     try {
+      if (data.addComponents && data.addComponents.length > 0) {
+        console.log(data.addComponents);
+        const componentPromises = data.addComponents.map((component: any) => {
+          return this.prisma.$executeRaw`
+            SELECT public.add_component_to_product(${component.productId}::INT, ${id}::INT, ${component.quantity}::INT)
+        `;
+        });
+        await Promise.all(componentPromises);
+        await this.prisma
+          .$executeRaw`SELECT public.recalculate_mix_price(${id}::INT)`;
+      }
+
+      if (data.editComponents && data.editComponents.length > 0) {
+        const componentPromises = data.editComponents.map((component: any) => {
+          return this.prisma.dependency.update({
+            where: {
+              mixId_productId: {
+                mixId: Number(id),
+                productId: Number(component.productId),
+              },
+            },
+            data: {
+              quantity: component.quantity,
+            },
+          });
+        });
+        await Promise.all(componentPromises);
+        await this.prisma
+          .$executeRaw`SELECT public.recalculate_mix_price(${id}::INT)`;
+      }
+
+      if (data.removeComponents && data.removeComponents.length > 0) {
+        const componentPromises = data.removeComponents.map(
+          (component: any) => {
+            return this.prisma.dependency.delete({
+              where: {
+                mixId_productId: {
+                  mixId: Number(id),
+                  productId: Number(component.productId),
+                },
+              },
+            });
+          }
+        );
+        await Promise.all(componentPromises);
+        await this.prisma
+          .$executeRaw`SELECT public.recalculate_mix_price(${id}::INT)`;
+      }
+
       const mapping = productUpdateMapping;
       const postMapping = productPostProcessingQueryMapping;
-
       const updateData = prismaUpdateEntityBuilder(data, mapping);
-      let updatedProduct = await this.prisma.product.update({
-        where: { id: Number(id) },
-        data: updateData,
-      });
+      let updatedProduct;
+      console.log("a ver la data updateada", updateData);
+      if (!updateData || Object.keys(updateData).length === 0) {
+        updatedProduct = await this.prisma.product.findUnique({
+          where: { id: Number(id) },
+          select: {
+            id: true,
+            name: true,
+            description: true,
+            price: true,
+            active: true,
+            Tags: true,
+            Category: true,
+            Brand: true,
+            isComponentOf: true,
+            hasComponents: true,
+          },
+        });
+        return new BaseResponse(
+          200,
+          "Entidad editada correctamente",
+          updatedProduct as any
+        );
+      } else {
+        updatedProduct = await this.prisma.product.update({
+          where: { id: Number(id) },
+          data: updateData,
+        });
+      }
       //Post processing mapping
       if (postMapping && updatedProduct) {
         (updatedProduct as any) = postMapping(updatedProduct as any);
       }
 
-      // ejecuta la query de recalculo de precios de mix
-      await this.prisma
-        .$executeRaw`SELECT public.recalculate_mix_price(${id}::INT)`;
+      console.log(data);
+
+      if (data.price || data.profitMargin) {
+        await this.prisma
+          .$executeRaw`SELECT public.recalculate_all_mixes_from_product(${id}::INT)`;
+      }
 
       return new BaseResponse(
         200,

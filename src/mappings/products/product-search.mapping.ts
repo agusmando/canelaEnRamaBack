@@ -14,6 +14,16 @@ export const productSearchQueryMapping = {
   currentStock: { field: "currentStock", type: "number" },
   minStock: { field: "currentStock", operation: "gte", type: "numberRange" },
   maxStock: { field: "currentStock", operation: "lte", type: "numberRange" },
-  ofuscatedComponentOf: { field: "isComponentOf", type: "relationArray" },
-  ofuscatedHasComponents: { field: "hasComponents", type: "relationArray" },
+  ofuscatedComponentOf: {
+    field: "isComponentOf",
+    type: "relationArray",
+    childField: "productId",
+    expand: ["name", "description", "price", "brand", "Category"], //acá lo que está faltando es el nombre "product" para ayudar a desglosar todo esto
+  },
+  ofuscatedHasComponents: {
+    field: "hasComponents",
+    type: "relationArray",
+    childField: "productId",
+    expand: ["name", "description", "price", "brand", "Category"],
+  },
 };

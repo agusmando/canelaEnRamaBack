@@ -52,7 +52,6 @@ enum MeasureType {
 }
 
 model Dependency {
-  id        Int     @id @default(autoincrement())
   mixId     Int
   productId Int
   quantity  Float
@@ -62,6 +61,8 @@ model Dependency {
   mixProduct       Product @relation("Mixes", fields: [mixId], references: [id])
   // El producto que es el Componente
   componentProduct Product @relation("Dependencies", fields: [productId], references: [id])
+
+  @@id([mixId, productId])
 }
 
 // Construir cuando tenga órdenes y carrito listos

@@ -69,7 +69,7 @@ export class GenericServiceImpl<T, U, V>
       let query: { where: any; select?: any; take?: number; skip?: number } = {
         where: { ...where },
       };
-      let select: Record<string, boolean> = {};
+      let select: Record<string, boolean | Record<string, boolean>> = {};
       let pagination = {};
 
       //Permite armar el select dinámicamente según si se solicita el detalle
@@ -78,8 +78,21 @@ export class GenericServiceImpl<T, U, V>
         Object.keys(mapping).forEach((key: string) => {
           const field = mapping[key]?.field;
           if (field) {
-            amount++;
-            select[field] = true;
+            if (mapping[key]?.expand) {
+              // ensure select[field] is an object before assigning child fields
+              if (typeof select[field] !== "object") {
+                select[field] = {};
+              }
+              mapping[key]?.expand.forEach((childField: string) => {
+                if (childField) {
+                  amount++;
+                  (select[field] as Record<string, boolean>)[childField] = true;
+                }
+              });
+            } else {
+              amount++;
+              select[field] = true;
+            }
           }
         });
         if (amount > 0) {

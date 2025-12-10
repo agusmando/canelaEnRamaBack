@@ -5,6 +5,7 @@ export const productUpdateMapping = {
   name: { field: "name" },
   description: { field: "description" },
   price: { field: "price" },
+  profitMargin: { field: "profitMargin" },
   active: { field: "active" },
 
   // Relaciones simples
@@ -45,6 +46,4 @@ export const productUpdateMapping = {
       },
     }),
   },
-
-  // hasComponents:
 };

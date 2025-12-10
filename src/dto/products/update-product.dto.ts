@@ -8,7 +8,12 @@ export class UpdateProductDto {
   tags: TagDto[];
   movementType: string;
   currentStock?: number;
+  price?: number;
   stockIncrement?: number;
+  profitMargin?: number;
+  addComponents?: { productId: number; quantity: number }[];
+  removeComponents?: { productId: number }[];
+  editComponents?: { productId: number; quantity: number }[];
 
   constructor(
     name: string,
@@ -18,7 +23,12 @@ export class UpdateProductDto {
     tags: TagDto[],
     movementType: string,
     currentStock?: number,
-    stockIncrement?: number
+    price?: number,
+    profitMargin?: number,
+    stockIncrement?: number,
+    addComponents?: { productId: number; quantity: number }[],
+    removeComponents?: { productId: number }[],
+    editComponents?: { productId: number; quantity: number }[]
   ) {
     this.name = name;
     this.description = description;
@@ -27,6 +37,11 @@ export class UpdateProductDto {
     this.tags = tags;
     this.currentStock = currentStock;
     this.movementType = movementType;
+    this.profitMargin = profitMargin;
+    this.price = price;
     this.stockIncrement = stockIncrement;
+    this.addComponents = addComponents;
+    this.removeComponents = removeComponents;
+    this.editComponents = editComponents;
   }
 }

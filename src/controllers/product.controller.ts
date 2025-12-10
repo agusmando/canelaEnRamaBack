@@ -25,6 +25,16 @@ export class ProductController extends GenericControllerImpl<
     }
   }
 
+  async update(req: any, res: any, next: any) {
+    try {
+      const objectId = req.params.id;
+      const response = await productService.update(Number(objectId), req.body);
+      res.status(response.statusCode).json({ ...response });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async addProductTags(req: any, res: any, next: any) {
     try {
       const productId: number = req.params.id;

@@ -39,7 +39,7 @@ model Product {
   // Mixes de los que este producto es componente
   isComponentOf Dependency[]    @relation("Dependencies")
   // Componentes de este producto si es un Mix
-  // hasComponents Dependency[]    @relation("Mixes")
+  hasComponents Dependency[]    @relation("Mixes")
 }
 
 enum MeasureType {
@@ -53,13 +53,13 @@ enum MeasureType {
 
 model Dependency {
   id        Int     @id @default(autoincrement())
-  // mixId     Int
+  mixId     Int
   productId Int
   quantity  Float
   active    Boolean @default(true)
 
   // El producto que es el Mix/Combo
-  // mixProduct       Product @relation("Mixes", fields: [mixId], references: [id])
+  mixProduct       Product @relation("Mixes", fields: [mixId], references: [id])
   // El producto que es el Componente
   componentProduct Product @relation("Dependencies", fields: [productId], references: [id])
 }

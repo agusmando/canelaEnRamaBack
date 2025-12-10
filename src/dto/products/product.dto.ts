@@ -21,7 +21,7 @@ export class ProductDto {
   tags?: (TagDto | { id: number })[];
   currentStock: string;
   finalPrice: number;
-  isComponentOf?: DependencyDto[];
+  hasComponents?: DependencyDto[];
   // hasComponents?: DependencyDto[];
   movements: MovementDto[] = [];
 
@@ -41,7 +41,7 @@ export class ProductDto {
     requestTime?: string,
     category?: CategoryDto,
     tags?: (TagDto | { id: number })[],
-    isComponentOf?: DependencyDto[],
+    hasComponents?: DependencyDto[],
     // hasComponents?: DependencyDto[],
     movements: MovementDto[] = []
   ) {
@@ -60,7 +60,7 @@ export class ProductDto {
     this.contentAmount = contentAmount;
     this.onRequest = onRequest;
     this.requestTime = requestTime;
-    this.isComponentOf = isComponentOf;
+    this.hasComponents = hasComponents;
     // this.hasComponents = hasComponents;
     this.movements = movements;
   }

@@ -14,4 +14,6 @@ export const productSearchQueryMapping = {
   currentStock: { field: "currentStock", type: "number" },
   minStock: { field: "currentStock", operation: "gte", type: "numberRange" },
   maxStock: { field: "currentStock", operation: "lte", type: "numberRange" },
+  ofuscatedComponentOf: { field: "isComponentOf", type: "relationArray" },
+  ofuscatedHasComponents: { field: "hasComponents", type: "relationArray" },
 };

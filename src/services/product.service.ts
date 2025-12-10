@@ -10,6 +10,9 @@ import { GenericServiceImpl } from "./generic-impl.service.ts";
 import { DependencyDto } from "../dto/dependency/dependency.dto.ts";
 import { productCreateMapping } from "../mappings/products/products-create.mapping.ts";
 import { prismaCreateEntityBuilder } from "../utils/prismaCreateEntityBuilder.ts";
+import { productUpdateMapping } from "../mappings/products/product-update.mapping.ts";
+import { productPostProcessingQueryMapping } from "../mappings/products/product-post-procesing.mapping.ts";
+import { prismaUpdateEntityBuilder } from "../utils/prismaUpdateEntityBuilder.ts";
 
 export class ProductService extends GenericServiceImpl<
   ProductDto,
@@ -30,10 +33,10 @@ export class ProductService extends GenericServiceImpl<
   ): Promise<BaseResponse<ProductDto>> {
     try {
       let finalPrice = createData.price || 0;
-      if (createData.isComponentOf) {
-        const duplicateArray = createData.isComponentOf; //id producto y quantity
+      if (createData.hasComponents) {
+        const duplicateArray = createData.hasComponents; //id producto y quantity
         const containingProductIds = duplicateArray.map(
-          (component: any) => component.id
+          (component: any) => component.productId
         );
         const foundProducts = await this.prisma.product.findMany({
           where: {
@@ -47,10 +50,9 @@ export class ProductService extends GenericServiceImpl<
             profitMargin: true,
           },
         });
-        finalPrice = 0;
         foundProducts.forEach((product: any) => {
           const currentDependency = duplicateArray.find(
-            (component: any) => component.id === product.id
+            (component: any) => component.productId === product.id
           );
           if (!currentDependency) return;
           console.log({
@@ -62,7 +64,6 @@ export class ProductService extends GenericServiceImpl<
             (product.price * product.profitMargin + product.price) *
             currentDependency?.quantity;
         });
-        console.log(finalPrice);
       }
       // prepare data ensuring Tags uses Prisma connect syntax
 
@@ -72,13 +73,13 @@ export class ProductService extends GenericServiceImpl<
         ...finalQuery,
         price: finalPrice,
       };
-      if (createData.isComponentOf && createData.isComponentOf.length > 0) {
-        if (createData.isComponentOf.length)
-          data.isComponentOf = {
-            create: createData.isComponentOf.map(
+      if (createData.hasComponents && createData.hasComponents.length > 0) {
+        if (createData.hasComponents.length)
+          data.hasComponents = {
+            create: createData.hasComponents.map(
               (component: any) =>
                 ({
-                  productId: component.id,
+                  productId: component.productId,
                   quantity: component.quantity,
                 } as any)
             ),
@@ -97,12 +98,44 @@ export class ProductService extends GenericServiceImpl<
           Tags: true,
           Category: true,
           Brand: true,
-          isComponentOf: finalPrice != createData.price,
+          hasComponents: finalPrice != createData.price,
         },
       });
       return new BaseResponse(200, "Producto creado correctamente", product);
     } catch (error) {
       throw new AppError(ErrorsEnum.SERVER_ERROR);
+    }
+  }
+
+  async update(
+    id: number,
+    data: UpdateProductDto
+  ): Promise<BaseResponse<ProductDto>> {
+    try {
+      const mapping = productUpdateMapping;
+      const postMapping = productPostProcessingQueryMapping;
+
+      const updateData = prismaUpdateEntityBuilder(data, mapping);
+      let updatedProduct = await this.prisma.product.update({
+        where: { id: Number(id) },
+        data: updateData,
+      });
+      //Post processing mapping
+      if (postMapping && updatedProduct) {
+        (updatedProduct as any) = postMapping(updatedProduct as any);
+      }
+
+      // ejecuta la query de recalculo de precios de mix
+      await this.prisma
+        .$executeRaw`SELECT public.recalculate_mix_price(${id}::INT)`;
+
+      return new BaseResponse(
+        200,
+        "Entidad editada correctamente",
+        updatedProduct
+      );
+    } catch (error) {
+      throw new AppError(ErrorsEnum.NOT_FOUND);
     }
   }
 

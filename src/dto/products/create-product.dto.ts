@@ -15,7 +15,7 @@ export class CreateProductDto {
   requestTime?: string;
   contentAmount?: number;
 
-  isComponentOf?: { id: number; quantity: number }[];
+  hasComponents?: { productId: number; quantity: number }[];
 
   constructor(
     name: string,
@@ -26,7 +26,7 @@ export class CreateProductDto {
     measure: MeasureType,
     price?: number,
     Tags?: { id: number }[],
-    isComponentOf?: { id: number; quantity: number }[],
+    hasComponents?: { productId: number; quantity: number }[],
     contentAmount?: number,
     onRequest?: boolean,
     requestTime?: string
@@ -38,7 +38,7 @@ export class CreateProductDto {
     this.brandId = brandId;
     this.Tags = Tags;
     this.currentStock = currentStock;
-    this.isComponentOf = isComponentOf;
+    this.hasComponents = hasComponents;
     this.measure = measure;
     this.contentAmount = contentAmount;
     this.onRequest = onRequest;

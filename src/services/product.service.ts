@@ -98,8 +98,8 @@ export class ProductService extends GenericServiceImpl<
           Tags: true,
           Category: true,
           Brand: true,
-          isComponentOf: true,
-          hasComponents: true,
+          isComponentOf: { include: { mixProduct: true } },
+          hasComponents: { include: { componentProduct: true } },
         },
       });
       return new BaseResponse(200, "Producto creado correctamente", product);
@@ -179,8 +179,8 @@ export class ProductService extends GenericServiceImpl<
             Tags: true,
             Category: true,
             Brand: true,
-            isComponentOf: true,
-            hasComponents: true,
+            isComponentOf: { include: { mixProduct: true } },
+            hasComponents: { include: { componentProduct: true } },
           },
         });
         return new BaseResponse(
@@ -241,6 +241,8 @@ export class ProductService extends GenericServiceImpl<
           Tags: true,
           Category: true,
           Brand: true,
+          isComponentOf: { include: { mixProduct: true } },
+          hasComponents: { include: { componentProduct: true } },
         },
       });
       return new BaseResponse(
@@ -277,6 +279,8 @@ export class ProductService extends GenericServiceImpl<
           Tags: true,
           Category: true,
           Brand: true,
+          isComponentOf: { include: { mixProduct: true } },
+          hasComponents: { include: { componentProduct: true } },
         },
       });
       return new BaseResponse(

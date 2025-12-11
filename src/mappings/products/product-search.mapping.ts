@@ -18,12 +18,12 @@ export const productSearchQueryMapping = {
     field: "isComponentOf",
     type: "relationArray",
     childField: "productId",
-    expand: ["name", "description", "price", "brand", "Category"], //acá lo que está faltando es el nombre "product" para ayudar a desglosar todo esto
+    expand: ["mixProduct"],
   },
   ofuscatedHasComponents: {
     field: "hasComponents",
     type: "relationArray",
     childField: "productId",
-    expand: ["name", "description", "price", "brand", "Category"],
+    expand: ["componentProduct"],
   },
 };

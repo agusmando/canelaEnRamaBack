@@ -69,7 +69,7 @@ export class GenericServiceImpl<T, U, V>
       let query: { where: any; select?: any; take?: number; skip?: number } = {
         where: { ...where },
       };
-      let select: Record<string, boolean | Record<string, boolean>> = {};
+      let select: Record<string, any> = {};
       let pagination = {};
 
       //Permite armar el select dinámicamente según si se solicita el detalle
@@ -78,17 +78,29 @@ export class GenericServiceImpl<T, U, V>
         Object.keys(mapping).forEach((key: string) => {
           const field = mapping[key]?.field;
           if (field) {
-            if (mapping[key]?.expand) {
+            const expandFields = mapping[key]?.expand;
+            if (expandFields) {
               // ensure select[field] is an object before assigning child fields
               if (typeof select[field] !== "object") {
                 select[field] = {};
               }
-              mapping[key]?.expand.forEach((childField: string) => {
-                if (childField) {
-                  amount++;
-                  (select[field] as Record<string, boolean>)[childField] = true;
-                }
-              });
+              amount++;
+              // support both array and single string for expand
+              if (Array.isArray(expandFields)) {
+                select[field] = { include: {} };
+                expandFields.forEach((childField: string) => {
+                  if (childField) {
+                    (select[field].include as Record<string, boolean>)[
+                      childField
+                    ] = true;
+                  }
+                });
+              } else if (typeof expandFields === "string") {
+                select[field] = { include: { [expandFields]: true } };
+              } else {
+                // fallback: treat as single key
+                select[field] = { include: { [String(expandFields)]: true } };
+              }
             } else {
               amount++;
               select[field] = true;
@@ -156,13 +168,40 @@ export class GenericServiceImpl<T, U, V>
         ? await this.mappingPromise.post
         : undefined;
       const model = await this.ensureModel("search");
-      let select: Record<string, boolean> = {};
+      let select: Record<string, any> = {};
+      let amount = 0;
       //Permite armar el select dinámicamente según si se solicita el detalle
       if (mapping) {
         Object.keys(mapping).forEach((key: string) => {
           const field = mapping[key]?.field;
           if (field) {
-            select[field] = true;
+            const expandFields = mapping[key]?.expand;
+            if (expandFields) {
+              // ensure select[field] is an object before assigning child fields
+              if (typeof select[field] !== "object") {
+                select[field] = {};
+              }
+              amount++;
+              // support both array and single string for expand
+              if (Array.isArray(expandFields)) {
+                select[field] = { include: {} };
+                expandFields.forEach((childField: string) => {
+                  if (childField) {
+                    (select[field].include as Record<string, boolean>)[
+                      childField
+                    ] = true;
+                  }
+                });
+              } else if (typeof expandFields === "string") {
+                select[field] = { include: { [expandFields]: true } };
+              } else {
+                // fallback: treat as single key
+                select[field] = { include: { [String(expandFields)]: true } };
+              }
+            } else {
+              amount++;
+              select[field] = true;
+            }
           }
         });
       }

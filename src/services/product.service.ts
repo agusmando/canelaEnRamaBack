@@ -33,37 +33,17 @@ export class ProductService extends GenericServiceImpl<
   ): Promise<BaseResponse<ProductDto>> {
     try {
       let finalPrice = createData.price || 0;
+      let finalStock = createData.currentStock || 0;
       if (createData.hasComponents) {
-        const duplicateArray = createData.hasComponents; //id producto y quantity
-        const containingProductIds = duplicateArray.map(
-          (component: any) => component.productId
+        if (!["G", "U"].includes(createData.measure)) {
+          throw new AppError(ErrorsEnum.INVALID_MEASURE);
+        }
+        const mixStatus = await this.handleMixCreation(
+          createData.hasComponents,
+          createData.measure
         );
-        const foundProducts = await this.prisma.product.findMany({
-          where: {
-            id: {
-              in: containingProductIds,
-            },
-          },
-          select: {
-            id: true,
-            price: true,
-            profitMargin: true,
-          },
-        });
-        foundProducts.forEach((product: any) => {
-          const currentDependency = duplicateArray.find(
-            (component: any) => component.productId === product.id
-          );
-          if (!currentDependency) return;
-          console.log({
-            price: product.price,
-            profitMargin: product.profitMargin,
-            quantity: currentDependency.quantity,
-          });
-          finalPrice +=
-            (product.price * product.profitMargin + product.price) *
-            currentDependency?.quantity;
-        });
+        finalPrice = mixStatus.finalPrice;
+        finalStock = mixStatus.finalStock;
       }
       // prepare data ensuring Tags uses Prisma connect syntax
 
@@ -72,6 +52,7 @@ export class ProductService extends GenericServiceImpl<
       const data: any = {
         ...finalQuery,
         price: finalPrice,
+        currentStock: finalStock,
       };
       if (createData.hasComponents && createData.hasComponents.length > 0) {
         if (createData.hasComponents.length)
@@ -292,4 +273,76 @@ export class ProductService extends GenericServiceImpl<
       throw new AppError(ErrorsEnum.NOT_FOUND);
     }
   };
+
+  async handleMixCreation(
+    productList: {
+      productId: number;
+      quantity: number;
+    }[],
+    measure: string
+  ) {
+    let finalPrice = 0;
+    let finalStock = 0;
+    const duplicateArray = productList; //id producto y quantity
+    const containingProductIds = duplicateArray.map(
+      (component: any) => component.productId
+    );
+    let foundProducts;
+    try {
+      foundProducts = await this.prisma.product.findMany({
+        where: {
+          id: {
+            in: containingProductIds,
+          },
+        },
+        select: {
+          id: true,
+          price: true,
+          profitMargin: true,
+          measure: true,
+          currentStock: true,
+        },
+      });
+    } catch (error) {
+      throw new AppError(ErrorsEnum.NOT_FOUND);
+    }
+
+    let stock = 0;
+    let stockForUnit: number[] = [];
+    foundProducts.forEach((product: any) => {
+      const currentDependency = duplicateArray.find(
+        (component: any) => component.productId === product.id
+      );
+      if (!currentDependency) {
+        throw new AppError(ErrorsEnum.NOT_FOUND);
+      }
+      if (measure === "G") {
+        if (product.measure !== "G") {
+          throw new AppError(ErrorsEnum.INVALID_MEASURE);
+        }
+        stock += currentDependency?.quantity || 0;
+      }
+      if (measure === "U") {
+        stockForUnit.push(product?.currentStock / product?.quantity || 0);
+      }
+
+      console.log({
+        price: product.price,
+        profitMargin: product.profitMargin,
+        quantity: currentDependency.quantity,
+      });
+      finalPrice +=
+        (product.price * product.profitMargin + product.price) *
+        currentDependency?.quantity;
+    });
+
+    if (measure === "G") {
+      finalStock = stock;
+    }
+    if (measure === "U") {
+      finalStock = Math.min(...(stockForUnit || []));
+    }
+    console.log("finalStock", finalStock);
+    return { finalPrice, finalStock };
+  }
 }

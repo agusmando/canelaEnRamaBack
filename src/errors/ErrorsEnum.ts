@@ -7,4 +7,5 @@ export const ErrorsEnum = {
   FORBIDDEN: { statusCode: 403, message: "Forbidden" },
   CONFLICT: { statusCode: 409, message: "Conflict" },
   UNPROCESSABLE_ENTITY: { statusCode: 422, message: "Unprocessable entity" },
+  INVALID_MEASURE: { statusCode: 400, message: "Invalid measure" },
 };

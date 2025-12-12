@@ -40,7 +40,8 @@ export class ProductService extends GenericServiceImpl<
         }
         const mixStatus = await this.handleMixCreation(
           createData.hasComponents,
-          createData.measure
+          createData.measure,
+          createData.currentStock
         );
         finalPrice = mixStatus.finalPrice;
         finalStock = mixStatus.finalStock;
@@ -279,7 +280,8 @@ export class ProductService extends GenericServiceImpl<
       productId: number;
       quantity: number;
     }[],
-    measure: string
+    measure: string,
+    sugestedStock: number
   ) {
     let finalPrice = 0;
     let finalStock = 0;
@@ -316,12 +318,13 @@ export class ProductService extends GenericServiceImpl<
       if (!currentDependency) {
         throw new AppError(ErrorsEnum.NOT_FOUND);
       }
-      if (measure === "G") {
-        if (product.measure !== "G") {
-          throw new AppError(ErrorsEnum.INVALID_MEASURE);
-        }
-        stock += currentDependency?.quantity || 0;
-      }
+      if ()
+      // if (measure === "G") {
+      //   if (product.measure !== "G") {
+      //     throw new AppError(ErrorsEnum.INVALID_MEASURE);
+      //   }
+      //   stock += currentDependency?.quantity || 0;
+      // }
       if (measure === "U") {
         stockForUnit.push(product?.currentStock / product?.quantity || 0);
       }
@@ -337,7 +340,7 @@ export class ProductService extends GenericServiceImpl<
     });
 
     if (measure === "G") {
-      finalStock = stock;
+      finalStock = sugestedStock;
     }
     if (measure === "U") {
       finalStock = Math.min(...(stockForUnit || []));

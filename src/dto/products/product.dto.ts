@@ -4,64 +4,41 @@ import { DependencyDto } from "../dependency/dependency.dto.ts";
 import { SupplierDto } from "../supplier/supplier.dto.ts";
 import { TagDto } from "../tags/tag.dto.ts";
 import { MovementDto } from "../movement/movement.dto.ts";
+import { ProductVariantDto } from "../product-variant/product-variant.dto.ts";
 
 export class ProductDto {
   name: string;
   description: string;
   active: boolean;
-  price: number;
-  profitMargin: number;
-  brandId?: number;
-  category?: CategoryDto;
-  categoryId?: number;
-  measure: MeasureType;
-  contentAmount?: number;
-  onRequest?: boolean;
-  requestTime?: string;
-  tags?: (TagDto | { id: number })[];
-  currentStock: string;
   finalPrice: number;
-  hasComponents?: DependencyDto[];
-  // hasComponents?: DependencyDto[];
-  movements: MovementDto[] = [];
+  brandId: number;
+  category?: CategoryDto;
+  categoryId: number;
+  measure?: MeasureType;
+  tags?: (TagDto | { id: number })[];
+  variants: ProductVariantDto[] = [];
 
   constructor(
     name: string,
     description: string,
     active: boolean,
-    price: number,
-    profitMargin: number,
     brandId: number,
     categoryId: number,
-    currentStock: string,
     finalPrice: number,
-    measure: MeasureType,
-    contentAmount?: number,
-    onRequest?: boolean,
-    requestTime?: string,
+    variants: ProductVariantDto[],
+    measure?: MeasureType,
     category?: CategoryDto,
-    tags?: (TagDto | { id: number })[],
-    hasComponents?: DependencyDto[],
-    // hasComponents?: DependencyDto[],
-    movements: MovementDto[] = []
+    tags?: (TagDto | { id: number })[]
   ) {
     this.name = name;
     this.description = description;
     this.active = active;
-    this.price = price;
-    this.profitMargin = profitMargin;
     this.brandId = brandId;
     this.category = category;
     this.categoryId = categoryId;
+    this.variants = variants;
     this.tags = tags;
-    this.currentStock = currentStock;
     this.finalPrice = finalPrice;
     this.measure = measure;
-    this.contentAmount = contentAmount;
-    this.onRequest = onRequest;
-    this.requestTime = requestTime;
-    this.hasComponents = hasComponents;
-    // this.hasComponents = hasComponents;
-    this.movements = movements;
   }
 }

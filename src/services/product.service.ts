@@ -318,16 +318,16 @@ export class ProductService extends GenericServiceImpl<
       if (!currentDependency) {
         throw new AppError(ErrorsEnum.NOT_FOUND);
       }
-      if ()
-      // if (measure === "G") {
-      //   if (product.measure !== "G") {
-      //     throw new AppError(ErrorsEnum.INVALID_MEASURE);
-      //   }
-      //   stock += currentDependency?.quantity || 0;
-      // }
-      if (measure === "U") {
-        stockForUnit.push(product?.currentStock / product?.quantity || 0);
-      }
+      if (product.currentStock)
+        if (measure === "U") {
+          // if (measure === "G") {
+          //   if (product.measure !== "G") {
+          //     throw new AppError(ErrorsEnum.INVALID_MEASURE);
+          //   }
+          //   stock += currentDependency?.quantity || 0;
+          // }
+          stockForUnit.push(product?.currentStock / product?.quantity || 0);
+        }
 
       console.log({
         price: product.price,
@@ -339,9 +339,9 @@ export class ProductService extends GenericServiceImpl<
         currentDependency?.quantity;
     });
 
-    if (measure === "G") {
-      finalStock = sugestedStock;
-    }
+    // if (measure === "G") {
+    //   finalStock = sugestedStock;
+    // }
     if (measure === "U") {
       finalStock = Math.min(...(stockForUnit || []));
     }

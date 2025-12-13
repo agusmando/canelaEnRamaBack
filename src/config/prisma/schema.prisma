@@ -12,57 +12,76 @@ datasource db {
 }
 
 model Product {
-  id            Int         @id @default(autoincrement())
-  name          String
-  description   String?
-  price         Float
-  active        Boolean     @default(true)
-  currentStock  Int         @default(0)
-  profitMargin  Float       @default(0.45)
-  measure       MeasureType
-  contentAmount Int         @default(0) // Por ejemplo un frasco de 60cc, 150ml, 360g, etc
-  onRequest     Boolean     @default(false) // Si el producto se trae por encargo
-  requestTime   String      @default("") // Fecha estimada de entrega
+  id          Int     @id @default(autoincrement())
+  name        String
+  description String?
+  active      Boolean @default(true)
 
   Category   Category @relation(fields: [categoryId], references: [id])
   categoryId Int
+  Brand      Brand    @relation(fields: [brandId], references: [id])
+  brandId    Int
+  Tags       Tag[]
+
+  variants ProductVariant[]
+
+  // Medidas (Esto define qué es físicamente)
+  measure       MeasureType @relation(fields: [measureTypeId], references: [id])
+  measureTypeId Int
+  // OrderDetail OrderDetail[]
   // Review      Review[]
-
-  Brand   Brand @relation(fields: [brandId], references: [id])
-  brandId Int
-
-  movements     StockMovement[]
   // CartItem    CartItem[]
-  Tags          Tag[]
-  OrderDetail   OrderDetail[]
   // offers      Offer[]
-  // Mixes de los que este producto es componente
-  isComponentOf Dependency[]    @relation("Dependencies")
-  // Componentes de este producto si es un Mix
-  hasComponents Dependency[]    @relation("Mixes")
+  // orderDetails OrderDetail[]
 }
 
-enum MeasureType {
-  KG // Kilogramo
-  U // Unidad
-  L // Litro
-  ML // Mililitro
-  G // Gramo
-  CC // Centímetro cuadrado
+model ProductVariant {
+  id        Int @id @default(autoincrement())
+  productId Int
+
+  // Atributos
+  name           String      @default("default")
+  price          Float
+  profitMargin   Float       @default(0)
+  currentStock   Int         @default(0)
+  active         Boolean     @default(true) // Apaga solo esta presentación
+  contentMeasure MeasureType @relation(fields: [measureTypeId], references: [id]) // Por ejemplo un frasco de 60cc, 150ml, 360g, etc
+  contentAmount  Int         @default(0) // Por ejemplo un frasco de 60cc, 150ml, 360g, etc
+
+  requestTime String @default("")
+
+  // Relación con el padre
+  product       Product      @relation(fields: [productId], references: [id])
+  // Soy componente de:
+  isComponentOf Dependency[] @relation("ComponentVariant")
+
+  // Tengo componentes (si soy un Mix):
+  hasComponents Dependency[] @relation("MixVariant")
+
+  movements     StockMovement[]
+  // OrderDetail  OrderDetail[]
+  measureTypeId Int
+}
+
+model MeasureType {
+  id              Int              @id @default(autoincrement())
+  name            String
+  products        Product[]
+  productVariants ProductVariant[]
 }
 
 model Dependency {
-  mixId     Int
-  productId Int
-  quantity  Float
-  active    Boolean @default(true)
+  mixVariantId     Int
+  productVariantId Int
+  quantity         Float
+  active           Boolean @default(true)
 
   // El producto que es el Mix/Combo
-  mixProduct       Product @relation("Mixes", fields: [mixId], references: [id])
+  mixVariant       ProductVariant @relation("MixVariant", fields: [mixVariantId], references: [id])
   // El producto que es el Componente
-  componentProduct Product @relation("Dependencies", fields: [productId], references: [id])
+  componentProduct ProductVariant @relation("ComponentVariant", fields: [productVariantId], references: [id])
 
-  @@id([mixId, productId])
+  @@id([mixVariantId, productVariantId])
 }
 
 // Construir cuando tenga órdenes y carrito listos
@@ -125,14 +144,14 @@ model Tag {
 }
 
 model StockMovement {
-  id        Int          @id @default(autoincrement())
-  productId Int
+  id               Int             @id @default(autoincrement())
+  productVariantId Int
   // Cantidad que se movió (ej: +10 o -5)
-  quantity  Int
+  quantity         Int
   // Útil para saber por qué cambió (Venta, Reabastecimiento, Merma, Devolución)
-  type      MovementType
-  createdAt DateTime     @default(now())
-  product   Product      @relation(fields: [productId], references: [id])
+  type             MovementType
+  createdAt        DateTime        @default(now())
+  productVariant   ProductVariant? @relation(fields: [productVariantId], references: [id])
 }
 
 // Enum para categorizar los movimientos
@@ -141,6 +160,7 @@ enum MovementType {
   OUT // Venta
   ADJUSTMENT // Corrección de inventario
   RETURN // Devolución de cliente
+  PRODUCTION // Reabastecimiento
 }
 
 model Supplier {
@@ -154,24 +174,26 @@ model Supplier {
   brands      Brand[]
 }
 
-model Order {
-  id         Int           @id @default(autoincrement())
-  createdAt  DateTime      @default(now())
-  totalPrice Float
-  details    OrderDetail[]
-}
+// model Order {
+//   id         Int           @id @default(autoincrement())
+//   createdAt  DateTime      @default(now())
+//   totalPrice Float
+//   details    OrderDetail[]
+// }
 
-model OrderDetail {
-  id        Int   @id @default(autoincrement())
-  orderId   Int
-  productId Int
-  quantity  Int
-  unitPrice Float
-  subtotal  Float
+// model OrderDetail {
+//   id        Int   @id @default(autoincrement())
+//   orderId   Int
+//   productId Int
+//   quantity  Int
+//   unitPrice Float
+//   subtotal  Float
 
-  Order   Order   @relation(fields: [orderId], references: [id])
-  Product Product @relation(fields: [productId], references: [id])
-}
+//   Order            Order           @relation(fields: [orderId], references: [id])
+//   Product          Product         @relation(fields: [productId], references: [id])
+//   productVariant   ProductVariant? @relation(fields: [productVariantId], references: [id])
+//   productVariantId Int?
+// }
 
 model User {
   id            Int      @id @default(autoincrement())

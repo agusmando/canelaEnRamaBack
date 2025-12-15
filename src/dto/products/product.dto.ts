@@ -1,4 +1,3 @@
-import { MeasureType } from "@prisma/client";
 import { CategoryDto } from "../category/category.dto.ts";
 import { DependencyDto } from "../dependency/dependency.dto.ts";
 import { SupplierDto } from "../supplier/supplier.dto.ts";
@@ -14,7 +13,7 @@ export class ProductDto {
   brandId: number;
   category?: CategoryDto;
   categoryId: number;
-  measure?: MeasureType;
+  measure?: { id: number; name: string };
   tags?: (TagDto | { id: number })[];
   variants: ProductVariantDto[] = [];
 
@@ -26,7 +25,7 @@ export class ProductDto {
     categoryId: number,
     finalPrice: number,
     variants: ProductVariantDto[],
-    measure?: MeasureType,
+    measure?: { id: number; name: string },
     category?: CategoryDto,
     tags?: (TagDto | { id: number })[]
   ) {

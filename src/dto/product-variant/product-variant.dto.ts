@@ -1,16 +1,16 @@
-import { MeasureType } from "@prisma/client";
 import { DependencyDto } from "../dependency/dependency.dto.ts";
 import { ProductDto } from "../products/product.dto.ts";
 import { MovementDto } from "../movement/movement.dto.ts";
 
 export class ProductVariantDto {
+  id: number;
   productId: number;
   name: string;
-  price: number;
-  profitMargin: number;
+  price?: number;
+  profitMargin?: number;
   currentStock: number;
   active: boolean;
-  contentMeasure?: MeasureType;
+  contentMeasure?: { id: number; name: string };
   contentAmount: number;
   requestTime: string;
   product?: ProductDto;
@@ -18,23 +18,26 @@ export class ProductVariantDto {
   isComponentOf?: DependencyDto[];
   hasComponents?: DependencyDto[];
   movements?: MovementDto[] = [];
-
+  finalPrice?: number;
   constructor(
+    id: number,
     name: string,
     active: boolean,
-    price: number,
     productId: number,
-    profitMargin: number,
     currentStock: number,
     contentAmount: number,
     requestTime: string,
     measureTypeId: number,
-    contentMeasure?: MeasureType,
+    contentMeasure?: { id: number; name: string },
+    profitMargin?: number,
+    price?: number,
     product?: ProductDto,
     isComponentOf?: DependencyDto[],
     hasComponents?: DependencyDto[],
-    movements?: MovementDto[]
+    movements?: MovementDto[],
+    finalPrice?: number
   ) {
+    this.id = id;
     this.productId = productId;
     this.name = name;
     this.active = active;
@@ -49,5 +52,6 @@ export class ProductVariantDto {
     this.isComponentOf = isComponentOf;
     this.hasComponents = hasComponents;
     this.movements = movements;
+    this.finalPrice = finalPrice;
   }
 }

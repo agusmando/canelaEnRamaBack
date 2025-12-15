@@ -1,21 +1,20 @@
-import { MeasureType } from "@prisma/client";
-import { ProductVariantDto } from "../product-variant/product-variant.dto.ts";
+import { CreateProductVariantDto } from "../product-variant/create-product-variant.dto.ts";
 export class CreateProductDto {
   name: string;
   description?: string;
   brandId: number;
   categoryId: number;
   Tags?: { id: number }[];
-  measure: MeasureType;
-  variants: ProductVariantDto[] = [];
+  measureTypeId: number;
+  variants: CreateProductVariantDto[] = [];
 
   constructor(
     name: string,
     description: string,
     categoryId: number,
     brandId: number,
-    measure: MeasureType,
-    variants: ProductVariantDto[],
+    measureTypeId: number,
+    variants: CreateProductVariantDto[],
     Tags?: { id: number }[]
   ) {
     this.name = name;
@@ -23,7 +22,7 @@ export class CreateProductDto {
     this.categoryId = categoryId;
     this.brandId = brandId;
     this.Tags = Tags;
-    this.measure = measure;
+    this.measureTypeId = measureTypeId;
     this.variants = variants;
   }
 }

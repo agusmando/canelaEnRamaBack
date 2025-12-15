@@ -1,3 +1,4 @@
+import { CreateProductVariantDto } from "../product-variant/create-product-variant.dto.ts";
 import { TagDto } from "../tags/tag.dto.ts";
 
 export class UpdateProductDto {
@@ -7,8 +8,9 @@ export class UpdateProductDto {
   category: string;
   tags: TagDto[];
   brand?: string;
-  addVariants?: string[];
-  removeVariants?: string[];
+  addVariants?: CreateProductVariantDto[];
+  activateVariants?: number[];
+  deactivateVariants?: number[];
 
   constructor(
     name: string,
@@ -17,8 +19,9 @@ export class UpdateProductDto {
     category: string,
     tags: TagDto[],
     brand?: string,
-    addVariants?: string[],
-    removeVariants?: string[]
+    addVariants?: CreateProductVariantDto[],
+    activateVariants?: number[],
+    deactivateVariants?: number[]
   ) {
     this.name = name;
     this.description = description;
@@ -27,6 +30,7 @@ export class UpdateProductDto {
     this.tags = tags;
     this.brand = brand;
     this.addVariants = addVariants;
-    this.removeVariants = removeVariants;
+    this.activateVariants = activateVariants;
+    this.deactivateVariants = deactivateVariants;
   }
 }

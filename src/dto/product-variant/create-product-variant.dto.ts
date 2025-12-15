@@ -1,4 +1,3 @@
-import { MeasureType } from "@prisma/client";
 export class CreateProductVariantDto {
   name: string;
   productId: number;

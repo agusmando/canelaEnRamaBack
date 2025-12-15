@@ -2,6 +2,7 @@ import { verifySession } from "supertokens-node/recipe/session/framework/express
 import express from "express";
 import { ProductController } from "../controllers/product.controller.ts";
 import { isAuthenticated, requireRole } from "../middleware/auth.middleware.ts";
+import productVariantRoutes from "./product-variant.route.ts";
 
 const router = express.Router();
 
@@ -45,5 +46,4 @@ router
     requireRole(["Admin"]),
     productController.activate.bind(productController)
   );
-
 export default router;

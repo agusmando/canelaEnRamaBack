@@ -120,12 +120,13 @@ export class GenericServiceImpl<T, U, V>
         query = { ...query, ...pagination };
       }
 
+      // console.log(query);
       //Busca los elementos con paginación
       [totalElements, entityList] = await Promise.all([
         model.count({ where }),
         model.findMany(query),
       ]);
-
+      console.log(entityList);
       //Post processing mapping
       if (postMapping && entityList && entityList.length > 0) {
         entityList = entityList.map((entity: any) => {

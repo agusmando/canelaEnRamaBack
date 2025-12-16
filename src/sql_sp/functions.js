@@ -14,11 +14,6 @@ END;
 // recalculate_all_mixes_from_product
 // * p_component_id
 BEGIN
-    -- 1. Actualizar la tabla Product:
-    --    - Busca todos los Mixes (mixId) que dependen del producto p_component_id.
-    --    - Para cada Mix, calcula la SUMA del (precio del componente * cantidad requerida)
-    --    - Actualiza el precio del Mix con esta nueva suma.
-
     UPDATE "Product" AS mix_product
     SET "price" = subquery.new_price
     FROM (
@@ -39,8 +34,6 @@ BEGIN
             d."mixId"
     ) AS subquery
     WHERE mix_product.id = subquery."mixId";
-
-    -- Opcional: Agregar lógica para recalcular el stock virtual si el precio de compra cambia.
 END;
 
 //recalculate_mix_price

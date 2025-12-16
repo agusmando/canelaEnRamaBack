@@ -8,9 +8,10 @@ export const productPostProcessingQueryMapping = (product: ProductDto) => {
   const variants: ProductVariantDto[] = finalProduct?.variants.map(
     (variant) => {
       if (!variant.price || !variant.profitMargin) return variant;
-      variant.finalPrice =
+      variant.finalPrice = Math.round(
         Number(variant.price) * Number(variant.profitMargin) +
-        Number(variant.price);
+          Number(variant.price)
+      );
       variant.profitMargin = 0;
       variant.price = 0;
       return variant;

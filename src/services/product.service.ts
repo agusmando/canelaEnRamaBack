@@ -38,16 +38,52 @@ export class ProductService extends GenericServiceImpl<
     try {
       const mapping = productCreateMapping;
       const variantMapping = productVariantCreateMapping;
-      const variants = createData.variants.map((variant: any) => {
+
+      const variants = createData.variants?.map((variant: any) => {
         return prismaCreateEntityBuilder(variant, variantMapping);
       });
+
+      // let finalPrice: number = 0;
+      // let finalStock: number = 0;
+      // if (variants.length === 1 && variants[0].hasComponents.length > 0) {
+      //   ({ finalPrice, finalStock } = await this.getFinalPriceAndStockForMix(
+      //     variants[0].hasComponents,
+      //     variants[0].measureTypeId,
+      //     variants[0].currentStock || 0
+      //   ));
+      // }
+
       const finalQuery = prismaCreateEntityBuilder(createData, mapping);
       const data: any = {
         ...finalQuery,
         variants: { create: variants },
       };
 
+      if (
+        variants.length === 1 &&
+        variants[0].hasComponents &&
+        variants[0].hasComponents.length > 0
+      ) {
+        data.variants = {
+          create: [
+            {
+              ...variants[0],
+              hasComponents: {
+                create: variants[0].hasComponents.map(
+                  (component: any) =>
+                    ({
+                      productVariantId: component.productVariantId,
+                      quantity: component.quantity,
+                    } as any)
+                ),
+              },
+            },
+          ],
+        };
+      }
+
       console.log(data);
+      console.log(JSON.stringify(data.variants));
       let product = await this.prisma.product.create({
         data,
         select: {
@@ -58,23 +94,28 @@ export class ProductService extends GenericServiceImpl<
           Tags: true,
           Category: true,
           Brand: true,
-          variants: true,
+          variants: {
+            include: {
+              isComponentOf: { include: { componentProduct: true } },
+              hasComponents: { include: { mixVariant: true } },
+            },
+          },
           // isComponentOf: { include: { mixProduct: true } },
           // hasComponents: { include: { componentProduct: true } },
         },
       });
 
       const postMapping = productVariantPostProcessingQueryMapping;
+
       const postVariants = product.variants.map((variant: any) => {
         if (!variant.profitMargin || !variant.price) return variant;
         return postMapping(variant);
       });
       product.variants = postVariants;
-      // const promises: Promise<any>[] = [];
-      // createData.variants.forEach(async (variant: any) => {
-      //   promises.push(this.createVariant(variant, product.id));
-      // });
-      // await Promise.all(promises);
+      if (data.hasComponents && data.hasComponents.length > 0) {
+        await this.prisma
+          .$executeRaw`SELECT public.recalculate_mix_price(${product.variants[0].id}::INT)`;
+      } //No está calculando el valor del mix
 
       return new BaseResponse(200, "Producto creado correctamente", product);
     } catch (error) {
@@ -82,119 +123,73 @@ export class ProductService extends GenericServiceImpl<
     }
   }
 
-  async createVariant(
-    createData: CreateProductVariantDto,
-    productId: number
-  ): Promise<any> {
-    try {
-      let finalPrice = createData.price || 0;
-      let finalStock = createData.currentStock || 0;
-      const measure = await this.prisma.measureType.findUnique({
-        where: {
-          id: createData.measureTypeId,
-        },
-      });
-      if (createData.hasComponents) {
-        if (!["G", "U"].includes(measure?.name || "")) {
-          throw new AppError(ErrorsEnum.INVALID_MEASURE);
-        } // esto ya no importa, total es el measure de las variantes, no el producto padre
-        const mixStatus = await this.handleMixCreation(
-          createData.hasComponents,
-          measure?.name || "",
-          createData.currentStock
-        );
-        finalPrice = mixStatus.finalPrice;
-        finalStock = mixStatus.finalStock;
-      }
+  // async createVariant(
+  //   createData: CreateProductVariantDto,
+  //   productId: number
+  // ): Promise<any> {
+  //   try {
+  //     let finalPrice = createData.price || 0;
+  //     let finalStock = createData.currentStock || 0;
+  //     const measure = await this.prisma.measureType.findUnique({
+  //       where: {
+  //         id: createData.measureTypeId,
+  //       },
+  //     });
+  //     if (createData.hasComponents) {
+  //       if (!["G", "U"].includes(measure?.name || "")) {
+  //         throw new AppError(ErrorsEnum.INVALID_MEASURE);
+  //       } // esto ya no importa, total es el measure de las variantes, no el producto padre
+  //       const mixStatus = await this.handleMixOperations(
+  //         createData.hasComponents,
+  //         measure?.name || "",
+  //         createData.currentStock
+  //       );
+  //       finalPrice = mixStatus.finalPrice;
+  //       finalStock = mixStatus.finalStock;
+  //     }
 
-      const mapping = productVariantCreateMapping;
-      const finalQuery = prismaCreateEntityBuilder(createData, mapping);
-      const data: any = {
-        ...finalQuery,
-        price: finalPrice,
-        currentStock: finalStock,
-        productId,
-      };
-      if (createData.hasComponents && createData.hasComponents.length > 0) {
-        if (createData.hasComponents.length)
-          data.hasComponents = {
-            create: createData.hasComponents.map(
-              (component: any) =>
-                ({
-                  productId: component.productId,
-                  quantity: component.quantity,
-                } as any)
-            ),
-          };
-      }
+  //     const mapping = productVariantCreateMapping;
+  //     const finalQuery = prismaCreateEntityBuilder(createData, mapping);
+  //     const data: any = {
+  //       ...finalQuery,
+  //       price: finalPrice,
+  //       currentStock: finalStock,
+  //       productId,
+  //     };
+  //     if (createData.hasComponents && createData.hasComponents.length > 0) {
+  //       if (createData.hasComponents.length)
+  //         data.hasComponents = {
+  //           create: createData.hasComponents.map(
+  //             (component: any) =>
+  //               ({
+  //                 productId: component.productId,
+  //                 quantity: component.quantity,
+  //               } as any)
+  //           ),
+  //         };
+  //     }
 
-      return await this.prisma.productVariant.create({
-        data,
-        select: {
-          id: true,
-          name: true,
-          price: true,
-          active: true,
-          isComponentOf: { include: { componentProduct: true } },
-          hasComponents: { include: { mixVariant: true } },
-        },
-      });
-    } catch (error) {
-      throw new AppError(ErrorsEnum.SERVER_ERROR);
-    }
-  }
+  //     return await this.prisma.productVariant.create({
+  //       data,
+  //       select: {
+  //         id: true,
+  //         name: true,
+  //         price: true,
+  //         active: true,
+  //         isComponentOf: { include: { componentProduct: true } },
+  //         hasComponents: { include: { mixVariant: true } },
+  //       },
+  //     });
+  //   } catch (error) {
+  //     throw new AppError(ErrorsEnum.SERVER_ERROR);
+  //   }
+  // }
 
   async update(
     id: number,
     data: UpdateProductDto
   ): Promise<BaseResponse<ProductDto>> {
     try {
-      //   if (data.addComponents && data.addComponents.length > 0) {
-      //     console.log(data.addComponents);
-      //     const componentPromises = data.addComponents.map((component: any) => {
-      //       return this.prisma.$executeRaw`
-      //     SELECT public.add_component_to_product(${component.productId}::INT, ${id}::INT, ${component.quantity}::INT)
-      // `;
-      //     });
-      //     await Promise.all(componentPromises);
-      //     await this.prisma
-      //       .$executeRaw`SELECT public.recalculate_mix_price(${id}::INT)`;
-      //   }
-      //   if (data.editComponents && data.editComponents.length > 0) {
-      //     const componentPromises = data.editComponents.map((component: any) => {
-      //       return this.prisma.dependency.update({
-      //         where: {
-      //           mixId_productId: {
-      //             mixId: Number(id),
-      //             productId: Number(component.productId),
-      //           },
-      //         },
-      //         data: {
-      //           quantity: component.quantity,
-      //         },
-      //       });
-      //     });
-      //     await Promise.all(componentPromises);
-      //     await this.prisma
-      //       .$executeRaw`SELECT public.recalculate_mix_price(${id}::INT)`;
-      //   }
-      //   if (data.removeComponents && data.removeComponents.length > 0) {
-      //     const componentPromises = data.removeComponents.map(
-      //       (component: any) => {
-      //         return this.prisma.dependency.delete({
-      //           where: {
-      //             mixId_productId: {
-      //               mixId: Number(id),
-      //               productId: Number(component.productId),
-      //             },
-      //           },
-      //         });
-      //       }
-      //     );
-      //     await Promise.all(componentPromises);
-      //     await this.prisma
-      //       .$executeRaw`SELECT public.recalculate_mix_price(${id}::INT)`;
-      //   }
       if (
         (data.addVariants && data.addVariants.length > 0) ||
         (data.activateVariants && data.activateVariants.length > 0) ||
@@ -224,7 +219,12 @@ export class ProductService extends GenericServiceImpl<
             Tags: true,
             Category: true,
             Brand: true,
-            variants: true,
+            variants: {
+              include: {
+                isComponentOf: { include: { componentProduct: true } },
+                hasComponents: { include: { mixVariant: true } },
+              },
+            },
           },
         });
         //Post processing mapping
@@ -248,7 +248,12 @@ export class ProductService extends GenericServiceImpl<
             Tags: true,
             Category: true,
             Brand: true,
-            variants: true,
+            variants: {
+              include: {
+                isComponentOf: { include: { componentProduct: true } },
+                hasComponents: { include: { mixVariant: true } },
+              },
+            },
           },
         });
       }
@@ -295,6 +300,12 @@ export class ProductService extends GenericServiceImpl<
           Tags: true,
           Category: true,
           Brand: true,
+          variants: {
+            include: {
+              isComponentOf: { include: { componentProduct: true } },
+              hasComponents: { include: { mixVariant: true } },
+            },
+          },
         },
       });
       return new BaseResponse(
@@ -330,6 +341,12 @@ export class ProductService extends GenericServiceImpl<
           Tags: true,
           Category: true,
           Brand: true,
+          variants: {
+            include: {
+              isComponentOf: { include: { componentProduct: true } },
+              hasComponents: { include: { mixVariant: true } },
+            },
+          },
         },
       });
       return new BaseResponse(
@@ -342,26 +359,86 @@ export class ProductService extends GenericServiceImpl<
     }
   };
 
-  async handleMixCreation(
-    productList: {
-      productId: number;
+  async handleMixOperations(
+    addComponents?: { productVariantId: number; quantity: number }[],
+    editComponents?: { productVariantId: number; quantity: number }[],
+    removeComponents?: { productVariantId: number; mixVariantId: number }[],
+    variantId?: number
+  ) {
+    if (addComponents && addComponents.length > 0) {
+      console.log(addComponents);
+      const componentPromises = addComponents.map((component: any) => {
+        return this.prisma.$executeRaw`
+          SELECT public.add_component_to_variant(${component.productVariantId}::INT, ${variantId}::INT, ${component.quantity}::INT)
+      `;
+      });
+      await Promise.all(componentPromises);
+      await this.prisma
+        .$executeRaw`SELECT public.recalculate_mix_price(${variantId}::INT)`;
+    }
+    if (editComponents && editComponents.length > 0) {
+      const componentPromises = editComponents.map((component: any) => {
+        return this.prisma.dependency.update({
+          where: {
+            mixVariantId_productVariantId: {
+              mixVariantId: Number(variantId),
+              productVariantId: Number(component.productVariantId),
+            },
+          },
+          data: {
+            quantity: component.quantity,
+          },
+        });
+      });
+      await Promise.all(componentPromises);
+      await this.prisma
+        .$executeRaw`SELECT public.recalculate_mix_price(${variantId}::INT)`;
+    }
+    if (removeComponents && removeComponents.length > 0) {
+      const componentPromises = removeComponents.map((component: any) => {
+        return this.prisma.dependency.delete({
+          where: {
+            mixVariantId_productVariantId: {
+              mixVariantId: Number(variantId),
+              productVariantId: Number(component.productVariantId),
+            },
+          },
+        });
+      });
+      await Promise.all(componentPromises);
+      await this.prisma
+        .$executeRaw`SELECT public.recalculate_mix_price(${variantId}::INT)`;
+    }
+  }
+
+  async getFinalPriceAndStockForMix(
+    variantsList: {
+      productVariantId: number;
       quantity: number;
     }[],
-    measure: string,
+    measureId: number,
     sugestedStock: number
   ) {
     let finalPrice = 0;
     let finalStock = 0;
-    const duplicateArray = productList; //id producto y quantity
-    const containingProductIds = duplicateArray.map(
-      (component: any) => component.productId
+    const contentMeasure = await this.prisma.measureType.findUnique({
+      where: {
+        id: measureId,
+      },
+    });
+    if (!contentMeasure) {
+      throw new AppError(ErrorsEnum.NOT_FOUND);
+    }
+    const duplicateArray = variantsList; //id producto y quantity
+    const containingVariantIds = duplicateArray.map(
+      (component: any) => component.productVariantId
     );
-    let foundProducts;
+    let foundVariants;
     try {
-      foundProducts = await this.prisma.productVariant.findMany({
+      foundVariants = await this.prisma.productVariant.findMany({
         where: {
           id: {
-            in: containingProductIds,
+            in: containingVariantIds,
           },
         },
         select: {
@@ -372,47 +449,53 @@ export class ProductService extends GenericServiceImpl<
           currentStock: true,
         },
       });
+      console.log(foundVariants);
     } catch (error) {
       throw new AppError(ErrorsEnum.NOT_FOUND);
     }
 
     let stock = 0;
     let stockForUnit: number[] = [];
-    foundProducts.forEach((product: any) => {
+    foundVariants.forEach((productVariant: any) => {
       const currentDependency = duplicateArray.find(
-        (component: any) => component.productId === product.id
+        (component: any) => component.productVariantId === productVariant.id
       );
       if (!currentDependency) {
         throw new AppError(ErrorsEnum.NOT_FOUND);
       }
-      if (product.currentStock)
-        if (measure === "U") {
-          // if (measure === "G") {
-          //   if (product.measure !== "G") {
+      if (productVariant.currentStock)
+        if (contentMeasure.name === "U") {
+          // if (contentMeasure.name === "G") {
+          //   if (product.contentMeasure.name !== "G") {
           //     throw new AppError(ErrorsEnum.INVALID_MEASURE);
           //   }
           //   stock += currentDependency?.quantity || 0;
           // }
-          stockForUnit.push(product?.currentStock / product?.quantity || 0);
+          stockForUnit.push(
+            productVariant?.currentStock / productVariant?.quantity || 0
+          );
         }
 
       console.log({
-        price: product.price,
-        profitMargin: product.profitMargin,
+        price: productVariant.price,
+        profitMargin: productVariant.profitMargin,
         quantity: currentDependency.quantity,
       });
-      finalPrice +=
-        (product.price * product.profitMargin + product.price) *
-        currentDependency?.quantity;
+      finalPrice += Math.round(
+        (productVariant.price * productVariant.profitMargin +
+          productVariant.price) *
+          currentDependency?.quantity
+      );
     });
 
-    // if (measure === "G") {
+    // if (contentMeasure.name === "G") {
     //   finalStock = sugestedStock;
     // }
-    if (measure === "U") {
+    if (contentMeasure.name === "U") {
       finalStock = Math.min(...(stockForUnit || []));
     }
     console.log("finalStock", finalStock);
+    //hasta acá recopilamos finalPrice y finalStock. Hay que crear la query de creación también.
     return { finalPrice, finalStock };
   }
 

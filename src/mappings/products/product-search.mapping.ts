@@ -7,5 +7,10 @@ export const productSearchQueryMapping = {
   category: { field: "Category", type: "object", childField: "name" },
   tags: { field: "Tags", type: "relationArray", childField: "name" },
   brand: { field: "Brand", type: "object", childField: "name" },
-  variants: { field: "variants", type: "relationArray", childField: "name" },
+  variants: {
+    field: "variants",
+    type: "relationArray",
+    childField: "name",
+    expand: ["hasComponents", "isComponentOf"],
+  },
 };

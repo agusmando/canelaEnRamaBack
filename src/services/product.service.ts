@@ -96,7 +96,7 @@ export class ProductService extends GenericServiceImpl<
               hasComponents: { include: { componentProduct: true } },
             },
           },
-        }
+        },
       });
 
       const postMapping = productVariantPostProcessingQueryMapping;
@@ -148,18 +148,18 @@ export class ProductService extends GenericServiceImpl<
       if (!updateData || Object.keys(updateData).length === 0) {
         updatedProduct = await this.prisma.product.findUnique({
           where: { id: Number(id) },
-          
-        include: {
-          Tags: true,
-          Category: true,
-          Brand: true,
-          variants: {
-            include: {
-              isComponentOf: { include: { mixVariant: true } },
-              hasComponents: { include: { componentProduct: true } },
+
+          include: {
+            Tags: true,
+            Category: true,
+            Brand: true,
+            variants: {
+              include: {
+                isComponentOf: { include: { mixVariant: true } },
+                hasComponents: { include: { componentProduct: true } },
+              },
             },
           },
-        }
         });
         //Post processing mapping
         if (postMapping && updatedProduct) {
@@ -174,18 +174,18 @@ export class ProductService extends GenericServiceImpl<
         updatedProduct = await this.prisma.product.update({
           where: { id: Number(id) },
           data: updateData,
-          
-        include: {
-          Tags: true,
-          Category: true,
-          Brand: true,
-          variants: {
-            include: {
-              isComponentOf: { include: { mixVariant: true } },
-              hasComponents: { include: { componentProduct: true } },
+
+          include: {
+            Tags: true,
+            Category: true,
+            Brand: true,
+            variants: {
+              include: {
+                isComponentOf: { include: { mixVariant: true } },
+                hasComponents: { include: { componentProduct: true } },
+              },
             },
           },
-        }
         });
       }
       //Post processing mapping
@@ -233,7 +233,7 @@ export class ProductService extends GenericServiceImpl<
               hasComponents: { include: { componentProduct: true } },
             },
           },
-        }
+        },
       });
       return new BaseResponse(
         200,
@@ -270,7 +270,7 @@ export class ProductService extends GenericServiceImpl<
               hasComponents: { include: { componentProduct: true } },
             },
           },
-        }
+        },
       });
       return new BaseResponse(
         200,
@@ -365,16 +365,9 @@ export class ProductService extends GenericServiceImpl<
           },
         },
         include: {
-          Tags: true,
-          Category: true,
-          Brand: true,
-          variants: {
-            include: {
-              isComponentOf: { include: { mixVariant: true } },
-              hasComponents: { include: { componentProduct: true } },
-            },
-          },
-        }
+          isComponentOf: { include: { mixVariant: true } },
+          hasComponents: { include: { componentProduct: true } },
+        },
       });
       console.log(foundVariants);
     } catch (error) {

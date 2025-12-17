@@ -54,9 +54,9 @@ export class ProductVariantService extends GenericServiceImpl<
         updatedVariant = await this.prisma.productVariant.findUnique({
           where: { id: Number(id) },
           include: {
-            hasComponents: true,
             contentMeasure: true,
-            isComponentOf: true,
+            isComponentOf: { include: { mixVariant: true } },
+            hasComponents: { include: { componentProduct: true } },
           },
         });
         //Post processing mapping
@@ -73,9 +73,9 @@ export class ProductVariantService extends GenericServiceImpl<
           where: { id: Number(id) },
           data: updateData,
           include: {
-            hasComponents: true,
             contentMeasure: true,
-            isComponentOf: true,
+            isComponentOf: { include: { mixVariant: true } },
+            hasComponents: { include: { componentProduct: true } },
           },
         });
       }
@@ -84,9 +84,18 @@ export class ProductVariantService extends GenericServiceImpl<
         updatedVariant = postMapping(updatedVariant as any);
       }
       console.log(data);
-      if (data.price || data.profitMargin) {
-        await this.prisma
+      if (
+        (updatedVariant.hasComponents && updatedVariant.hasComponents.length > 0) ||
+        (updatedVariant.isComponentOf && updatedVariant.isComponentOf.length > 0)
+      ) {
+        if (data.price || data.profitMargin) {
+          await this.prisma
           .$executeRaw`SELECT public.recalculate_all_mixes_from_product(${id}::INT)`;
+        }
+        if (data.stockIncrement && data.stockIncrement > 0) {
+          await this.prisma
+          .$executeRaw`SELECT public.process_mix_production(${id}::INT, ${data.stockIncrement}::INT)`;
+        }
       }
       return new BaseResponse(
         200,

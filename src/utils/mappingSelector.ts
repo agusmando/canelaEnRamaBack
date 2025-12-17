@@ -27,9 +27,9 @@ export default function mappingSelector(entity: string) {
         update: import(
           "../mappings/product-variants/product-variant-update.mapping.ts"
         ).then((module) => module.productVariantUpdateMapping),
-        // post: import(
-        //   "../mappings/product-variants/product-variant-post-procesing.mapping.ts"
-        // ).then((module) => module.productVariantPostProcessingQueryMapping),
+        post: import(
+          "../mappings/product-variants/product-variant-post-procesing.mapping.ts"
+        ).then((module) => module.productVariantPostProcessingQueryMapping),
       };
     case "brand":
       return {

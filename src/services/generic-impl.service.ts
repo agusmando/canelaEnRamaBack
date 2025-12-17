@@ -260,19 +260,19 @@ export class GenericServiceImpl<T, U, V>
       const model = await this.ensureModel("update");
 
       const updateData = prismaUpdateEntityBuilder(data, mapping);
-      let updatedProduct = await model.update({
+      let updatedEntity = await model.update({
         where: { id: Number(id) },
         data: updateData,
       });
       //Post processing mapping
-      if (postMapping && updatedProduct) {
-        updatedProduct = postMapping(updatedProduct);
+      if (postMapping && updatedEntity) {
+        updatedEntity = postMapping(updatedEntity);
       }
 
       return new BaseResponse(
         200,
         "Entidad editada correctamente",
-        updatedProduct
+        updatedEntity
       );
     } catch (error) {
       throw new AppError(ErrorsEnum.NOT_FOUND);

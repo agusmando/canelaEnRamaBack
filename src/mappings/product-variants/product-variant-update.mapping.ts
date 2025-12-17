@@ -37,46 +37,4 @@ export const productVariantUpdateMapping = {
       },
     }),
   },
-
-  addComponents: {
-    transform: (components: { productId: number; quantity: number }[]) => ({
-      components: {
-        createMany: {
-          data: components.map((component) => ({
-            productId: component.productId,
-            quantity: component.quantity,
-          })),
-        },
-      },
-    }),
-  },
-
-  removeComponents: {
-    transform: (components: { productId: number }[]) => ({
-      components: {
-        deleteMany: {
-          productId: {
-            in: components.map((component) => component.productId),
-          },
-        },
-      },
-    }),
-  },
-
-  editComponents: {
-    transform: (components: { productId: number; quantity: number }[]) => ({
-      components: {
-        updateMany: {
-          data: components.map((component) => ({
-            where: {
-              productId: component.productId,
-            },
-            data: {
-              quantity: component.quantity,
-            },
-          })),
-        },
-      },
-    }),
-  },
 };

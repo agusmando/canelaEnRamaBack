@@ -86,23 +86,17 @@ export class ProductService extends GenericServiceImpl<
       console.log(JSON.stringify(data.variants));
       let product = await this.prisma.product.create({
         data,
-        select: {
-          id: true,
-          name: true,
-          description: true,
-          active: true,
+        include: {
           Tags: true,
           Category: true,
           Brand: true,
           variants: {
             include: {
-              isComponentOf: { include: { componentProduct: true } },
-              hasComponents: { include: { mixVariant: true } },
+              isComponentOf: { include: { mixVariant: true } },
+              hasComponents: { include: { componentProduct: true } },
             },
           },
-          // isComponentOf: { include: { mixProduct: true } },
-          // hasComponents: { include: { componentProduct: true } },
-        },
+        }
       });
 
       const postMapping = productVariantPostProcessingQueryMapping;
@@ -112,7 +106,12 @@ export class ProductService extends GenericServiceImpl<
         return postMapping(variant);
       });
       product.variants = postVariants;
-      if (data.hasComponents && data.hasComponents.length > 0) {
+      if (
+        createData?.variants &&
+        createData.variants[0] &&
+        createData.variants[0].hasComponents &&
+        createData.variants[0].hasComponents.length > 0
+      ) {
         await this.prisma
           .$executeRaw`SELECT public.recalculate_mix_price(${product.variants[0].id}::INT)`;
       } //No está calculando el valor del mix
@@ -122,68 +121,6 @@ export class ProductService extends GenericServiceImpl<
       throw new AppError(ErrorsEnum.SERVER_ERROR);
     }
   }
-
-  // async createVariant(
-  //   createData: CreateProductVariantDto,
-  //   productId: number
-  // ): Promise<any> {
-  //   try {
-  //     let finalPrice = createData.price || 0;
-  //     let finalStock = createData.currentStock || 0;
-  //     const measure = await this.prisma.measureType.findUnique({
-  //       where: {
-  //         id: createData.measureTypeId,
-  //       },
-  //     });
-  //     if (createData.hasComponents) {
-  //       if (!["G", "U"].includes(measure?.name || "")) {
-  //         throw new AppError(ErrorsEnum.INVALID_MEASURE);
-  //       } // esto ya no importa, total es el measure de las variantes, no el producto padre
-  //       const mixStatus = await this.handleMixOperations(
-  //         createData.hasComponents,
-  //         measure?.name || "",
-  //         createData.currentStock
-  //       );
-  //       finalPrice = mixStatus.finalPrice;
-  //       finalStock = mixStatus.finalStock;
-  //     }
-
-  //     const mapping = productVariantCreateMapping;
-  //     const finalQuery = prismaCreateEntityBuilder(createData, mapping);
-  //     const data: any = {
-  //       ...finalQuery,
-  //       price: finalPrice,
-  //       currentStock: finalStock,
-  //       productId,
-  //     };
-  //     if (createData.hasComponents && createData.hasComponents.length > 0) {
-  //       if (createData.hasComponents.length)
-  //         data.hasComponents = {
-  //           create: createData.hasComponents.map(
-  //             (component: any) =>
-  //               ({
-  //                 productId: component.productId,
-  //                 quantity: component.quantity,
-  //               } as any)
-  //           ),
-  //         };
-  //     }
-
-  //     return await this.prisma.productVariant.create({
-  //       data,
-  //       select: {
-  //         id: true,
-  //         name: true,
-  //         price: true,
-  //         active: true,
-  //         isComponentOf: { include: { componentProduct: true } },
-  //         hasComponents: { include: { mixVariant: true } },
-  //       },
-  //     });
-  //   } catch (error) {
-  //     throw new AppError(ErrorsEnum.SERVER_ERROR);
-  //   }
-  // }
 
   async update(
     id: number,
@@ -211,21 +148,18 @@ export class ProductService extends GenericServiceImpl<
       if (!updateData || Object.keys(updateData).length === 0) {
         updatedProduct = await this.prisma.product.findUnique({
           where: { id: Number(id) },
-          select: {
-            id: true,
-            name: true,
-            description: true,
-            active: true,
-            Tags: true,
-            Category: true,
-            Brand: true,
-            variants: {
-              include: {
-                isComponentOf: { include: { componentProduct: true } },
-                hasComponents: { include: { mixVariant: true } },
-              },
+          
+        include: {
+          Tags: true,
+          Category: true,
+          Brand: true,
+          variants: {
+            include: {
+              isComponentOf: { include: { mixVariant: true } },
+              hasComponents: { include: { componentProduct: true } },
             },
           },
+        }
         });
         //Post processing mapping
         if (postMapping && updatedProduct) {
@@ -240,21 +174,18 @@ export class ProductService extends GenericServiceImpl<
         updatedProduct = await this.prisma.product.update({
           where: { id: Number(id) },
           data: updateData,
-          select: {
-            id: true,
-            name: true,
-            description: true,
-            active: true,
-            Tags: true,
-            Category: true,
-            Brand: true,
-            variants: {
-              include: {
-                isComponentOf: { include: { componentProduct: true } },
-                hasComponents: { include: { mixVariant: true } },
-              },
+          
+        include: {
+          Tags: true,
+          Category: true,
+          Brand: true,
+          variants: {
+            include: {
+              isComponentOf: { include: { mixVariant: true } },
+              hasComponents: { include: { componentProduct: true } },
             },
           },
+        }
         });
       }
       //Post processing mapping
@@ -292,21 +223,17 @@ export class ProductService extends GenericServiceImpl<
             connect: tagData.tagsId.map((tagId: any) => ({ id: tagId.id })),
           },
         } as any,
-        select: {
-          id: true,
-          name: true,
-          description: true,
-          active: true,
+        include: {
           Tags: true,
           Category: true,
           Brand: true,
           variants: {
             include: {
-              isComponentOf: { include: { componentProduct: true } },
-              hasComponents: { include: { mixVariant: true } },
+              isComponentOf: { include: { mixVariant: true } },
+              hasComponents: { include: { componentProduct: true } },
             },
           },
-        },
+        }
       });
       return new BaseResponse(
         200,
@@ -333,21 +260,17 @@ export class ProductService extends GenericServiceImpl<
             disconnect: tagData.tagsId.map((tag: any) => ({ id: tag.id })),
           },
         } as any,
-        select: {
-          id: true,
-          name: true,
-          description: true,
-          active: true,
+        include: {
           Tags: true,
           Category: true,
           Brand: true,
           variants: {
             include: {
-              isComponentOf: { include: { componentProduct: true } },
-              hasComponents: { include: { mixVariant: true } },
+              isComponentOf: { include: { mixVariant: true } },
+              hasComponents: { include: { componentProduct: true } },
             },
           },
-        },
+        }
       });
       return new BaseResponse(
         200,
@@ -441,13 +364,17 @@ export class ProductService extends GenericServiceImpl<
             in: containingVariantIds,
           },
         },
-        select: {
-          id: true,
-          price: true,
-          profitMargin: true,
-          contentMeasure: true,
-          currentStock: true,
-        },
+        include: {
+          Tags: true,
+          Category: true,
+          Brand: true,
+          variants: {
+            include: {
+              isComponentOf: { include: { mixVariant: true } },
+              hasComponents: { include: { componentProduct: true } },
+            },
+          },
+        }
       });
       console.log(foundVariants);
     } catch (error) {

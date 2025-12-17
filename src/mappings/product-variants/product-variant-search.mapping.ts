@@ -11,16 +11,16 @@ export const productVariantSearchQueryMapping = {
   currentStock: { field: "currentStock", type: "number" },
   minStock: { field: "currentStock", operation: "gte", type: "numberRange" },
   maxStock: { field: "currentStock", operation: "lte", type: "numberRange" },
-  // ofuscatedComponentOf: {
-  //   field: "isComponentOf",
-  //   type: "relationArray",
-  //   childField: "productId",
-  //   expand: ["ComponentVariant"],
-  // },
-  // ofuscatedHasComponents: {
-  //   field: "hasComponents",
-  //   type: "relationArray",
-  //   childField: "productId",
-  //   expand: ["MixVariant"],
-  // },
+  ofuscatedComponentOf: {
+    field: "isComponentOf",
+    type: "relationArray",
+    childField: "mixVariantId",
+    expand: ["mixVariant"],
+  },
+  ofuscatedHasComponents: {
+    field: "hasComponents",
+    type: "relationArray",
+    childField: "productVariantId",
+    expand: ["componentProduct"],
+  },
 };

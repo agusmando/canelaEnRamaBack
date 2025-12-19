@@ -22,6 +22,7 @@ model Product {
   Brand      Brand    @relation(fields: [brandId], references: [id])
   brandId    Int
   Tags       Tag[]
+  images     Image[]
 
   variants ProductVariant[]
 
@@ -61,6 +62,7 @@ model ProductVariant {
   movements     StockMovement[]
   // OrderDetail  OrderDetail[]
   measureTypeId Int
+  offers        Offer[]
 }
 
 model MeasureType {
@@ -134,6 +136,7 @@ model Category {
   products    Product[]
   active      Boolean   @default(true)
   // offers      Offer[]
+  offers      Offer[]
 }
 
 model Tag {
@@ -173,6 +176,29 @@ model Supplier {
   updatedAt   DateTime @updatedAt
   active      Boolean  @default(true)
   brands      Brand[]
+}
+
+model Offer {
+  id               Int            @id @default(autoincrement())
+  categoryId       Int
+  Category         Category       @relation(fields: [categoryId], references: [id])
+  productVariantId Int
+  ProductVariant   ProductVariant @relation(fields: [productVariantId], references: [id])
+  startTime        DateTime
+  finishTime       DateTime
+  discountValue    Float // (El porcentaje o el valor del descuento)
+  discountType     DiscountType
+  discountQuantity Int // (La cantidad de productos que tienen que comprar para obtener el descuento)
+  stockTheshold    Int // (La cantidad mínima de stock necesaria para que la oferta sea válida)
+  active           Boolean
+}
+
+enum DiscountType {
+  PERCENTAGE // Descuento porcentual (0.1 = 10%)
+  FIXED // Descuento fijo (10 = -$10)
+  BUY_ONE_GET_MORE // Compra un producto y obtienes otro gratis (usa discountQuantity para saber la cantidad mínima que tiene que comprar para obtenerlo)
+  BUY_MORE_GET_DISCOUNT // Compra un producto y obtienes un descuento (usa discountQuantity igual, pero usa discountValue para saber el porcentaje de descuento)
+  BUY_MORE_GET_FIXED_DISCOUNT // Compra un producto y obtienes un descuento fijo (usa discountQuantity igual, pero usa discountValue para saber el descuento fijo)
 }
 
 // model Order {
@@ -261,3 +287,13 @@ enum UserRole {
 //   cart    cart    @relation(fields: [cartId], references: [id])
 //   product Product @relation(fields: [productId], references: [id])
 // }
+model Image {
+  id               Int      @id @default(autoincrement())
+  productVariantId Int
+  public_id        String // Obligatorio: El ID que te dio Cloudinary (para borrar/editar).
+  secure_url       String // La URL para mostrar la imagen en el frontend.
+  is_main          Boolean // (Opcional) Para marcar cuál es la imagen de portada.
+  created_at       DateTime @default(now())
+  Product          Product? @relation(fields: [productId], references: [id])
+  productId        Int?
+}

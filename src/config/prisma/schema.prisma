@@ -148,6 +148,7 @@ model StockMovement {
   productVariantId Int
   // Cantidad que se movió (ej: +10 o -5)
   quantity         Int
+  priceAtTime      Float           @default(0)
   // Útil para saber por qué cambió (Venta, Reabastecimiento, Merma, Devolución)
   type             MovementType
   createdAt        DateTime        @default(now())

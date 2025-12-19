@@ -5,11 +5,8 @@ import { PrismaClient } from "@prisma/client";
 import { ErrorsEnum } from "../errors/ErrorsEnum.ts";
 import { AppError } from "../errors/AppError.ts";
 import { GenericServiceImpl } from "./generic-impl.service.ts";
-import { DependencyDto } from "../dto/dependency/dependency.dto.ts";
-import { prismaCreateEntityBuilder } from "../utils/prismaCreateEntityBuilder.ts";
 import { prismaUpdateEntityBuilder } from "../utils/prismaUpdateEntityBuilder.ts";
 import { UpdateProductVariantDto } from "../dto/product-variant/update-product-variant.dto.ts";
-import { productVariantCreateMapping } from "../mappings/product-variants/product-variant-create.mapping.ts";
 import { productVariantUpdateMapping } from "../mappings/product-variants/product-variant-update.mapping.ts";
 import { productVariantPostProcessingQueryMapping } from "../mappings/product-variants/product-variant-post-procesing.mapping.ts";
 
@@ -84,19 +81,38 @@ export class ProductVariantService extends GenericServiceImpl<
         updatedVariant = postMapping(updatedVariant as any);
       }
       console.log(data);
+
       if (
-        (updatedVariant.hasComponents && updatedVariant.hasComponents.length > 0) ||
-        (updatedVariant.isComponentOf && updatedVariant.isComponentOf.length > 0)
+        (data.price || data.profitMargin) &&
+        updatedVariant.isComponentOf &&
+        updatedVariant.isComponentOf.length > 0
       ) {
-        if (data.price || data.profitMargin) {
-          await this.prisma
+        await this.prisma
           .$executeRaw`SELECT public.recalculate_all_mixes_from_product(${id}::INT)`;
-        }
-        if (data.stockIncrement && data.stockIncrement > 0) {
+      }
+      if (data.stockIncrement) {
+        if (
+          data.stockIncrement > 0 &&
+          updatedVariant.hasComponents &&
+          updatedVariant.hasComponents.length > 0
+        ) {
           await this.prisma
-          .$executeRaw`SELECT public.process_mix_production(${id}::INT, ${data.stockIncrement}::INT)`;
+            .$executeRaw`SELECT public.process_mix_production(${id}::INT, ${data.stockIncrement}::INT)`;
+        } else {
+          await this.prisma
+            .$executeRaw`SELECT public.create_stock_movement(${id}::INT, ${
+            data.stockIncrement
+          }::INT, ${data.stockIncrement < 0 ? "OUT" : "IN"}::TEXT)`;
         }
       }
+
+      if (data.currentStock) {
+        await this.prisma
+          .$executeRaw`SELECT public.create_stock_movement(${id}::INT, ${
+          data.currentStock
+        }::INT, ${"ADJUSTMENT"}::TEXT)`;
+      }
+
       return new BaseResponse(
         200,
         "Entidad editada correctamente",

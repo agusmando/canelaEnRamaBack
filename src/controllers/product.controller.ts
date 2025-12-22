@@ -18,7 +18,8 @@ export class ProductController extends GenericControllerImpl<
   async create(req: any, res: any, next: any) {
     try {
       const data = req.body;
-      const response = await productService.create(data);
+      const files = req.files
+      const response = await productService.create(data, files);
       res.status(response.statusCode).json({ ...response });
     } catch (error) {
       next(error);

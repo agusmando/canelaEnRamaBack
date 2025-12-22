@@ -1,3 +1,4 @@
+import cloudinary from "cloudinary";
 import { CreateProductDto } from "./../dto/products/create-product.dto.ts";
 import { ProductDto } from "../dto/products/product.dto.ts";
 import { BaseResponse, PaginatedResponse } from "../utils/responseFormat.ts";
@@ -33,15 +34,35 @@ export class ProductService extends GenericServiceImpl<
   }
 
   async create(
-    createData: CreateProductDto
+    createData: CreateProductDto,
+    uploadedFilesByField?: Record<string, any[]>
   ): Promise<BaseResponse<ProductDto>> {
     try {
       const mapping = productCreateMapping;
       const variantMapping = productVariantCreateMapping;
 
-      const variants = createData.variants?.map((variant: any) => {
-        return prismaCreateEntityBuilder(variant, variantMapping);
-      });
+      const variants = createData.variants?.map(
+        (variant: any, index: number) => {
+          const basic = prismaCreateEntityBuilder(variant, variantMapping);
+          // Buscar archivos asociados: campo esperado 'variant_<index>'
+          const filesForVariant =
+            uploadedFilesByField?.[`variant_${index}`] || [];
+          const imagesCreate =
+            filesForVariant && filesForVariant.length > 0
+              ? filesForVariant.map((u: any) => ({
+                  public_id: u.public_id,
+                  secure_url: u.secure_url,
+                }))
+              : undefined;
+
+          // si tiene componentes, construir create para hasComponents más abajo en la transacción
+          const result: any = {
+            ...basic,
+            ...(imagesCreate ? { images: { create: imagesCreate } } : {}),
+          };
+          return result;
+        }
+      );
 
       // let finalPrice: number = 0;
       // let finalStock: number = 0;
@@ -94,6 +115,7 @@ export class ProductService extends GenericServiceImpl<
             include: {
               isComponentOf: { include: { mixVariant: true } },
               hasComponents: { include: { componentProduct: true } },
+              images: true,
             },
           },
         },
@@ -118,6 +140,19 @@ export class ProductService extends GenericServiceImpl<
 
       return new BaseResponse(200, "Producto creado correctamente", product);
     } catch (error) {
+      // cleanup: eliminar uploads recién subidos en Cloudinary
+      if (uploadedFilesByField) {
+        const allUploaded = Object.values(uploadedFilesByField).flat();
+        await Promise.allSettled(
+          allUploaded.map((u: any) =>
+            u && u.public_id
+              ? cloudinary.v2.uploader.destroy(u.public_id, {
+                  resource_type: "image",
+                })
+              : Promise.resolve()
+          )
+        );
+      }
       throw new AppError(ErrorsEnum.SERVER_ERROR);
     }
   }

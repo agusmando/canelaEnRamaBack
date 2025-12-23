@@ -22,7 +22,6 @@ model Product {
   Brand      Brand    @relation(fields: [brandId], references: [id])
   brandId    Int
   Tags       Tag[]
-  images     Image[]
 
   variants ProductVariant[]
 
@@ -63,6 +62,7 @@ model ProductVariant {
   // OrderDetail  OrderDetail[]
   measureTypeId Int
   offers        Offer[]
+  images        Image[]
 }
 
 model MeasureType {
@@ -260,12 +260,9 @@ enum UserRole {
 //   product Product @relation(fields: [productId], references: [id])
 // }
 model Image {
-  id               Int      @id @default(autoincrement())
+  id               Int    @id @default(autoincrement())
   productVariantId Int
   public_id        String // Obligatorio: El ID que te dio Cloudinary (para borrar/editar).
   secure_url       String // La URL para mostrar la imagen en el frontend.
-  is_main          Boolean // (Opcional) Para marcar cuál es la imagen de portada.
-  created_at       DateTime @default(now())
-  Product          Product? @relation(fields: [productId], references: [id])
-  productId        Int?
+  ProductVariant ProductVariant @relation(fields: [productVariantId], references: [id])
 }

@@ -1,6 +1,6 @@
 export const offerSearchQueryMapping = {
   ofuscatedId: { field: "id", type: "number" },
-  category: { field: "Category", type: "object", childField: "name" },
+  product: { field: "Product", type: "object", childField: "name" },
   variants: {
     field: "ProductVariant",
     type: "object",
@@ -14,6 +14,7 @@ export const offerSearchQueryMapping = {
   ofuscatedDiscountValue: { field: "discountValue", type: "number" },
   ofuscatedDiscountType: { field: "discountType", type: "enum" },
   ofuscatedDiscountQuantity: { field: "discountQuantity", type: "number" },
+  ofuscatedQuantityToGet: { field: "quantityToGet", type: "number" },
   ofuscatedStockThreshold: { field: "stockThreshold", type: "number" },
   active: { field: "active", type: "boolean" },
 };

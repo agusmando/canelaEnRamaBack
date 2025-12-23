@@ -28,6 +28,7 @@ model Product {
   // Medidas (Esto define qué es físicamente)
   measure       MeasureType @relation(fields: [measureTypeId], references: [id])
   measureTypeId Int
+  offers        Offer[]
   // OrderDetail OrderDetail[]
   // Review      Review[]
   // CartItem    CartItem[]
@@ -108,7 +109,6 @@ model Category {
   description String?
   products    Product[]
   active      Boolean   @default(true)
-  offers      Offer[]
 }
 
 model Tag {
@@ -152,15 +152,16 @@ model Supplier {
 
 model Offer {
   id               Int            @id @default(autoincrement())
-  categoryId       Int
-  Category         Category       @relation(fields: [categoryId], references: [id])
-  productVariantId Int
-  ProductVariant   ProductVariant @relation(fields: [productVariantId], references: [id])
+  productVariantId Int?
+  ProductVariant   ProductVariant? @relation(fields: [productVariantId], references: [id])
+  productId        Int?
+  Product          Product?        @relation(fields: [productId], references: [id])
   startTime        DateTime
   finishTime       DateTime
-  discountValue    Float // (El porcentaje o el valor del descuento)
+  discountValue    Float? // (El porcentaje o el valor del descuento)
   discountType     DiscountType
   discountQuantity Int? // (La cantidad de productos que tienen que comprar para obtener el descuento)
+  quantityToGet    Int? // (la cantidad total de items que se lleva el cliente, o la cantidad gratis)
   stockThreshold    Int? // (La cantidad mínima de stock necesaria para que la oferta sea válida)
   active           Boolean @default(true)
 }
@@ -169,6 +170,7 @@ enum DiscountType {
   PERCENTAGE // Descuento porcentual (0.1 = 10%)
   FIXED // Descuento fijo (10 = -$10)
   BUY_ONE_GET_MORE // Compra un producto y obtienes otro gratis (usa discountQuantity para saber la cantidad mínima que tiene que comprar para obtenerlo)
+  BUY_MORE_GET_MORE // Compra muchos producto y obtienes una cantidad gratis (usa discountQuantity para saber la cantidad mínima que tiene que comprar para obtenerlo, quantityToGet te diría cuántos gratis)
   BUY_MORE_GET_DISCOUNT // Compra un producto y obtienes un descuento (usa discountQuantity igual, pero usa discountValue para saber el porcentaje de descuento)
   BUY_MORE_GET_FIXED_DISCOUNT // Compra un producto y obtienes un descuento fijo (usa discountQuantity igual, pero usa discountValue para saber el descuento fijo)
 }

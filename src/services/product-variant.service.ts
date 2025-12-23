@@ -247,4 +247,8 @@ export class ProductVariantService extends GenericServiceImpl<
         .$executeRaw`SELECT public.recalculate_mix_price(${productVariantId}::INT)`;
     }
   }
+
+  async handleImagesUpdates(productVariantId: number, addImages: any[], removeImages: any[]) {
+    //igual que el remove variants pero esta vez hay que pedirle al cloudinary que elimine ese public_id 
+  }
 }

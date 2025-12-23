@@ -39,7 +39,7 @@ export class ProductController extends GenericControllerImpl<
   async addProductTags(req: any, res: any, next: any) {
     try {
       const productId: number = req.params.id;
-      const response = await productService.addProductTags(productId, req.body);
+      const response = await productService.addProductTags(Number(productId), req.body);
       res.status(response.statusCode).json({ ...response });
     } catch (error) {
       next(error);
@@ -50,7 +50,7 @@ export class ProductController extends GenericControllerImpl<
     try {
       const productId: number = req.params.id;
       const response = await productService.removeProductTags(
-        productId,
+        Number(productId),
         req.body
       );
       res.status(response.statusCode).json({ ...response });

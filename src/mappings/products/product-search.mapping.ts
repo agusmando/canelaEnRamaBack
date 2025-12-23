@@ -11,7 +11,7 @@ export const productSearchQueryMapping = {
     field: "variants",
     type: "relationArray",
     childField: "name",
-    expand: ["hasComponents", "isComponentOf", "offers"],
+    expand: ["hasComponents", "isComponentOf", "offers", "images"],
   },
   ofuscatedOffers: { field: "offers", type: "relationArray", childField: "id" },
 };

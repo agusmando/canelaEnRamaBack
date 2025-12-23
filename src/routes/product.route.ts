@@ -11,19 +11,24 @@ const productController = new ProductController();
 
 const adminRoles = ["Admin", "Employee"];
 
-router.route("/").get(productController.findAll.bind(productController)).post(
-  isAuthenticated,
-  requireRole(adminRoles),
-  upload.single("image"),
-  cloudinaryUpload("products"),
-  productController.create.bind(productController)
-);
+router
+  .route("/")
+  .get(productController.findAll.bind(productController))
+  .post(
+    isAuthenticated,
+    requireRole(adminRoles),
+    upload.array("image", 7),
+    cloudinaryUpload("products"),
+    productController.create.bind(productController)
+  );
 router
   .route("/:id")
   .get(productController.findOne.bind(productController))
   .put(
     isAuthenticated,
     requireRole(adminRoles),
+    upload.array("image", 7),
+    cloudinaryUpload("products"),
     productController.update.bind(productController)
   );
 router

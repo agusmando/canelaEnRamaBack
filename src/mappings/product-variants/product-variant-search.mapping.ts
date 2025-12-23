@@ -27,5 +27,10 @@ export const productVariantSearchQueryMapping = {
     field: "offers",
     type: "relationArray",
     childField: "id",
+  },
+  ofuscatedImages: {
+    field: "images",
+    type: "relationArray",
+    childField: "id",
   }
 };

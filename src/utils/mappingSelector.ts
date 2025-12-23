@@ -6,7 +6,7 @@ export default function mappingSelector(entity: string) {
         search: import("../mappings/products/product-search.mapping.ts").then(
           (module) => module.productSearchQueryMapping
         ),
-        create: import("../mappings/products/products-create.mapping.ts").then(
+        create: import("../mappings/products/product-create.mapping.ts").then(
           (module) => module.productCreateMapping
         ),
         update: import("../mappings/products/product-update.mapping.ts").then(

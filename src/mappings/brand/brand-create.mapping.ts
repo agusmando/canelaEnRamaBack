@@ -1,3 +1,3 @@
 export const brandCreateMapping = {
-  products: { relation: true, connectField: "id", allowCreate: false },
+  products: { relation: true, connectField: "id"},
 };

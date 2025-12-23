@@ -1,3 +1,43 @@
+// product-variant-create.mapping.ts
+
 export const productVariantCreateMapping = {
-  movements: { relation: true, connectField: "id", allowCreate: true },
+  // Integers
+  measureTypeId: { parseInt: true },
+  contentAmount: { parseInt: true },
+  currentStock: { parseInt: true },
+  
+  // Floats (IMPORTANTE: FormData envía strings, Prisma requiere Float)
+  price: { parseFloat: true },
+  profitMargin: { parseFloat: true },
+
+  // Booleans
+  active: { parseBoolean: true },
+
+  // Relaciones Anidadas dentro de la variante
+  movements: { 
+    relation: true, 
+    allowCreate: true,
+    childMapping: {
+      quantity: { parseInt: true },
+      type: { field: "type" },
+    } 
+
+    // Si movements tuviera campos complejos, definirías un mapping para él aquí:
+  },
+  
+  // Relaciones Mix/Componentes (según tu JSON comentado)
+  hasComponents: {
+     relation: true,
+     allowCreate: false,
+     // childMapping: dependencyMapping // (Definir si vas a enviar componentes anidados)
+  },
+
+  images: {
+    relation:  true,
+    allowCreate: true,
+    childMapping: {
+      public_id: { field: "public_id" },
+      secure_url: { field: "secure_url" },
+    }
+  }
 };

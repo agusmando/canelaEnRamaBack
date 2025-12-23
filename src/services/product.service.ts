@@ -9,7 +9,7 @@ import { UpdateProductDto } from "../dto/products/update-product.dto.ts";
 import { UpdateProductTagDto } from "../dto/products/update-product-tag.dto.ts";
 import { GenericServiceImpl } from "./generic-impl.service.ts";
 import { DependencyDto } from "../dto/dependency/dependency.dto.ts";
-import { productCreateMapping } from "../mappings/products/products-create.mapping.ts";
+import { productCreateMapping } from "../mappings/products/product-create.mapping.ts";
 import { prismaCreateEntityBuilder } from "../utils/prismaCreateEntityBuilder.ts";
 import { productUpdateMapping } from "../mappings/products/product-update.mapping.ts";
 import { productPostProcessingQueryMapping } from "../mappings/products/product-post-procesing.mapping.ts";
@@ -45,10 +45,10 @@ export class ProductService extends GenericServiceImpl<
         (variant: any, index: number) => {
           const basic = prismaCreateEntityBuilder(variant, variantMapping);
           // Buscar archivos asociados: campo esperado 'variant_<index>'
-          const filesForVariant =
-            uploadedFilesByField?.[`variant_${index}`] || [];
+          console.log(uploadedFilesByField)
+          const filesForVariant: any[] = Array.isArray(uploadedFilesByField) ? uploadedFilesByField : [];
           const imagesCreate =
-            filesForVariant && filesForVariant.length > 0
+            filesForVariant.length > 0
               ? filesForVariant.map((u: any) => ({
                   public_id: u.public_id,
                   secure_url: u.secure_url,
@@ -60,6 +60,7 @@ export class ProductService extends GenericServiceImpl<
             ...basic,
             ...(imagesCreate ? { images: { create: imagesCreate } } : {}),
           };
+          console.log(result)
           return result;
         }
       );
@@ -93,7 +94,7 @@ export class ProductService extends GenericServiceImpl<
                 create: variants[0].hasComponents.map(
                   (component: any) =>
                     ({
-                      productVariantId: component.productVariantId,
+                      productVariantId: Number(component.productVariantId),
                       quantity: component.quantity,
                     } as any)
                 ),

@@ -12,6 +12,7 @@ cloudinary.v2.config({
 const storage = Multer.memoryStorage();
 export const upload = Multer({ storage }); // usar upload.single('file'), upload.array('files'), upload.fields([...]) según necesidad
 
+
 async function uploadBufferToCloudinary(
   buffer: Buffer,
   mimetype: string,
@@ -22,7 +23,7 @@ async function uploadBufferToCloudinary(
     const opts: any = { resource_type: "auto" };
     if (folder) opts.folder = folder;
     if (publicId) opts.public_id = publicId;
-
+ 
     console.log("cloudinary upload opts:", {
       folder,
       publicId,
@@ -49,6 +50,8 @@ async function uploadBufferToCloudinary(
     streamifier.createReadStream(buffer).pipe(uploadStream);
   });
 }
+
+
 
 export function cloudinaryUpload(folderOrFn?: string | ((req: any) => string)) {
   return async (req: any, _res: any, next: any) => {
@@ -117,3 +120,17 @@ export function cloudinaryUpload(folderOrFn?: string | ((req: any) => string)) {
     }
   };
 }
+
+export function cloudinaryDelete(publicId: string) {
+  return async (req: any, _res: any, next: any) => {
+    try {
+      await cloudinary.v2.uploader.destroy(publicId);
+      return next();
+    } catch (err) {
+      console.error("cloudinaryDelete caught error:", err);
+      return next(err);
+    }
+  };
+}
+
+

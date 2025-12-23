@@ -1,7 +1,7 @@
 export const productVariantSearchQueryMapping = {
   ofuscatedId: { field: "id", type: "number" }, // Not supposed to be used directly
   ofuscatedProductId: { field: "product", type: "number" }, // Not supposed to be used directly
-  name: { field: "name", type: "string" },
+  name: { field: "name", type: "string" },    
   ofuscatedProfitMargin: { field: "profitMargin", type: "number" }, // Not supposed to be used directly
   ofuscatedMeasure: { field: "contentMeasure", type: "string" }, // Not supposed to be used directly
   ofuscatedMeasureContent: { field: "contentAmount", type: "string" }, // Not supposed to be used directly
@@ -23,4 +23,9 @@ export const productVariantSearchQueryMapping = {
     childField: "productVariantId",
     expand: ["componentProduct"],
   },
+  ofuscatedOffer: {
+    field: "offers",
+    type: "relationArray",
+    childField: "id",
+  }
 };

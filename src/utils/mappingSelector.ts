@@ -77,6 +77,19 @@ export default function mappingSelector(entity: string) {
           "../mappings/movements/movements-search.mapping.ts"
         ).then((module) => module.movementSearchQueryMapping),
       };
+
+    case "offer":
+      return {
+        search: import(
+          "../mappings/offers/offer-search.mapping.ts"
+        ).then((module) => module.offerSearchQueryMapping),
+        create: import("../mappings/offers/offer-create.mapping.ts").then(
+          (module) => module.offerCreateMapping
+        ),
+        update: import("../mappings/offers/offer-update.mapping.ts").then(
+          (module) => module.productUpdateMapping
+        ),
+      };
   }
 
   // throw new Error(`No mapping found for entity: ${entity}`);

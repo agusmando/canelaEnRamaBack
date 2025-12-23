@@ -1,0 +1,19 @@
+export const offerSearchQueryMapping = {
+  ofuscatedId: { field: "id", type: "number" },
+  category: { field: "Category", type: "object", childField: "name" },
+  variants: {
+    field: "ProductVariant",
+    type: "object",
+    childField: "name",
+    expand: ["hasComponents", "isComponentOf"],
+  },
+  startTime: { field: "startTime", type: "date", operation: "eq" },
+  finishTime: { field: "finishTime", type: "date", operation: "eq" },
+  from: { field: "startTime", type: "date", operation: "gte" },
+  to: { field: "finishTime", type: "date", operation: "lte" },
+  ofuscatedDiscountValue: { field: "discountValue", type: "number" },
+  ofuscatedDiscountType: { field: "discountType", type: "enum" },
+  ofuscatedDiscountQuantity: { field: "discountQuantity", type: "number" },
+  ofuscatedStockThreshold: { field: "stockThreshold", type: "number" },
+  active: { field: "active", type: "boolean" },
+};

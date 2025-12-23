@@ -16,7 +16,7 @@ export class SupplierService extends GenericServiceImpl<
   protected prisma: PrismaClient;
 
   constructor() {
-    super("brand");
+    super("supplier");
     this.prisma = new PrismaClient({
       log: ["query", "info", "warn", "error"],
     });

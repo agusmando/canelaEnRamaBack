@@ -84,34 +84,7 @@ model Dependency {
   componentProduct ProductVariant @relation("ComponentVariant", fields: [productVariantId], references: [id])
 
   @@id([mixVariantId, productVariantId])
-}
-
-// Construir cuando tenga órdenes y carrito listos
-// model Offer { 
-//   id               Int          @id @default(autoincrement())
-//   productId        Int
-//   categoryId       Int
-//   discountType     DiscountType
-//   discountValue    Float
-//   discountQuantity Int?
-//   startTime        DateTime
-//   endTime          DateTime?
-//   stockThreshold   Int?
-//   isActive         Boolean      @default(true)
-
-//   product  Product  @relation(fields: [productId], references: [id])
-//   category Category @relation(fields: [categoryId], references: [id])
-
-//   @@unique([productId, categoryId], name: "OfferUnique")
-// }
-
-// enum DiscountType {
-//   PERCENTAGE
-//   FIXED
-//   BUY_ONE_GET_MORE
-//   BUY_MORE_GET_DISCOUNT
-//   BUY_MORE_GET_FIXED_DISCOUNT
-// }
+} 
 
 model Brand {
   id          Int     @id @default(autoincrement())
@@ -135,7 +108,6 @@ model Category {
   description String?
   products    Product[]
   active      Boolean   @default(true)
-  // offers      Offer[]
   offers      Offer[]
 }
 
@@ -188,9 +160,9 @@ model Offer {
   finishTime       DateTime
   discountValue    Float // (El porcentaje o el valor del descuento)
   discountType     DiscountType
-  discountQuantity Int // (La cantidad de productos que tienen que comprar para obtener el descuento)
-  stockTheshold    Int // (La cantidad mínima de stock necesaria para que la oferta sea válida)
-  active           Boolean
+  discountQuantity Int? // (La cantidad de productos que tienen que comprar para obtener el descuento)
+  stockThreshold    Int? // (La cantidad mínima de stock necesaria para que la oferta sea válida)
+  active           Boolean @default(true)
 }
 
 enum DiscountType {

@@ -16,11 +16,19 @@ app.use(express.json());
 
 app.use(
   cors({
-    origin: "http://localhost:3000",
-    allowedHeaders: ["content-type", ...supertokens.getAllCORSHeaders()],
+    origin: [
+      "http://localhost:3000",
+      "https://ecommercedesignforcanelaenrama.vercel.app/",
+      "https://278ff69fb362.ngrok-free.app",
+    ],
     credentials: true,
+    allowedHeaders: [
+      "content-type",
+      ...supertokens.getAllCORSHeaders(),
+    ],
   })
 );
+
 app.use(middleware());
 app.use("/api", rutas);
 app.get("/getJWT", verifySession(), async (req, res) => {

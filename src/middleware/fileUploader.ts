@@ -1,56 +1,14 @@
 // import { PrismaClient } from "@prisma/client/extension";
 import cloudinary from "cloudinary";
 import Multer from "multer";
+import { ImageService } from "../services/image.service.ts";
 
-import streamifier from "streamifier";
-cloudinary.v2.config({
-  cloud_name: process.env.CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-});
 
 const storage = Multer.memoryStorage();
 export const upload = Multer({ storage }); // usar upload.single('file'), upload.array('files'), upload.fields([...]) según necesidad
 
 
-async function uploadBufferToCloudinary(
-  buffer: Buffer,
-  mimetype: string,
-  folder?: string,
-  publicId?: string
-) {
-  return new Promise((resolve, reject) => {
-    const opts: any = { resource_type: "auto" };
-    if (folder) opts.folder = folder;
-    if (publicId) opts.public_id = publicId;
- 
-    console.log("cloudinary upload opts:", {
-      folder,
-      publicId,
-      mimetype,
-      size: buffer?.length,
-    });
-
-    const uploadStream = cloudinary.v2.uploader.upload_stream(
-      opts,
-      (error: any, result: any) => {
-        if (error) {
-          console.error("cloudinary upload error:", error);
-          return reject(error);
-        }
-        console.log("cloudinary upload result:", {
-          public_id: result?.public_id,
-          url: result?.secure_url,
-        });
-        resolve(result);
-      }
-    );
-
-    // pipe buffer into upload stream
-    streamifier.createReadStream(buffer).pipe(uploadStream);
-  });
-}
-
+const imageService = new ImageService();
 
 
 export function cloudinaryUpload(folderOrFn?: string | ((req: any) => string)) {
@@ -74,7 +32,7 @@ export function cloudinaryUpload(folderOrFn?: string | ((req: any) => string)) {
           mimetype: req.file.mimetype,
           size: req.file.buffer.length,
         });
-        const res = await uploadBufferToCloudinary(
+        const res = await imageService.uploadBufferToCloudinary(
           req.file.buffer,
           req.file.mimetype,
           folder
@@ -88,7 +46,7 @@ export function cloudinaryUpload(folderOrFn?: string | ((req: any) => string)) {
         console.log("Uploading array of files, count:", req.files.length);
         const uploads = await Promise.all(
           req.files.map((f: any) =>
-            uploadBufferToCloudinary(f.buffer, f.mimetype, folder)
+            imageService.uploadBufferToCloudinary(f.buffer, f.mimetype, folder)
           )
         );
         req.files = uploads;
@@ -104,7 +62,7 @@ export function cloudinaryUpload(folderOrFn?: string | ((req: any) => string)) {
           const arr = req.files[key];
           result[key] = await Promise.all(
             arr.map((f: any) =>
-              uploadBufferToCloudinary(f.buffer, f.mimetype, folder)
+              imageService.uploadBufferToCloudinary(f.buffer, f.mimetype, folder)
             )
           );
         }
@@ -121,16 +79,6 @@ export function cloudinaryUpload(folderOrFn?: string | ((req: any) => string)) {
   };
 }
 
-export function cloudinaryDelete(publicId: string) {
-  return async (req: any, _res: any, next: any) => {
-    try {
-      await cloudinary.v2.uploader.destroy(publicId);
-      return next();
-    } catch (err) {
-      console.error("cloudinaryDelete caught error:", err);
-      return next(err);
-    }
-  };
-}
+
 
 

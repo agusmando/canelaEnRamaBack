@@ -14,32 +14,47 @@ initSupertokens();
 const app = express();
 app.use(express.json());
 
-app.use(
-  cors({
-    origin: [
+
+const corsMiddleware = cors({
+  origin: function (origin, callback) {
+    const allowedOrigins = [
       "http://localhost:3000",
-      "https://ecommercedesignforcanelaenrama.vercel.app/",
-      "https://278ff69fb362.ngrok-free.app",
-    ],
-    credentials: true,
-    allowedHeaders: [
-      "content-type",
-      ...supertokens.getAllCORSHeaders(),
-    ],
-  })
-);
+      "https://ecommercedesignforcanelaenrama.vercel.app",
+      "https://846e52c106c6.ngrok-free.app",
+    ];
+
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+
+    return callback(new Error("Not allowed by CORS"));
+  },
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"], 
+  allowedHeaders: [
+    "content-type",
+    "ngrok-skip-browser-warning", // 🔥 ESTA ES LA CLAVE
+    ...supertokens.getAllCORSHeaders(),
+  ],
+});
+
+app.use(corsMiddleware);
+
+/**
+ * ⚠️ ESTO ES LO CLAVE
+ * SuperTokens necesita que el mismo CORS
+ * esté activo cuando él responde OPTIONS
+ */
+app.use((req, res, next) => {
+  if (req.method === "OPTIONS") {
+    return corsMiddleware(req, res, next);
+  }
+  next();
+});
 
 app.use(middleware());
 app.use("/api", rutas);
-app.get("/getJWT", verifySession(), async (req, res) => {
-  console.log("hola");
-  let session = req.session;
-  console.log(session);
-  let jwt = session.getAccessToken();
-  console.log(jwt);
-
-  res.json({ token: jwt });
-});
 app.use(supertokensErrorHandler());
 app.use(canelaErrorHandler);
 

@@ -9,6 +9,7 @@ import { prismaUpdateEntityBuilder } from "../utils/prismaUpdateEntityBuilder.ts
 import { UpdateProductVariantDto } from "../dto/product-variant/update-product-variant.dto.ts";
 import { productVariantUpdateMapping } from "../mappings/product-variants/product-variant-update.mapping.ts";
 import { productVariantPostProcessingQueryMapping } from "../mappings/product-variants/product-variant-post-procesing.mapping.ts";
+import { ImageService } from "./image.service.ts";
 
 export class ProductVariantService extends GenericServiceImpl<
   ProductVariantDto,
@@ -16,6 +17,7 @@ export class ProductVariantService extends GenericServiceImpl<
   UpdateProductVariantDto
 > {
   protected prisma: PrismaClient;
+  protected imagesService = new ImageService();
 
   constructor() {
     super("productVariant");
@@ -41,6 +43,12 @@ export class ProductVariantService extends GenericServiceImpl<
           data.addComponents
         );
       }
+
+      // Si
+      if (data.removeImages && data.removeImages.length > 0) {
+        await this.handleImagesUpdates(data.removeImages);
+      }
+
       const mapping = productVariantUpdateMapping;
       const postMapping = productVariantPostProcessingQueryMapping;
       const updateData = prismaUpdateEntityBuilder(data, mapping);
@@ -80,39 +88,8 @@ export class ProductVariantService extends GenericServiceImpl<
       if (postMapping && updatedVariant) {
         updatedVariant = postMapping(updatedVariant as any);
       }
-      console.log(data);
 
-      if (
-        (data.price || data.profitMargin) &&
-        updatedVariant.isComponentOf &&
-        updatedVariant.isComponentOf.length > 0
-      ) {
-        await this.prisma
-          .$executeRaw`SELECT public.recalculate_all_mixes_from_product(${id}::INT)`;
-      }
-      if (data.stockIncrement) {
-        if (
-          data.stockIncrement > 0 &&
-          updatedVariant.hasComponents &&
-          updatedVariant.hasComponents.length > 0
-        ) {
-          await this.prisma
-            .$executeRaw`SELECT public.process_mix_production(${id}::INT, ${data.stockIncrement}::INT)`;
-        } else {
-          await this.prisma
-            .$executeRaw`SELECT public.create_stock_movement(${id}::INT, ${
-            data.stockIncrement
-          }::INT, ${data.stockIncrement < 0 ? "OUT" : "IN"}::TEXT)`;
-        }
-      }
-
-      if (data.currentStock) {
-        await this.prisma
-          .$executeRaw`SELECT public.create_stock_movement(${id}::INT, ${
-          data.currentStock
-        }::INT, ${"ADJUSTMENT"}::TEXT)`;
-      }
-
+      this.handlePostProcessingQueries(data, id, updatedVariant as any);
       return new BaseResponse(
         200,
         "Entidad editada correctamente",
@@ -248,7 +225,58 @@ export class ProductVariantService extends GenericServiceImpl<
     }
   }
 
-  async handleImagesUpdates(productVariantId: number, addImages: any[], removeImages: any[]) {
-    //igual que el remove variants pero esta vez hay que pedirle al cloudinary que elimine ese public_id 
+  async handleImagesUpdates(removeImages?: { id: number }[]) {
+    let imagePromises: any[] = [];
+    if (removeImages && removeImages.length > 0) {
+      const imageIds = removeImages.map((image: any) => image.id);
+      console.log("imageIds", imageIds)
+      const foundImages = await this.prisma.image.findMany({
+        where: {
+          id: { in: imageIds },
+        },
+      });
+      console.log("foundImages", foundImages)
+      foundImages.forEach((image: any) => {
+        imagePromises.push(this.imagesService.cloudinaryDelete(image.public_id));
+      });
+      await Promise.all(imagePromises);
+    }
+  }
+
+  async handlePostProcessingQueries(
+    requestData: any,
+    id: number,
+    updatedVariant: any
+  ) {
+    if (
+      (requestData.price || requestData.profitMargin) &&
+      updatedVariant.isComponentOf &&
+      updatedVariant.isComponentOf.length > 0
+    ) {
+      await this.prisma
+        .$executeRaw`SELECT public.recalculate_all_mixes_from_product(${id}::INT)`;
+    }
+    if (requestData.stockIncrement) {
+      if (
+        requestData.stockIncrement > 0 &&
+        updatedVariant.hasComponents &&
+        updatedVariant.hasComponents.length > 0
+      ) {
+        await this.prisma
+          .$executeRaw`SELECT public.process_mix_production(${id}::INT, ${requestData.stockIncrement}::INT)`;
+      } else {
+        await this.prisma
+          .$executeRaw`SELECT public.create_stock_movement(${id}::INT, ${
+          requestData.stockIncrement
+        }::INT, ${requestData.stockIncrement < 0 ? "OUT" : "IN"}::TEXT)`;
+      }
+    }
+
+    if (requestData.currentStock) {
+      await this.prisma
+        .$executeRaw`SELECT public.create_stock_movement(${id}::INT, ${
+        requestData.currentStock
+      }::INT, ${"ADJUSTMENT"}::TEXT)`;
+    }
   }
 }

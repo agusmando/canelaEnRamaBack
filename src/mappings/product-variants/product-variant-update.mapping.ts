@@ -23,4 +23,16 @@ export const productVariantUpdateMapping = {
       currentStock: finalValue,
     }),
   },
+  // Obtiene un array de public_id
+  removeImages: {
+    transform: (images: any[], fullData: any) => ({
+      images: {
+        deleteMany: {
+          public_id: {
+            in: images.map((image) => image.public_id),
+          },
+        },
+      },
+    }),
+  },
 };

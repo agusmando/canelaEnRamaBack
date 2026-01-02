@@ -11,6 +11,7 @@ export class UpdateProductVariantDto {
   editComponents?: { productId: number; quantity: number }[];
   stockIncrement?: number;
   currentStock?: number;
+  removeImages?: { id: number }[];
 
   constructor(
     name?: string,
@@ -24,7 +25,9 @@ export class UpdateProductVariantDto {
     requestTime?: string,
     addComponents?: { productId: number; quantity: number }[],
     removeComponents?: { productId: number }[],
-    editComponents?: { productId: number; quantity: number }[]
+    editComponents?: { productId: number; quantity: number }[],
+    removeImages?: { id: number }[]
+
   ) {
     this.name = name;
     this.active = active;
@@ -38,5 +41,6 @@ export class UpdateProductVariantDto {
     this.requestTime = requestTime;
     this.removeComponents = removeComponents;
     this.editComponents = editComponents;
+    this.removeImages = removeImages
   }
 }

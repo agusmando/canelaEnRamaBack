@@ -1,9 +1,7 @@
-import { AppError } from "../errors/AppError.ts";
-
 export interface GenericRepositoryInterface<T, U, V> {
   ensureModel(type: "search" | "create" | "update" | "search"): Promise<any>;
   create(data: U): Promise<T>;
-  update(data: V): Promise<T>;
+  update(id: number, data: V): Promise<T>;
   search(
     data: any,
     paginate: boolean,
@@ -17,4 +15,7 @@ export interface GenericRepositoryInterface<T, U, V> {
     totalElements: number;
   }>;
   post(data: any): Promise<any>;
+  getById(id: number): Promise<T>;
+  deactivate(id: number): Promise<T>;
+  activate(id: number): Promise<T>;
 }

@@ -1,26 +1,63 @@
 import { GenericServiceImpl } from "../services/generic-impl.service.ts";
+import { BaseResponse, PaginatedResponse } from "../utils/responseFormat.ts";
 import type GenericControllerInterface from "./generic-controller.interface.ts";
 
-export class GenericControllerImpl<T, U, V> implements GenericControllerInterface {
-
+export class GenericControllerImpl<T, U, V>
+  implements GenericControllerInterface
+{
   service: GenericServiceImpl<T, U, V>;
   protected controllerName: string;
 
   constructor(controllerName: string) {
-      this.controllerName = controllerName;
-      this.service = new GenericServiceImpl(controllerName);
+    this.controllerName = controllerName;
+    this.service = new GenericServiceImpl(controllerName);
   }
   async findAll(req: any, res: any, next: any) {
-    const { currentPage = 1, amountPerPage = 10, paginate = false, detalle = false } = req.query;
+    const {
+      currentPage = 1,
+      amountPerPage = 10,
+      paginate = false,
+      detalle = false,
+    } = req.query;
     try {
       const response = await this.service.getListedElements(
-      req.query as any,
-      paginate as boolean,
-      Number(currentPage),
-      Number(amountPerPage),
+        req.query as any,
+        paginate as boolean,
+        Number(currentPage),
+        Number(amountPerPage),
         detalle as boolean
       );
-      res.status(response.statusCode).json({ ...response });
+      if (
+        paginate &&
+        response &&
+        Array.isArray(response.entityList) &&
+        "currentPage" in response &&
+        "amountPerPage" in response &&
+        "totalElements" in response
+      ) {
+        res
+          .status(200)
+          .json(
+            new PaginatedResponse<T>(
+              200,
+              "Entidades obtenidas con éxito",
+              response.entityList,
+              response.currentPage,
+              response.amountPerPage,
+              response.totalElements
+            )
+          );
+      } else {
+        res
+          .status(200)
+          .json(
+            new BaseResponse<T>(
+              200,
+              "Entidades obtenidas con éxito",
+              response.entityList ?? response
+            )
+          );
+      }
     } catch (error) {
       next(error);
     }
@@ -28,47 +65,53 @@ export class GenericControllerImpl<T, U, V> implements GenericControllerInterfac
   async findOne(req: any, res: any, next: any) {
     try {
       const objectId = req.params.id;
-      const response = await this.service.findOne(Number(objectId));
-      res.status(response.statusCode).json({ ...response });
+      const entity = await this.service.findOne(Number(objectId));
+      res
+        .status(200)
+        .json(
+          new BaseResponse(200, "Entidad obtenida con éxito", entity ?? {})
+        );
     } catch (error) {
       next(error);
     }
-  };
+  }
   async create(req: any, res: any, next: any) {
     try {
       const data = req.body;
-      const response = await this.service.create(data);
-      res.status(response.statusCode).json({ ...response });
+      await this.service.create(data);
+      res
+        .status(201)
+        .json(new BaseResponse(201, "Entidad creada con éxito", {}));
     } catch (error) {
       next(error);
     }
-  };
+  }
   async update(req: any, res: any, next: any) {
     try {
       const objectId = req.params.id;
-      const response = await this.service.update(Number(objectId), req.body);
-      res.status(response.statusCode).json({ ...response });
+      await this.service.update(Number(objectId), req.body);
+      res.status(200).json(new BaseResponse(200, "Entidad actualizada", {}));
     } catch (error) {
       next(error);
     }
-  };
+  }
   async deactivate(req: any, res: any, next: any) {
     try {
       const objectId = req.params.id;
-      const response = await this.service.deactivate(Number(objectId));
-      res.status(response.statusCode).json({ ...response });
+      await this.service.deactivate(Number(objectId));
+      res.status(200).json(new BaseResponse(200, "Entidad desactivada", {}));
     } catch (error) {
       next(error);
     }
-  };
+  }
 
   async activate(req: any, res: any, next: any) {
     try {
       const objectId = req.params.id;
-      const response = await this.service.activate(Number(objectId));
-      res.status(response.statusCode).json({ ...response });
+      await this.service.activate(Number(objectId));
+      res.status(200).json(new BaseResponse(200, "Entidad activada", {}));
     } catch (error) {
       next(error);
     }
-  };
+  }
 }

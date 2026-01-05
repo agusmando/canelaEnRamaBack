@@ -8,13 +8,15 @@ export interface GenericRepositoryInterface<T, U, V> {
     currentPage: number,
     amountPerPage: number,
     detalle: boolean
-  ): Promise<{
-    entityList?: T[];
-    currentPage: number;
-    amountPerPage: number;
-    totalElements: number;
-  }>;
-  post(data: any): Promise<any>;
+  ): Promise<
+    | {
+        entityList?: T[];
+        currentPage: number;
+        amountPerPage: number;
+        totalElements: number;
+      }
+    | { entityList: T[] }
+  >;
   getById(id: number): Promise<T>;
   deactivate(id: number): Promise<T>;
   activate(id: number): Promise<T>;

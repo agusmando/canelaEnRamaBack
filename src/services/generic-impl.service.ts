@@ -38,18 +38,12 @@ export class GenericServiceImpl<T, U, V>
     currentPage: number = 1,
     amountPerPage: number = 10,
     detalle: boolean = false
-  ): Promise<
-    | {
-        entityList: T[];
-        currentPage: number;
-        amountPerPage: number;
-        totalElements: number;
-      }
-    | { entityList: T[] }
-  > {
-    let entityList = [],
-      totalElements = 0;
-
+  ): Promise<{
+    entityList: T[];
+    currentPage: number;
+    amountPerPage: number;
+    totalElements: number;
+  }> {
     const response = await this.genericRepositoryImpl.search(
       receivedDto,
       paginate,
@@ -57,24 +51,13 @@ export class GenericServiceImpl<T, U, V>
       amountPerPage,
       detalle
     );
-    entityList = response.entityList ?? [];
-    totalElements = response.totalElements;
-
-    if (totalElements === 0 || entityList.length === 0) {
+    if (response.entityList === undefined || response.entityList.length === 0) {
       throw new AppError(ErrorsEnum.NOT_FOUND);
     }
-    if (paginate) {
-      return {
-        entityList,
-        currentPage,
-        amountPerPage,
-        totalElements,
-      };
-    } else {
-      return {
-        entityList,
-      };
-    }
+    return {
+      ...response,
+      entityList: response.entityList ?? [],
+    };
   }
   async findOne(id: number): Promise<T> {
     const entity = await this.genericRepositoryImpl.getById(id);

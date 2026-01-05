@@ -10,7 +10,7 @@ export class GenericRepositoryImpl<T, U, V>
   implements GenericRepositoryInterface<T, U, V>
 {
   model: any;
-  private prisma = new PrismaClient({
+  protected prisma = new PrismaClient({
     log: ["query", "info", "warn", "error"],
   });
   private prismaName: string;
@@ -20,33 +20,6 @@ export class GenericRepositoryImpl<T, U, V>
     this.mappingPromise = mappingPromise;
     this.model = this.ensureModel();
   }
-  async deactivate(id: number): Promise<T> {
-    const mapping = this.mappingPromise
-      ? await this.mappingPromise.create
-      : undefined;
-    const postMapping = this.mappingPromise
-      ? await this.mappingPromise.post
-      : undefined;
-    const model = await this.ensureModel("create");
-    return await model.update({
-      where: { id: Number(id) },
-      data: { active: false } as any,
-    });
-  }
-  async activate(id: number): Promise<T> {
-    const mapping = this.mappingPromise
-      ? await this.mappingPromise.create
-      : undefined;
-    const postMapping = this.mappingPromise
-      ? await this.mappingPromise.post
-      : undefined;
-    const model = await this.ensureModel("create");
-    return await model.update({
-      where: { id: Number(id) },
-      data: { active: true } as any,
-    });
-  }
-
   async ensureModel(type: "search" | "create" | "update" = "search") {
     if (this.model) return this.model;
     const mapping = this.mappingPromise
@@ -193,7 +166,6 @@ export class GenericRepositoryImpl<T, U, V>
 
     return { entityList, currentPage, amountPerPage, totalElements };
   }
-
   async getById(id: number): Promise<T> {
     const mapping = this.mappingPromise
       ? await this.mappingPromise.search
@@ -250,7 +222,30 @@ export class GenericRepositoryImpl<T, U, V>
     return entity;
   }
 
-  post(data: any): Promise<any> {
-    throw new Error("Method not implemented.");
+  async deactivate(id: number): Promise<T> {
+    const mapping = this.mappingPromise
+      ? await this.mappingPromise.create
+      : undefined;
+    const postMapping = this.mappingPromise
+      ? await this.mappingPromise.post
+      : undefined;
+    const model = await this.ensureModel("create");
+    return await model.update({
+      where: { id: Number(id) },
+      data: { active: false } as any,
+    });
+  }
+  async activate(id: number): Promise<T> {
+    const mapping = this.mappingPromise
+      ? await this.mappingPromise.create
+      : undefined;
+    const postMapping = this.mappingPromise
+      ? await this.mappingPromise.post
+      : undefined;
+    const model = await this.ensureModel("create");
+    return await model.update({
+      where: { id: Number(id) },
+      data: { active: true } as any,
+    });
   }
 }

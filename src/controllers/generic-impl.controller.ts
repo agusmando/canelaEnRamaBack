@@ -27,24 +27,23 @@ export class GenericControllerImpl<T, U, V>
         Number(amountPerPage),
         detalle as boolean
       );
-      if (
-        paginate &&
-        response &&
-        Array.isArray(response.entityList) &&
-        "currentPage" in response &&
-        "amountPerPage" in response &&
-        "totalElements" in response
-      ) {
+      const entityList = response.entityList ?? [];
+      const totalElements =
+        "totalElements" in response &&
+        typeof response.totalElements === "number"
+          ? response.totalElements
+          : 0;
+      if (paginate && response) {
         res
           .status(200)
           .json(
             new PaginatedResponse<T>(
               200,
               "Entidades obtenidas con éxito",
-              response.entityList,
+              entityList,
               response.currentPage,
               response.amountPerPage,
-              response.totalElements
+              totalElements
             )
           );
       } else {
@@ -54,7 +53,7 @@ export class GenericControllerImpl<T, U, V>
             new BaseResponse<T>(
               200,
               "Entidades obtenidas con éxito",
-              response.entityList ?? response
+              entityList ?? response
             )
           );
       }

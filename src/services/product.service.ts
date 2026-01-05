@@ -24,13 +24,9 @@ export class ProductService extends GenericServiceImpl<
   CreateProductDto,
   UpdateProductDto
 > {
-  protected prisma: PrismaClient;
 
   constructor() {
     super("product");
-    this.prisma = new PrismaClient({
-      log: ["query", "info", "warn", "error"],
-    });
   }
 
   async create(

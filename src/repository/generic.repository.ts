@@ -1,5 +1,4 @@
 import { PrismaClient } from "@prisma/client";
-import { AppError } from "../errors/AppError.ts";
 import { prismaQueryBuilder } from "../utils/prismaQueryBuilder.ts";
 import type { GenericRepositoryInterface } from "./generic-repository.interface.ts";
 import { prismaCreateEntityBuilder } from "../utils/prismaCreateEntityBuilder.ts";
@@ -28,7 +27,7 @@ export class GenericRepositoryImpl<T, U, V>
       : undefined;
     const modelName = mapping?.modelName || this.prismaName;
     const m = (this.prisma as any)[modelName];
-    if (!m) throw new DatabaseError();
+    if (!m) console.log("Model not found:", modelName);
     this.model = m;
     return this.model;
   }

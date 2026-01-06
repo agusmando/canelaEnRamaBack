@@ -1,6 +1,6 @@
 import { ProductVariantDto } from "../../dto/product-variant/product-variant.dto.ts";
 
-export const productVariantPostProcessingQueryMapping = (
+export const productVariantPostProcessingMapping = (
   product: ProductVariantDto
 ): ProductVariantDto => {
   let finalVariant = { ...product };

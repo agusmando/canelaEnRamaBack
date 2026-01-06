@@ -6,8 +6,8 @@ export class ProductDto {
   name: string;
   description: string;
   active: boolean;
-  finalPrice: number;
   brandId: number;
+  finalPrice?: number;
   category?: CategoryDto;
   categoryId: number;
   measure?: { id: number; name: string };
@@ -20,8 +20,8 @@ export class ProductDto {
     active: boolean,
     brandId: number,
     categoryId: number,
-    finalPrice: number,
     variants: ProductVariantDto[],
+    finalPrice?: number,
     measure?: { id: number; name: string },
     category?: CategoryDto,
     tags?: (TagDto | { id: number })[]

@@ -1,7 +1,5 @@
 import { BaseResponse, PaginatedResponse } from "../utils/responseFormat.ts";
 import { PrismaClient } from "@prisma/client";
-import { ErrorsEnum } from "../errors/ErrorsEnum.ts";
-import { AppError } from "../errors/AppError.ts";
 import { UpdateSupplierBrandDto } from "../dto/supplier/update-supplier-brand.dto.ts";
 import { GenericServiceImpl } from "./generic-impl.service.ts";
 import { SupplierDto } from "../dto/supplier/supplier.dto.ts";

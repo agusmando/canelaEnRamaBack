@@ -30,6 +30,7 @@ export class ProductVariantRepository extends GenericRepositoryImpl<
     uploadedFilesByField?: Record<string, any[]>
   ): Promise<any> {
     const variantMapping = productVariantCreateMapping;
+    let result: any;
     variants?.forEach((variant: any) => {
       const basic = prismaCreateEntityBuilder(variant, variantMapping);
 
@@ -37,7 +38,7 @@ export class ProductVariantRepository extends GenericRepositoryImpl<
         ? uploadedFilesByField
         : [];
 
-      let result: any = {
+      result = {
         ...basic,
       };
 
@@ -57,7 +58,42 @@ export class ProductVariantRepository extends GenericRepositoryImpl<
           ...(imagesCreate ? { images: { create: imagesCreate } } : {}),
         };
       }
-      return result;
     });
+    return result;
+  }
+
+  // TODO: Esto lo tiene que hacer product variant repository
+  async handleVariantsUpdate(
+    productId: number,
+    activate?: number[],
+    deactivate?: number[],
+    addVariants?: CreateProductVariantDto[]
+  ) {
+    if (activate) {
+      await this.prisma.productVariant.updateMany({
+        where: { id: { in: activate } },
+        data: { active: true },
+      });
+    }
+    if (deactivate) {
+      await this.prisma.productVariant.updateMany({
+        where: { id: { in: deactivate } },
+        data: { active: false },
+      });
+    }
+    if (addVariants) {
+      const mapping = productVariantCreateMapping;
+
+      for (const variant of addVariants) {
+        const variantData = prismaCreateEntityBuilder(
+          { ...variant, productId },
+          mapping
+        );
+
+        await this.prisma.productVariant.create({
+          data: variantData,
+        });
+      }
+    }
   }
 }

@@ -11,6 +11,8 @@ export class UpdateProductDto {
   addVariants?: CreateProductVariantDto[];
   activateVariants?: number[];
   deactivateVariants?: number[];
+  price?: number;
+  profitMargin?: number;
 
   constructor(
     name: string,
@@ -21,7 +23,9 @@ export class UpdateProductDto {
     brand?: string,
     addVariants?: CreateProductVariantDto[],
     activateVariants?: number[],
-    deactivateVariants?: number[]
+    deactivateVariants?: number[],
+    price?: number,
+    profitMargin?: number
   ) {
     this.name = name;
     this.description = description;
@@ -32,5 +36,7 @@ export class UpdateProductDto {
     this.addVariants = addVariants;
     this.activateVariants = activateVariants;
     this.deactivateVariants = deactivateVariants;
+    this.price = price;
+    this.profitMargin = profitMargin;
   }
 }

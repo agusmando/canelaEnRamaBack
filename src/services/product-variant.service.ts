@@ -1,15 +1,12 @@
+import { BaseResponse } from "../utils/responseFormat.ts";
 import { CreateProductVariantDto } from "../dto/product-variant/create-product-variant.dto.ts";
 import { ProductVariantDto } from "../dto/product-variant/product-variant.dto.ts";
-import { BaseResponse, PaginatedResponse } from "../utils/responseFormat.ts";
-import { PrismaClient } from "@prisma/client";
-import { ErrorsEnum } from "../errors/ErrorsEnum.ts";
-import { AppError } from "../errors/AppError.ts";
 import { GenericServiceImpl } from "./generic-impl.service.ts";
 import { prismaUpdateEntityBuilder } from "../utils/prismaUpdateEntityBuilder.ts";
 import { UpdateProductVariantDto } from "../dto/product-variant/update-product-variant.dto.ts";
 import { productVariantUpdateMapping } from "../mappings/product-variants/product-variant-update.mapping.ts";
-import { productVariantPostProcessingQueryMapping } from "../mappings/product-variants/product-variant-post-procesing.mapping.ts";
 import { ImageService } from "./image.service.ts";
+import { PrismaClient } from "@prisma/client";
 
 export class ProductVariantService extends GenericServiceImpl<
   ProductVariantDto,

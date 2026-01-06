@@ -77,10 +77,10 @@ export class GenericControllerImpl<T, U, V>
   async create(req: any, res: any, next: any) {
     try {
       const data = req.body;
-      await this.service.create(data);
+      const createdEntity = await this.service.create(data);
       res
         .status(201)
-        .json(new BaseResponse(201, "Entidad creada con éxito", {}));
+        .json(new BaseResponse(201, "Entidad creada con éxito", createdEntity));
     } catch (error) {
       next(error);
     }
@@ -88,8 +88,8 @@ export class GenericControllerImpl<T, U, V>
   async update(req: any, res: any, next: any) {
     try {
       const objectId = req.params.id;
-      await this.service.update(Number(objectId), req.body);
-      res.status(200).json(new BaseResponse(200, "Entidad actualizada", {}));
+      const updatedEntity = await this.service.update(Number(objectId), req.body);
+      res.status(200).json(new BaseResponse(200, "Entidad actualizada", updatedEntity));
     } catch (error) {
       next(error);
     }
@@ -98,7 +98,7 @@ export class GenericControllerImpl<T, U, V>
     try {
       const objectId = req.params.id;
       await this.service.deactivate(Number(objectId));
-      res.status(200).json(new BaseResponse(200, "Entidad desactivada", {}));
+      res.status(204).json(new BaseResponse(204, "Entidad desactivada", {}));
     } catch (error) {
       next(error);
     }
@@ -108,7 +108,7 @@ export class GenericControllerImpl<T, U, V>
     try {
       const objectId = req.params.id;
       await this.service.activate(Number(objectId));
-      res.status(200).json(new BaseResponse(200, "Entidad activada", {}));
+      res.status(204).json(new BaseResponse(204, "Entidad activada", {}));
     } catch (error) {
       next(error);
     }

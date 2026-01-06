@@ -1,5 +1,3 @@
-// import { PrismaClient } from "@prisma/client/extension";
-import cloudinary from "cloudinary";
 import Multer from "multer";
 import { ImageService } from "../services/image.service.ts";
 
@@ -11,12 +9,19 @@ const imageService = new ImageService();
 export function cloudinaryUpload(folderOrFn?: string | ((req: any) => string)) {
   return async (req: any, _res: any, next: any) => {
     try {
+      if (!req.files?.length && !req.file) {
+        return next();
+      }
       // debugging: ensure multer ran
       console.log(
         "cloudinaryUpload middleware hit; has req.file?",
         !!req.file,
         "has req.files?",
-        !!req.files
+        !!req.files,
+        "isArray",
+        Array.isArray(req.files),
+        "is object",
+        typeof req.files === "object"
       );
 
       const folder =

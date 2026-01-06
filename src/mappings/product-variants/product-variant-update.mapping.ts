@@ -35,4 +35,8 @@ export const productVariantUpdateMapping = {
       },
     }),
   },
+  images: {
+    field: "images",
+    connectField: "id",
+  },
 };

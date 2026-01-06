@@ -87,14 +87,20 @@ export class ProductService extends GenericServiceImpl<
     return product;
   }
 
-  async update(id: number, data: UpdateProductDto): Promise<ProductDto> {
+  async updateProduct(
+    id: number,
+    data: UpdateProductDto,
+    uploadedFilesByField: Record<string, any[]>
+  ): Promise<ProductDto> {
     const postMapping = productPostProcessingQueryMapping;
 
     if (!id || id == 0) {
+      uploadedFilesByField &&
+        (await this.imageRepository.abortImageUpload(uploadedFilesByField));
       throw new NotFoundError();
     }
     // Updating the product
-    let updatedProduct = await this.productRepository.update(id, data);
+    let updatedProduct = await this.productRepository.update(id, data, uploadedFilesByField);
     console.log("a ver la data updateada", updatedProduct);
 
     //Post-updating processing
@@ -107,17 +113,19 @@ export class ProductService extends GenericServiceImpl<
       this.productRepository.recalculateAllMixesFromProduct(Number(id));
     }
 
-    // Add, activate or deactivate variants from one product
+    // Add, remove, activate or deactivate variants from one product
     if (
       (data.addVariants && data.addVariants.length > 0) ||
       (data.activateVariants && data.activateVariants.length > 0) ||
-      (data.deactivateVariants && data.deactivateVariants.length > 0)
+      (data.deactivateVariants && data.deactivateVariants.length > 0) ||
+      (data.removeVariants && data.removeVariants.length > 0)
     ) {
       await this.productVariantRepository.handleVariantsUpdate(
         Number(id),
         data.activateVariants,
         data.deactivateVariants,
-        data.addVariants
+        data.addVariants,
+        data.removeVariants
       );
     }
     return updatedProduct;
@@ -128,13 +136,16 @@ export class ProductService extends GenericServiceImpl<
     tagData: UpdateProductTagDto,
     addingTag: boolean
   ): Promise<ProductDto> {
-
     if (!productId || productId == 0) {
       throw new NotFoundError();
     }
     if (!tagData.tagsId || tagData.tagsId.length == 0) {
       throw new ValidationError();
     }
-    return await this.productRepository.addRemoveTags(Number(productId), tagData, addingTag);
-  };
+    return await this.productRepository.addRemoveTags(
+      Number(productId),
+      tagData,
+      addingTag
+    );
+  }
 }

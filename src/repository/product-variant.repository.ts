@@ -5,6 +5,7 @@ import { productVariantCreateMapping } from "../mappings/product-variants/produc
 import { CreateProductVariantDto } from "../dto/product-variant/create-product-variant.dto.ts";
 import { ProductVariantDto } from "../dto/product-variant/product-variant.dto.ts";
 import { UpdateProductVariantDto } from "../dto/product-variant/update-product-variant.dto.ts";
+import { ImageService } from "../services/image.service.ts";
 
 export class ProductVariantRepository extends GenericRepositoryImpl<
   ProductVariantDto,
@@ -12,11 +13,13 @@ export class ProductVariantRepository extends GenericRepositoryImpl<
   UpdateProductVariantDto
 > {
   protected prisma: PrismaClient;
+  protected imageService: ImageService;
   constructor() {
     super("product-variant");
     this.prisma = new PrismaClient({
       log: ["query", "info", "warn", "error"],
     });
+    this.imageService = new ImageService();
   }
 
   /**
@@ -33,41 +36,29 @@ export class ProductVariantRepository extends GenericRepositoryImpl<
     let result: any;
     variants?.forEach((variant: any) => {
       const basic = prismaCreateEntityBuilder(variant, variantMapping);
-
-      const filesForVariant: any[] = Array.isArray(uploadedFilesByField)
-        ? uploadedFilesByField
-        : [];
-
       result = {
         ...basic,
-      };
-
-      // Si tiene imágenes disponibles, las gestiona
-      if (filesForVariant.length > 0) {
-        const imagesCreate =
-          filesForVariant.length > 0
-            ? filesForVariant.map((u: any) => ({
-                public_id: u.public_id,
-                secure_url: u.secure_url,
-              }))
-            : undefined;
-
-        // si tiene componentes, construir create para hasComponents más abajo en la transacción
+      }
+      if (!!uploadedFilesByField) {
+        const images = this.imageService.createImageQuery(
+          uploadedFilesByField?.[variant.id]
+        );
         result = {
-          ...basic,
-          ...(imagesCreate ? { images: { create: imagesCreate } } : {}),
+          ...result,
+          ...images,
         };
       }
     });
     return result;
   }
 
-  // TODO: Esto lo tiene que hacer product variant repository
+  // Activa o desactiva las variantes en lote. También las añade
   async handleVariantsUpdate(
     productId: number,
     activate?: number[],
     deactivate?: number[],
-    addVariants?: CreateProductVariantDto[]
+    addVariants?: CreateProductVariantDto[],
+    removeVariants?: number[]
   ) {
     if (activate) {
       await this.prisma.productVariant.updateMany({
@@ -94,6 +85,11 @@ export class ProductVariantRepository extends GenericRepositoryImpl<
           data: variantData,
         });
       }
+    }
+    if (removeVariants) {
+      await this.prisma.productVariant.deleteMany({
+        where: { id: { in: removeVariants } },
+      });
     }
   }
 }

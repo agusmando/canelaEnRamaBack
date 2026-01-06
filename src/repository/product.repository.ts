@@ -6,11 +6,10 @@ import { UpdateProductDto } from "../dto/products/update-product.dto.ts";
 import { prismaCreateEntityBuilder } from "../utils/prismaCreateEntityBuilder.ts";
 import { productCreateMapping } from "../mappings/products/product-create.mapping.ts";
 import { ProductVariantRepository } from "../repository/product-variant.repository.ts";
-import { CreateProductVariantDto } from "../dto/product-variant/create-product-variant.dto.ts";
-import { productVariantCreateMapping } from "../mappings/product-variants/product-variant-create.mapping.ts";
 import { productUpdateMapping } from "../mappings/products/product-update.mapping.ts";
 import { prismaUpdateEntityBuilder } from "../utils/prismaUpdateEntityBuilder.ts";
 import { UpdateProductTagDto } from "../dto/products/update-product-tag.dto.ts";
+import { ImageService } from "../services/image.service.ts";
 
 export class ProductRepository extends GenericRepositoryImpl<
   ProductDto,
@@ -18,12 +17,15 @@ export class ProductRepository extends GenericRepositoryImpl<
   UpdateProductDto
 > {
   protected prisma: PrismaClient;
-  protected productVariantService = new ProductVariantRepository();
+  protected productVariantService: ProductVariantRepository;
+  protected imageService: ImageService;
   constructor() {
     super("product");
     this.prisma = new PrismaClient({
       log: ["query", "info", "warn", "error"],
     });
+    this.productVariantService = new ProductVariantRepository();
+    this.imageService = new ImageService();
   }
   async create(
     createData: CreateProductDto,
@@ -87,10 +89,26 @@ export class ProductRepository extends GenericRepositoryImpl<
       .$executeRaw`SELECT public.recalculate_all_mixes_from_product(${productId}::INT)`;
   }
 
-  async update(id: number, data: UpdateProductDto): Promise<ProductDto> {
+  async update(
+    id: number,
+    data: UpdateProductDto,
+    uploadedFilesByField?: Record<string, any[]>
+  ): Promise<ProductDto> {
     // Crea la query para actualizar el producto (campos normales)
     const mapping = productUpdateMapping;
-    const updateData = prismaUpdateEntityBuilder(data, mapping);
+    let updateData = prismaUpdateEntityBuilder(data, mapping);
+
+    // Crea la query para las imagenes
+    if (!!uploadedFilesByField) {
+      const images = this.imageService.createImageQuery(
+        uploadedFilesByField?.[id]
+      );
+      updateData = {
+        ...updateData,
+        ...images,
+      };
+    }
+
     let updatedProduct;
 
     console.log("a ver la data updateada", updateData);
@@ -106,7 +124,7 @@ export class ProductRepository extends GenericRepositoryImpl<
     id: number,
     tagData: UpdateProductTagDto,
     addingTag: boolean
-  ) {
+  ): Promise<any> {
     let data = {
       Tags: {
         [addingTag ? "connect" : "disconnect"]: tagData.tagsId.map(
@@ -123,7 +141,8 @@ export class ProductRepository extends GenericRepositoryImpl<
         variants: true,
         Category: true,
         Brand: true,
+        measure: true,
       },
-    })
+    });
   }
 }

@@ -1,5 +1,7 @@
 import cloudinary from "cloudinary";
 import streamifier from "streamifier";
+import dotenv from "dotenv";
+dotenv.config();
 
 cloudinary.v2.config({
   cloud_name: process.env.CLOUD_NAME,
@@ -69,4 +71,6 @@ export class ImageRepository {
       throw new Error("cloudinaryDelete caught error" + err);
     }
   }
+
+  
 }

@@ -29,8 +29,10 @@ export class ProductController extends GenericControllerImpl<
 
   async update(req: any, res: any, next: any) {
     try {
-      const objectId = req.params.id;
-      const response = await productService.update(Number(objectId), req.body);
+      const data = req.body;
+      const objectId = Number(req.params.id);
+      const files = req.files;
+      const response = await productService.updateProduct(objectId, data, files);
       res.status(200).json(new BaseResponse(200, "Product updated", response));
     } catch (error) {
       next(error);
@@ -45,7 +47,9 @@ export class ProductController extends GenericControllerImpl<
         req.body,
         true
       );
-      res.status(200).json(new BaseResponse(200, "Product tags added", response));
+      res
+        .status(200)
+        .json(new BaseResponse(200, "Product tags added", response));
     } catch (error) {
       next(error);
     }
@@ -59,7 +63,9 @@ export class ProductController extends GenericControllerImpl<
         req.body,
         false
       );
-      res.status(200).json(new BaseResponse(200, "Product tags removed", response));
+      res
+        .status(200)
+        .json(new BaseResponse(200, "Product tags removed", response));
     } catch (error) {
       next(error);
     }

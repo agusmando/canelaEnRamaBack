@@ -9,6 +9,7 @@ export class UpdateProductDto {
   tags: TagDto[];
   brand?: string;
   addVariants?: CreateProductVariantDto[];
+  removeVariants?: number[];
   activateVariants?: number[];
   deactivateVariants?: number[];
   price?: number;
@@ -22,6 +23,7 @@ export class UpdateProductDto {
     tags: TagDto[],
     brand?: string,
     addVariants?: CreateProductVariantDto[],
+    removeVariants?: number[],
     activateVariants?: number[],
     deactivateVariants?: number[],
     price?: number,
@@ -34,6 +36,7 @@ export class UpdateProductDto {
     this.tags = tags;
     this.brand = brand;
     this.addVariants = addVariants;
+    this.removeVariants = removeVariants;
     this.activateVariants = activateVariants;
     this.deactivateVariants = deactivateVariants;
     this.price = price;

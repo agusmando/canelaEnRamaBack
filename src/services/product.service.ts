@@ -1,3 +1,4 @@
+import { ImageRepository } from "./../repository/image.repository";
 import cloudinary from "cloudinary";
 import { CreateProductDto } from "./../dto/products/create-product.dto.ts";
 import { ProductDto } from "../dto/products/product.dto.ts";
@@ -21,129 +22,60 @@ import { ProductHasNoVariantsError } from "../errors/domain/product/ProductHasNo
 import { InvalidMeasureError } from "../errors/domain/product/InvalidMeasureError.ts";
 import { ProductHasNoCategoryError } from "../errors/domain/product/ProductHasNoCategoryError.ts";
 import { ValidationError } from "../errors/application/ValidationError.ts";
+import { ProductRepository } from "../repository/product.repository.ts";
+import { ExternalServiceError } from "../errors/infra/ExternalServiceError.ts";
 
 export class ProductService extends GenericServiceImpl<
   ProductDto,
   CreateProductDto,
   UpdateProductDto
 > {
+  productRepository: ProductRepository;
+  imageRepository: ImageRepository;
 
   constructor() {
     super("product");
+    this.productRepository = new ProductRepository();
+    this.imageRepository = new ImageRepository();
   }
 
   async create(
     createData: CreateProductDto,
     uploadedFilesByField?: Record<string, any[]>
-  ): Promise<BaseResponse<ProductDto>> {
-    try {
-      const mapping = productCreateMapping;
-      const variantMapping = productVariantCreateMapping;
-
-      if (createData.variants.length == 0 || !createData.variants) {
-        throw new ProductHasNoVariantsError()
-      }
-      if (createData.measureTypeId == 0 || !createData.measureTypeId ) {
-        throw new InvalidMeasureError()
-      }
-      if (createData.categoryId == 0 || !createData.categoryId ) {
-        throw new ProductHasNoCategoryError()
-      }
-      if (!createData.name || createData.description == "") {
-        throw new ValidationError() 
-      }
-
-      // let finalPrice: number = 0;
-      // let finalStock: number = 0;
-      // if (variants.length === 1 && variants[0].hasComponents.length > 0) {
-      //   ({ finalPrice, finalStock } = await this.getFinalPriceAndStockForMix(
-      //     variants[0].hasComponents,
-      //     variants[0].measureTypeId,
-      //     variants[0].currentStock || 0
-      //   ));
-      // }
-
-      const finalQuery = prismaCreateEntityBuilder(createData, mapping);
-      const data: any = {
-        ...finalQuery,
-        variants: { create: variants },
-      };
-
-      if (
-        variants.length === 1 &&
-        variants[0].hasComponents &&
-        variants[0].hasComponents.length > 0
-      ) {
-        data.variants = {
-          create: [
-            {
-              ...variants[0],
-              hasComponents: {
-                create: variants[0].hasComponents.map(
-                  (component: any) =>
-                    ({
-                      productVariantId: Number(component.productVariantId),
-                      quantity: component.quantity,
-                    } as any)
-                ),
-              },
-            },
-          ],
-        };
-      }
-
-      console.log(data);
-      console.log(JSON.stringify(data.variants));
-      let product = await this.prisma.product.create({
-        data,
-        include: {
-          Tags: true,
-          Category: true,
-          Brand: true,
-          variants: {
-            include: {
-              isComponentOf: { include: { mixVariant: true } },
-              hasComponents: { include: { componentProduct: true } },
-              images: true,
-            },
-          },
-        },
-      });
-
-      const postMapping = productVariantPostProcessingQueryMapping;
-
-      const postVariants = product.variants.map((variant: any) => {
-        if (!variant.profitMargin || !variant.price) return variant;
-        return postMapping(variant);
-      });
-      product.variants = postVariants;
-      if (
-        createData?.variants &&
-        createData.variants[0] &&
-        createData.variants[0].hasComponents &&
-        createData.variants[0].hasComponents.length > 0
-      ) {
-        await this.prisma
-          .$executeRaw`SELECT public.recalculate_mix_price(${product.variants[0].id}::INT)`;
-      } //No está calculando el valor del mix
-
-      return new BaseResponse(200, "Producto creado correctamente", product);
-    } catch (error) {
-      // cleanup: eliminar uploads recién subidos en Cloudinary
-      if (uploadedFilesByField) {
-        const allUploaded = Object.values(uploadedFilesByField).flat();
-        await Promise.allSettled(
-          allUploaded.map((u: any) =>
-            u && u.public_id
-              ? cloudinary.v2.uploader.destroy(u.public_id, {
-                  resource_type: "image",
-                })
-              : Promise.resolve()
-          )
-        );
-      }
-      throw new AppError(ErrorsEnum.SERVER_ERROR);
+  ): Promise<ProductDto> {
+    if (createData.variants.length == 0 || !createData.variants) {
+      await this.imageRepository.abortImageUpload(uploadedFilesByField);
+      throw new ProductHasNoVariantsError();
     }
+    if (createData.measureTypeId == 0 || !createData.measureTypeId) {
+      await this.imageRepository.abortImageUpload(uploadedFilesByField);
+      throw new InvalidMeasureError();
+    }
+    if (createData.categoryId == 0 || !createData.categoryId) {
+      await this.imageRepository.abortImageUpload(uploadedFilesByField);
+      throw new ProductHasNoCategoryError();
+    }
+    if (!createData.name || createData.description == "") {
+      await this.imageRepository.abortImageUpload(uploadedFilesByField);
+      throw new ValidationError();
+    }
+    // cleanup: eliminar uploads recién subidos en Cloudinary
+
+    const product = await this.productRepository.create(
+      createData,
+      uploadedFilesByField
+    );
+
+    if (
+      createData?.variants &&
+      createData.variants[0] &&
+      createData.variants[0].hasComponents &&
+      createData.variants[0].hasComponents.length > 0
+    ) {
+      await this.productRepository.recalculateMixPrice(product.variants[0].id);
+    }
+
+    return product;
   }
 
   async update(

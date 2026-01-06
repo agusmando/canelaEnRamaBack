@@ -3,13 +3,10 @@ import cloudinary from "cloudinary";
 import Multer from "multer";
 import { ImageService } from "../services/image.service.ts";
 
-
 const storage = Multer.memoryStorage();
 export const upload = Multer({ storage }); // usar upload.single('file'), upload.array('files'), upload.fields([...]) según necesidad
 
-
 const imageService = new ImageService();
-
 
 export function cloudinaryUpload(folderOrFn?: string | ((req: any) => string)) {
   return async (req: any, _res: any, next: any) => {
@@ -32,7 +29,7 @@ export function cloudinaryUpload(folderOrFn?: string | ((req: any) => string)) {
           mimetype: req.file.mimetype,
           size: req.file.buffer.length,
         });
-        const res = await imageService.uploadBufferToCloudinary(
+        const res = await imageService.uploadBuffer(
           req.file.buffer,
           req.file.mimetype,
           folder
@@ -46,7 +43,7 @@ export function cloudinaryUpload(folderOrFn?: string | ((req: any) => string)) {
         console.log("Uploading array of files, count:", req.files.length);
         const uploads = await Promise.all(
           req.files.map((f: any) =>
-            imageService.uploadBufferToCloudinary(f.buffer, f.mimetype, folder)
+            imageService.uploadBuffer(f.buffer, f.mimetype, folder)
           )
         );
         req.files = uploads;
@@ -62,7 +59,7 @@ export function cloudinaryUpload(folderOrFn?: string | ((req: any) => string)) {
           const arr = req.files[key];
           result[key] = await Promise.all(
             arr.map((f: any) =>
-              imageService.uploadBufferToCloudinary(f.buffer, f.mimetype, folder)
+              imageService.uploadBuffer(f.buffer, f.mimetype, folder)
             )
           );
         }
@@ -78,7 +75,3 @@ export function cloudinaryUpload(folderOrFn?: string | ((req: any) => string)) {
     }
   };
 }
-
-
-
-

@@ -6,9 +6,10 @@ import { prismaUpdateEntityBuilder } from "../utils/prismaUpdateEntityBuilder.ts
 import { BaseResponse, PaginatedResponse } from "../utils/responseFormat.ts";
 import type GenericServiceInterface from "./generic-service.interface.ts";
 import { AppError } from "../errors/AppError.ts";
-import { ErrorsEnum } from "../errors/ErrorsEnum.ts";
 import mappingSelector from "../utils/mappingSelector.ts";
 import { GenericRepositoryImpl } from "../repository/generic.repository.ts";
+import { NotFoundError } from "../errors/application/NotFoundError.ts";
+import { ServerError } from "../errors/application/ServerError.ts";
 
 export class GenericServiceImpl<T, U, V>
   implements GenericServiceInterface<T, U, V>
@@ -25,10 +26,8 @@ export class GenericServiceImpl<T, U, V>
   private genericRepositoryImpl: GenericRepositoryImpl<T, U, V>;
   constructor(controllerName: string) {
     this.controllerName = controllerName;
-    this.mappingPromise = mappingSelector(controllerName) as any;
     this.genericRepositoryImpl = new GenericRepositoryImpl(
-      controllerName,
-      this.mappingPromise
+      controllerName
     );
   }
 
@@ -52,7 +51,7 @@ export class GenericServiceImpl<T, U, V>
       detalle
     );
     if (response.entityList === undefined || response.entityList.length === 0) {
-      throw new AppError(ErrorsEnum.NOT_FOUND);
+      throw new NotFoundError()
     }
     return {
       ...response,
@@ -62,15 +61,15 @@ export class GenericServiceImpl<T, U, V>
   async findOne(id: number): Promise<T> {
     const entity = await this.genericRepositoryImpl.getById(id);
     if (!entity) {
-      throw new AppError(ErrorsEnum.NOT_FOUND);
+      throw new NotFoundError()
     }
     return entity;
   }
-
+  
   async create(data: U): Promise<any> {
     const newEntity = await this.genericRepositoryImpl.create(data);
     if (!newEntity) {
-      throw new AppError(ErrorsEnum.SERVER_ERROR);
+      throw new ServerError()
     } else {
       return;
     }
@@ -78,7 +77,7 @@ export class GenericServiceImpl<T, U, V>
   async update(id: number, data: V): Promise<any> {
     const newEntity = await this.genericRepositoryImpl.update(id, data);
     if (!newEntity) {
-      throw new AppError(ErrorsEnum.SERVER_ERROR);
+      throw new ServerError()
     } else {
       return;
     }
@@ -86,7 +85,7 @@ export class GenericServiceImpl<T, U, V>
   async deactivate(id: number): Promise<any> {
     const entity = await this.genericRepositoryImpl.deactivate(id);
     if (!entity) {
-      throw new AppError(ErrorsEnum.NOT_FOUND);
+      throw new NotFoundError()
     } else {
       return;
     }
@@ -94,7 +93,7 @@ export class GenericServiceImpl<T, U, V>
   async activate(id: number): Promise<any> {
     const entity = await this.genericRepositoryImpl.activate(id);
     if (!entity) {
-      throw new AppError(ErrorsEnum.NOT_FOUND);
+      throw new NotFoundError()
     } else {
       return;
     }

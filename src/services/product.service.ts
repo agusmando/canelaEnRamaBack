@@ -3,7 +3,6 @@ import { CreateProductDto } from "./../dto/products/create-product.dto.ts";
 import { ProductDto } from "../dto/products/product.dto.ts";
 import { BaseResponse, PaginatedResponse } from "../utils/responseFormat.ts";
 import { PrismaClient } from "@prisma/client";
-import { ErrorsEnum } from "../errors/ErrorsEnum.ts";
 import { AppError } from "../errors/AppError.ts";
 import { UpdateProductDto } from "../dto/products/update-product.dto.ts";
 import { UpdateProductTagDto } from "../dto/products/update-product-tag.dto.ts";
@@ -18,6 +17,10 @@ import { CreateProductVariantDto } from "../dto/product-variant/create-product-v
 import { ProductVariantDto } from "../dto/product-variant/product-variant.dto.ts";
 import { productVariantCreateMapping } from "../mappings/product-variants/product-variant-create.mapping.ts";
 import { productVariantPostProcessingQueryMapping } from "../mappings/product-variants/product-variant-post-procesing.mapping.ts";
+import { ProductHasNoVariantsError } from "../errors/domain/product/ProductHasNoVariantsError.ts";
+import { InvalidMeasureError } from "../errors/domain/product/InvalidMeasureError.ts";
+import { ProductHasNoCategoryError } from "../errors/domain/product/ProductHasNoCategoryError.ts";
+import { ValidationError } from "../errors/application/ValidationError.ts";
 
 export class ProductService extends GenericServiceImpl<
   ProductDto,
@@ -37,29 +40,18 @@ export class ProductService extends GenericServiceImpl<
       const mapping = productCreateMapping;
       const variantMapping = productVariantCreateMapping;
 
-      const variants = createData.variants?.map(
-        (variant: any, index: number) => {
-          const basic = prismaCreateEntityBuilder(variant, variantMapping);
-          // Buscar archivos asociados: campo esperado 'variant_<index>'
-          console.log(uploadedFilesByField)
-          const filesForVariant: any[] = Array.isArray(uploadedFilesByField) ? uploadedFilesByField : [];
-          const imagesCreate =
-            filesForVariant.length > 0
-              ? filesForVariant.map((u: any) => ({
-                  public_id: u.public_id,
-                  secure_url: u.secure_url,
-                }))
-              : undefined;
-
-          // si tiene componentes, construir create para hasComponents más abajo en la transacción
-          const result: any = {
-            ...basic,
-            ...(imagesCreate ? { images: { create: imagesCreate } } : {}),
-          };
-          console.log(result)
-          return result;
-        }
-      );
+      if (createData.variants.length == 0 || !createData.variants) {
+        throw new ProductHasNoVariantsError()
+      }
+      if (createData.measureTypeId == 0 || !createData.measureTypeId ) {
+        throw new InvalidMeasureError()
+      }
+      if (createData.categoryId == 0 || !createData.categoryId ) {
+        throw new ProductHasNoCategoryError()
+      }
+      if (!createData.name || createData.description == "") {
+        throw new ValidationError() 
+      }
 
       // let finalPrice: number = 0;
       // let finalStock: number = 0;

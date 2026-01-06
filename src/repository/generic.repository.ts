@@ -1,10 +1,11 @@
 import { PrismaClient } from "@prisma/client";
 import { AppError } from "../errors/AppError.ts";
-import { ErrorsEnum } from "../errors/ErrorsEnum.ts";
 import { prismaQueryBuilder } from "../utils/prismaQueryBuilder.ts";
 import type { GenericRepositoryInterface } from "./generic-repository.interface.ts";
 import { prismaCreateEntityBuilder } from "../utils/prismaCreateEntityBuilder.ts";
 import { prismaUpdateEntityBuilder } from "../utils/prismaUpdateEntityBuilder.ts";
+import mappingSelector from "../utils/mappingSelector.ts";
+import { DatabaseError } from "../errors/infra/DatabaseError.ts";
 
 export class GenericRepositoryImpl<T, U, V>
   implements GenericRepositoryInterface<T, U, V>
@@ -15,9 +16,9 @@ export class GenericRepositoryImpl<T, U, V>
   });
   private prismaName: string;
   private mappingPromise: any;
-  constructor(prismaName: string, mappingPromise: any) {
+  constructor(prismaName: string) {
     this.prismaName = prismaName;
-    this.mappingPromise = mappingPromise;
+    this.mappingPromise = mappingSelector(prismaName) as any;
     this.model = this.ensureModel();
   }
   async ensureModel(type: "search" | "create" | "update" = "search") {
@@ -27,7 +28,7 @@ export class GenericRepositoryImpl<T, U, V>
       : undefined;
     const modelName = mapping?.modelName || this.prismaName;
     const m = (this.prisma as any)[modelName];
-    if (!m) throw new AppError(ErrorsEnum.SERVER_ERROR);
+    if (!m) throw new DatabaseError();
     this.model = m;
     return this.model;
   }
@@ -41,9 +42,14 @@ export class GenericRepositoryImpl<T, U, V>
     const model = await this.ensureModel("create");
 
     const createData = prismaCreateEntityBuilder(data as any, mapping);
-    let newEntity = await model.create({
-      data: createData,
-    });
+    let newEntity;
+    try {
+      newEntity = await model.create({
+        data: createData,
+      });
+    } catch (error) {
+      throw new DatabaseError();
+    }
 
     //Post processing mapping
     if (postMapping && newEntity) {
@@ -61,10 +67,15 @@ export class GenericRepositoryImpl<T, U, V>
     const model = await this.ensureModel("update");
 
     const updateData = prismaUpdateEntityBuilder(data, mapping);
-    let updatedEntity = await model.update({
-      where: { id: Number(id) },
-      data: updateData,
-    });
+    let updatedEntity;
+    try {
+      updatedEntity = await model.update({
+        where: { id: Number(id) },
+        data: updateData,
+      });
+    } catch (error) {
+      throw new DatabaseError();
+    }
     //Post processing mapping
     if (postMapping && updatedEntity) {
       updatedEntity = postMapping(updatedEntity);
@@ -154,7 +165,9 @@ export class GenericRepositoryImpl<T, U, V>
     [totalElements, entityList] = await Promise.all([
       this.model.count({ where }),
       this.model.findMany(query),
-    ]);
+    ]).catch(() => {
+      throw new DatabaseError();
+    });
     console.log(entityList);
     //Post processing mapping
     if (postMapping && entityList && entityList.length > 0) {
@@ -211,10 +224,15 @@ export class GenericRepositoryImpl<T, U, V>
         }
       });
     }
-    let entity = await model.findFirst({
-      where: { id: Number(id) },
-      select,
-    });
+    let entity;
+    try {
+      entity = await model.findFirst({
+        where: { id: Number(id) },
+        select,
+      });
+    } catch (error) {
+      throw new DatabaseError();
+    }
     //Post processing mapping
     if (postMapping && entity) {
       entity = postMapping(entity);
@@ -230,10 +248,14 @@ export class GenericRepositoryImpl<T, U, V>
       ? await this.mappingPromise.post
       : undefined;
     const model = await this.ensureModel("create");
-    return await model.update({
-      where: { id: Number(id) },
-      data: { active: false } as any,
-    });
+    try {
+      return await model.update({
+        where: { id: Number(id) },
+        data: { active: false } as any,
+      });
+    } catch (error) {
+      throw new DatabaseError();
+    }
   }
   async activate(id: number): Promise<T> {
     const mapping = this.mappingPromise
@@ -243,9 +265,13 @@ export class GenericRepositoryImpl<T, U, V>
       ? await this.mappingPromise.post
       : undefined;
     const model = await this.ensureModel("create");
-    return await model.update({
-      where: { id: Number(id) },
-      data: { active: true } as any,
-    });
+    try {
+      return await model.update({
+        where: { id: Number(id) },
+        data: { active: true } as any,
+      });
+    } catch (error) {
+      throw new DatabaseError();
+    }
   }
 }

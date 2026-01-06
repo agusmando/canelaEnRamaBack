@@ -6,7 +6,9 @@ import { GenericRepositoryImpl } from "./generic.repository.ts";
 import { prismaCreateEntityBuilder } from "../utils/prismaCreateEntityBuilder.ts";
 import { productVariantPostProcessingQueryMapping } from "../mappings/product-variants/product-variant-post-procesing.mapping.ts";
 import { AppError } from "../errors/AppError.ts";
-import { ErrorsEnum } from "../errors/ErrorsEnum.ts";
+import { productCreateMapping } from "../mappings/products/product-create.mapping.ts";
+import { productVariantCreateMapping } from "../mappings/product-variants/product-variant-create.mapping.ts";
+import { ServerError } from "../errors/application/ServerError.ts";
 
 export class ProductRepository extends GenericRepositoryImpl<
   ProductDto,
@@ -28,31 +30,40 @@ export class ProductRepository extends GenericRepositoryImpl<
       const mapping = productCreateMapping;
       const variantMapping = productVariantCreateMapping;
 
+      // Crea la query para las variantes del producto (campos normales)
       const variants = createData.variants?.map(
         (variant: any, index: number) => {
           const basic = prismaCreateEntityBuilder(variant, variantMapping);
           // Buscar archivos asociados: campo esperado 'variant_<index>'
-          console.log(uploadedFilesByField);
+
           const filesForVariant: any[] = Array.isArray(uploadedFilesByField)
             ? uploadedFilesByField
             : [];
-          const imagesCreate =
-            filesForVariant.length > 0
-              ? filesForVariant.map((u: any) => ({
-                  public_id: u.public_id,
-                  secure_url: u.secure_url,
-                }))
-              : undefined;
 
-          // si tiene componentes, construir create para hasComponents más abajo en la transacción
-          const result: any = {
+          let result: any = {
             ...basic,
-            ...(imagesCreate ? { images: { create: imagesCreate } } : {}),
           };
-          console.log(result);
+
+          // Si tiene imágenes disponibles, las gestiona
+          if (filesForVariant.length > 0) {
+            const imagesCreate =
+              filesForVariant.length > 0
+                ? filesForVariant.map((u: any) => ({
+                    public_id: u.public_id,
+                    secure_url: u.secure_url,
+                  }))
+                : undefined;
+
+            // si tiene componentes, construir create para hasComponents más abajo en la transacción
+            result = {
+              ...basic,
+              ...(imagesCreate ? { images: { create: imagesCreate } } : {}),
+            };
+          }
           return result;
         }
       );
+
 
       // let finalPrice: number = 0;
       // let finalStock: number = 0;
@@ -64,6 +75,7 @@ export class ProductRepository extends GenericRepositoryImpl<
       //   ));
       // }
 
+      // Crea la query para el producto y agrega las variantes
       const finalQuery = prismaCreateEntityBuilder(createData, mapping);
       const data: any = {
         ...finalQuery,
@@ -143,7 +155,7 @@ export class ProductRepository extends GenericRepositoryImpl<
           )
         );
       }
-      throw new AppError(ErrorsEnum.SERVER_ERROR);
+      throw new ServerError();
     }
   }
 }

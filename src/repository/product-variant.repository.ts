@@ -6,6 +6,8 @@ import { CreateProductVariantDto } from "../dto/product-variant/create-product-v
 import { ProductVariantDto } from "../dto/product-variant/product-variant.dto.ts";
 import { UpdateProductVariantDto } from "../dto/product-variant/update-product-variant.dto.ts";
 import { ImageService } from "../services/image.service.ts";
+import { productVariantUpdateMapping } from "../mappings/product-variants/product-variant-update.mapping.ts";
+import { prismaUpdateEntityBuilder } from "../utils/prismaUpdateEntityBuilder.ts";
 
 export class ProductVariantRepository extends GenericRepositoryImpl<
   ProductVariantDto,
@@ -20,6 +22,37 @@ export class ProductVariantRepository extends GenericRepositoryImpl<
       log: ["query", "info", "warn", "error"],
     });
     this.imageService = new ImageService();
+  }
+
+  async updateVariant(
+    id: number,
+    data: UpdateProductVariantDto,
+    uploadedFilesByField?: Record<string, any[]>
+  ) {
+    // Crea la query para actualizar el producto (campos normales)
+    const mapping = productVariantUpdateMapping;
+    let updateData = prismaUpdateEntityBuilder(data, mapping);
+
+    // Crea la query para las imagenes
+    if (!!uploadedFilesByField) {
+      const images = this.imageService.createImageQuery(
+        uploadedFilesByField?.[id]
+      );
+      updateData = {
+        ...updateData,
+        ...images,
+      };
+    }
+
+    let updatedProductVariant;
+
+    console.log("a ver la data updateada", updateData);
+    if (!updateData || Object.keys(updateData).length === 0) {
+      updatedProductVariant = await super.getById(id);
+    } else {
+      updatedProductVariant = await super.update(id, updateData);
+    }
+    return updatedProductVariant;
   }
 
   /**
@@ -38,7 +71,7 @@ export class ProductVariantRepository extends GenericRepositoryImpl<
       const basic = prismaCreateEntityBuilder(variant, variantMapping);
       result = {
         ...basic,
-      }
+      };
       if (!!uploadedFilesByField) {
         const images = this.imageService.createImageQuery(
           uploadedFilesByField?.[variant.id]
@@ -91,5 +124,67 @@ export class ProductVariantRepository extends GenericRepositoryImpl<
         where: { id: { in: removeVariants } },
       });
     }
+  }
+
+  async recalculateSingleMixPrice(mixVariantId: number) {
+    await this.prisma
+      .$executeRaw`SELECT public.recalculate_mix_price(${mixVariantId}::INT)`;
+  }
+
+  async recalculateAllMixesFromProduct(productId: number) {
+    await this.prisma
+      .$executeRaw`SELECT public.recalculate_all_mixes_from_product(${productId}::INT)`;
+  }
+
+  async processMixProduction(mixVariantId: number, newStock: number) {
+    await this.prisma
+      .$executeRaw`SELECT public.create_stock_movement(${mixVariantId}::INT, ${newStock}::INT, ${"ADJUSTMENT"}::TEXT)`;
+  }
+
+  async createStockMovement(
+    mixVariantId: number,
+    newStock: number,
+    type: string
+  ) {
+    await this.prisma
+      .$executeRaw`SELECT public.create_stock_movement(${mixVariantId}::INT, ${newStock}::INT, ${type}::TEXT)`;
+  }
+
+  async removeVariant(mixVariantId: number, productVariantId: number) {
+    return this.prisma.dependency.delete({
+      where: {
+        mixVariantId_productVariantId: {
+          mixVariantId: Number(mixVariantId),
+          productVariantId: Number(productVariantId),
+        },
+      },
+    });
+  }
+
+  async updateMixVariant(
+    mixVariantId: number,
+    productVariantId: number,
+    quantity: number
+  ) {
+    return this.prisma.dependency.update({
+      where: {
+        mixVariantId_productVariantId: {
+          mixVariantId: Number(mixVariantId),
+          productVariantId: Number(productVariantId),
+        },
+      },
+      data: {
+        quantity,
+      },
+    });
+  }
+
+  async addComponentToVariant( // Revisar si esto funciona
+    productVariantId: number,
+    mixVariantId: number,
+    quantity: number
+  ) {
+    return await this.prisma
+      .$executeRaw`SELECT public.add_component_to_variant(${productVariantId}::INT, ${mixVariantId}::INT, ${quantity}::INT)`;
   }
 }

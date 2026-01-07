@@ -1,7 +1,7 @@
 import { ProductVariantDto } from "../../dto/product-variant/product-variant.dto.ts";
 import { ProductDto } from "../../dto/products/product.dto.ts";
 
-export const productPostProcessingQueryMapping = (product: ProductDto) => {
+export const productPostProcessingMapping = (product: ProductDto) => {
   let finalProduct = { ...product };
   if (!finalProduct.variants || finalProduct?.variants.length < 1)
     return finalProduct;

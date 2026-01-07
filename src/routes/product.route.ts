@@ -1,8 +1,6 @@
-import { verifySession } from "supertokens-node/recipe/session/framework/express";
 import express from "express";
 import { ProductController } from "../controllers/product.controller.ts";
 import { isAuthenticated, requireRole } from "../middleware/auth.middleware.ts";
-import productVariantRoutes from "./product-variant.route.ts";
 import { cloudinaryUpload, upload } from "../middleware/fileUploader.ts";
 
 const router = express.Router();
@@ -27,8 +25,6 @@ router
   .put(
     isAuthenticated,
     requireRole(adminRoles),
-    upload.array("image", 7),
-    cloudinaryUpload("products"),
     productController.update.bind(productController)
   );
 router

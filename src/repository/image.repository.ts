@@ -1,6 +1,7 @@
 import cloudinary from "cloudinary";
 import streamifier from "streamifier";
 import dotenv from "dotenv";
+import { PrismaClient } from "@prisma/client";
 dotenv.config();
 
 cloudinary.v2.config({
@@ -10,7 +11,12 @@ cloudinary.v2.config({
 });
 
 export class ImageRepository {
-  constructor() {}
+  prisma: PrismaClient;
+  constructor() {
+    this.prisma = new PrismaClient({
+      log: ["query", "info", "warn", "error"],
+    });
+  }
 
   async uploadBuffer(
     buffer: Buffer,
@@ -72,5 +78,11 @@ export class ImageRepository {
     }
   }
 
-  
+  async findManyImagesDb(imageIds: any[]) {
+    return await this.prisma.image.findMany({
+      where: {
+        id: { in: imageIds },
+      },
+    });
+  }
 }

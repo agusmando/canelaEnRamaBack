@@ -17,14 +17,14 @@ export class ProductRepository extends GenericRepositoryImpl<
   UpdateProductDto
 > {
   protected prisma: PrismaClient;
-  protected productVariantService: ProductVariantRepository;
+  protected productVariantRepository: ProductVariantRepository;
   protected imageService: ImageService;
   constructor() {
     super("product");
     this.prisma = new PrismaClient({
       log: ["query", "info", "warn", "error"],
     });
-    this.productVariantService = new ProductVariantRepository();
+    this.productVariantRepository = new ProductVariantRepository();
     this.imageService = new ImageService();
   }
   async create(
@@ -34,7 +34,7 @@ export class ProductRepository extends GenericRepositoryImpl<
     const mapping = productCreateMapping;
 
     // Crea la query para las variantes del producto (campos normales)
-    const variants = await this.productVariantService.createBaseVariantQuery(
+    const variants = await this.productVariantRepository.createBaseVariantQuery(
       createData.variants,
       uploadedFilesByField
     );
@@ -79,35 +79,26 @@ export class ProductRepository extends GenericRepositoryImpl<
     return product;
   }
 
-  async recalculateMixPrice(mixVariantId: number) {
-    await this.prisma
-      .$executeRaw`SELECT public.recalculate_mix_price(${mixVariantId}::INT)`;
-  }
-
-  async recalculateAllMixesFromProduct(productId: number) {
-    await this.prisma
-      .$executeRaw`SELECT public.recalculate_all_mixes_from_product(${productId}::INT)`;
-  }
 
   async update(
     id: number,
     data: UpdateProductDto,
-    uploadedFilesByField?: Record<string, any[]>
+    // uploadedFilesByField?: Record<string, any[]>
   ): Promise<ProductDto> {
     // Crea la query para actualizar el producto (campos normales)
     const mapping = productUpdateMapping;
     let updateData = prismaUpdateEntityBuilder(data, mapping);
 
     // Crea la query para las imagenes
-    if (!!uploadedFilesByField) {
-      const images = this.imageService.createImageQuery(
-        uploadedFilesByField?.[id]
-      );
-      updateData = {
-        ...updateData,
-        ...images,
-      };
-    }
+    // if (!!uploadedFilesByField) {
+    //   const images = this.imageService.createImageQuery(
+    //     uploadedFilesByField?.[id]
+    //   );
+    //   updateData = {
+    //     ...updateData,
+    //     ...images,
+    //   };
+    // }
 
     let updatedProduct;
 

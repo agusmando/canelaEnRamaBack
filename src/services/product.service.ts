@@ -3,7 +3,7 @@ import { CreateProductDto } from "./../dto/products/create-product.dto.ts";
 import { ProductDto } from "../dto/products/product.dto.ts";
 import { UpdateProductDto } from "../dto/products/update-product.dto.ts";
 import { UpdateProductTagDto } from "../dto/products/update-product-tag.dto.ts";
-import { productPostProcessingQueryMapping } from "../mappings/products/product-post-procesing.mapping.ts";
+import { productPostProcessingMapping } from "../mappings/products/product-post-procesing.mapping.ts";
 import {
   ProductHasNoVariantsError,
   InvalidMeasureError,
@@ -12,12 +12,12 @@ import {
 import {
   ValidationError,
   NotFoundError,
+  BadRequestError,
 } from "../errors/application/index-app.error.ts";
 import { GenericServiceImpl } from "./generic-impl.service.ts";
 import { ProductRepository } from "../repository/product.repository.ts";
-import { ImageRepository } from "./../repository/image.repository.ts";
-import { productVariantPostProcessingMapping } from "../mappings/product-variants/product-variant-post-procesing.mapping.ts";
 import { ProductVariantRepository } from "../repository/product-variant.repository.ts";
+import { ImageService } from "./image.service.ts";
 
 export class ProductService extends GenericServiceImpl<
   ProductDto,
@@ -26,13 +26,13 @@ export class ProductService extends GenericServiceImpl<
 > {
   productRepository: ProductRepository;
   productVariantRepository: ProductVariantRepository;
-  imageRepository: ImageRepository;
+  imageService: ImageService;
 
   constructor() {
     super("product");
     this.productRepository = new ProductRepository();
     this.productVariantRepository = new ProductVariantRepository();
-    this.imageRepository = new ImageRepository();
+    this.imageService = new ImageService();
   }
 
   async createProduct(
@@ -41,22 +41,22 @@ export class ProductService extends GenericServiceImpl<
   ): Promise<ProductDto> {
     if (createData.variants.length == 0 || !createData.variants) {
       uploadedFilesByField &&
-        (await this.imageRepository.abortImageUpload(uploadedFilesByField));
+        (await this.imageService.abortImageUpload(uploadedFilesByField));
       throw new ProductHasNoVariantsError();
     }
     if (createData.measureTypeId == 0 || !createData.measureTypeId) {
       uploadedFilesByField &&
-        (await this.imageRepository.abortImageUpload(uploadedFilesByField));
+        (await this.imageService.abortImageUpload(uploadedFilesByField));
       throw new InvalidMeasureError();
     }
     if (createData.categoryId == 0 || !createData.categoryId) {
       uploadedFilesByField &&
-        (await this.imageRepository.abortImageUpload(uploadedFilesByField));
+        (await this.imageService.abortImageUpload(uploadedFilesByField));
       throw new ProductHasNoCategoryError();
     }
     if (!createData.name || createData.description == "") {
       uploadedFilesByField &&
-        (await this.imageRepository.abortImageUpload(uploadedFilesByField));
+        (await this.imageService.abortImageUpload(uploadedFilesByField));
       throw new ValidationError();
     }
 
@@ -67,7 +67,7 @@ export class ProductService extends GenericServiceImpl<
     );
 
     // Post-creation processing
-    const postMapping = productVariantPostProcessingMapping;
+    const postMapping = productPostProcessingMapping;
     const postVariants = product.variants.map((variant: any) => {
       if (!variant.profitMargin || !variant.price) return variant;
       return postMapping(variant);
@@ -81,7 +81,7 @@ export class ProductService extends GenericServiceImpl<
       createData.variants[0].hasComponents &&
       createData.variants[0].hasComponents.length > 0
     ) {
-      await this.productRepository.recalculateMixPrice(product.variants[0].id);
+      await this.productVariantRepository.recalculateSingleMixPrice(product.variants[0].id);
     }
 
     return product;
@@ -90,17 +90,21 @@ export class ProductService extends GenericServiceImpl<
   async updateProduct(
     id: number,
     data: UpdateProductDto,
-    uploadedFilesByField: Record<string, any[]>
   ): Promise<ProductDto> {
-    const postMapping = productPostProcessingQueryMapping;
+    const postMapping = productPostProcessingMapping;
 
     if (!id || id == 0) {
-      uploadedFilesByField &&
-        (await this.imageRepository.abortImageUpload(uploadedFilesByField));
       throw new NotFoundError();
     }
+
+    if (!data) {
+      throw new BadRequestError();
+    }
     // Updating the product
-    let updatedProduct = await this.productRepository.update(id, data, uploadedFilesByField);
+    let updatedProduct = await this.productRepository.update(
+      id,
+      data,
+    );
     console.log("a ver la data updateada", updatedProduct);
 
     //Post-updating processing
@@ -110,7 +114,7 @@ export class ProductService extends GenericServiceImpl<
 
     // Recalculate all mixes prices from one product
     if (data.price || data.profitMargin) {
-      this.productRepository.recalculateAllMixesFromProduct(Number(id));
+      this.productVariantRepository.recalculateAllMixesFromProduct(Number(id));
     }
 
     // Add, remove, activate or deactivate variants from one product

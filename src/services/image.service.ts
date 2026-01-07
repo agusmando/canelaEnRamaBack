@@ -43,7 +43,23 @@ export class ImageService {
     return result;
   }
 
-  async cloudinaryDelete(publicId: string) {
+  async deleteImage(publicId: string) {
     return this.imageRepository.cloudinaryDelete(publicId);
+  }
+  
+  async removeImages(removeImages?: { id: number }[]) {
+    let imagePromises: any[] = [];
+    if (removeImages && removeImages.length > 0) {
+      const imageIds = removeImages.map((image: any) => image.id);
+      console.log("imageIds", imageIds);
+      const foundImages = await this.imageRepository.findManyImagesDb(imageIds);
+      console.log("foundImages", foundImages);
+      foundImages.forEach((image: any) => {
+        imagePromises.push(
+          this.deleteImage(image.public_id)
+        );
+      });
+      await Promise.all(imagePromises);
+    }
   }
 }

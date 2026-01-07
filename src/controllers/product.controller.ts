@@ -31,8 +31,7 @@ export class ProductController extends GenericControllerImpl<
     try {
       const data = req.body;
       const objectId = Number(req.params.id);
-      const files = req.files;
-      const response = await productService.updateProduct(objectId, data, files);
+      const response = await productService.updateProduct(objectId, data);
       res.status(200).json(new BaseResponse(200, "Product updated", response));
     } catch (error) {
       next(error);

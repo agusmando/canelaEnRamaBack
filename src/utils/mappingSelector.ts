@@ -14,7 +14,7 @@ export default function mappingSelector(entity: string) {
         ),
         post: import(
           "../mappings/products/product-post-procesing.mapping.ts"
-        ).then((module) => module.productPostProcessingQueryMapping),
+        ).then((module) => module.productPostProcessingMapping),
       };
     case "productVariant":
       return {

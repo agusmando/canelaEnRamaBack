@@ -5,88 +5,37 @@ import { GenericServiceImpl } from "./generic-impl.service.ts";
 import { SupplierDto } from "../dto/supplier/supplier.dto.ts";
 import { CreateSupplierDto } from "../dto/supplier/create-supplier.dto.ts";
 import { UpdateSupplierDto } from "../dto/supplier/update-supplier.dto.ts";
+import { NotFoundError } from "../errors/application/NotFoundError.ts";
+import { ValidationError } from "../errors/application/ValidationError.ts";
+import { SupplierRepository } from "../repository/supplier.repository.ts";
 
 export class SupplierService extends GenericServiceImpl<
   SupplierDto,
   CreateSupplierDto,
   UpdateSupplierDto
 > {
-  protected prisma: PrismaClient;
+  protected supplierRepository: SupplierRepository;
 
   constructor() {
     super("supplier");
-    this.prisma = new PrismaClient({
-      log: ["query", "info", "warn", "error"],
-    });
+    this.supplierRepository = new SupplierRepository();
   }
 
-  addSupplierBrands: (
+  async addRemoveBrands(
     supplierId: number,
-    brandData: UpdateSupplierBrandDto
-  ) => Promise<BaseResponse<SupplierDto>> = async (
-    supplierId: number,
-    brandData: UpdateSupplierBrandDto
-  ) => {
-    try {
-      const updatedSupplier = await this.prisma.supplier.update({
-        where: { id: Number(supplierId) },
-        data: {
-          brands: {
-            connect: brandData.brandsId.map((brandId: any) => ({
-              id: brandId.id,
-            })),
-          },
-        } as any,
-        select: {
-          id: true,
-          name: true,
-          contact: true,
-          description: true,
-          brands: true,
-        },
-      });
-      return new BaseResponse(
-        200,
-        "Proveedor editado correctamente",
-        updatedSupplier
-      );
-    } catch (error) {
-      throw new AppError(ErrorsEnum.NOT_FOUND);
+    brandData: UpdateSupplierBrandDto,
+    addingBrand: boolean
+  ): Promise<SupplierDto> {
+    if (!supplierId || supplierId == 0) {
+      throw new NotFoundError();
     }
-  };
-
-  removeSupplierBrand: (
-    supplierId: number,
-    brandData: UpdateSupplierBrandDto
-  ) => Promise<BaseResponse<SupplierDto>> = async (
-    supplierId: number,
-    brandData: UpdateSupplierBrandDto
-  ) => {
-    try {
-      const updatedSupplier = await this.prisma.supplier.update({
-        where: { id: Number(supplierId) },
-        data: {
-          brands: {
-            disconnect: brandData.brandsId.map((brand: any) => ({
-              id: brand.id,
-            })),
-          },
-        } as any,
-        select: {
-          id: true,
-          name: true,
-          contact: true,
-          description: true,
-          brands: true,
-        },
-      });
-      return new BaseResponse(
-        200,
-        "Proveedor editado correctamente",
-        updatedSupplier
-      );
-    } catch (error) {
-      throw new AppError(ErrorsEnum.NOT_FOUND);
+    if (!brandData.brandsId || brandData.brandsId.length == 0) {
+      throw new ValidationError();
     }
-  };
+    return await this.supplierRepository.addRemoveBrands(
+      Number(supplierId),
+      brandData,
+      addingBrand
+    );
+  }
 }

@@ -41,11 +41,13 @@ export class ProductRepository extends GenericRepositoryImpl<
 
     // Crea la query para el producto y agrega las variantes
     // SI LLAMA A SUPER() ES PROBABLE QUE ESTO DE ACÁ NO HAGA FALTA PORQUE YA SE HACE
-    const finalQuery = prismaCreateEntityBuilder(createData, mapping);
+    // const finalQuery = prismaCreateEntityBuilder(createData, mapping);
     const data: any = {
-      ...finalQuery,
+      ...createData,
       variants: { create: variants },
     };
+
+    console.log("data", data)
 
     // TODO: Pensar en la creación múltiple de variantes
     // Si la primera variante tiene componentes, las agrega a su query
@@ -55,20 +57,16 @@ export class ProductRepository extends GenericRepositoryImpl<
       variants[0].hasComponents.length > 0
     ) {
       data.variants = {
-        create: [
-          {
-            ...variants[0],
-            hasComponents: {
-              create: variants[0].hasComponents.map(
-                (component: any) =>
-                  ({
-                    productVariantId: Number(component.productVariantId),
-                    quantity: component.quantity,
-                  } as any)
-              ),
-            },
-          },
-        ],
+        ...variants[0],
+        hasComponents: {
+          create: variants[0].hasComponents.map(
+            (component: any) =>
+              ({
+                productVariantId: Number(component.productVariantId),
+                quantity: component.quantity,
+              } as any)
+          ),
+        },
       };
     }
 
@@ -80,10 +78,9 @@ export class ProductRepository extends GenericRepositoryImpl<
     return product;
   }
 
-
   async update(
     id: number,
-    data: UpdateProductDto,
+    data: UpdateProductDto
     // uploadedFilesByField?: Record<string, any[]>
   ): Promise<ProductDto> {
     // Crea la query para actualizar el producto (campos normales)
@@ -138,3 +135,51 @@ export class ProductRepository extends GenericRepositoryImpl<
     });
   }
 }
+
+
+// const creation={
+//   data: {
+//     name: "Producto prueba completa",
+//     description: "Descripción editable",
+//     categoryId: 2,
+//     brandId: 3,
+//     Tags: {
+//       connect: [
+//         {
+//           id: 1
+//         },
+//         {
+//           id: 2
+//         }
+//       ]
+//     },
+//     variants: {
+//       create: {
+//         create: {
+//           name: "Variante prueba mix",
+//           price: 300,
+//           profitMargin: 0.4,
+//           measureTypeId: 1,
+//           contentAmount: 100,
+//           currentStock: 3000,
+//           movements: {
+//             create: {
+//               quantity: 3000,
+//               type: "IN"
+//             }
+//           },
+//           images: {
+//             create: [
+//               {
+//                 public_id: "products/d0kffxubmwj5nxirhzm8",
+//                 secure_url: "https://res.cloudinary.com/dyyn5wgmm/image/upload/v1767883025/products/d0kffxubmwj5nxirhzm8.png"
+//               }
+//             ]
+//           }
+//         },
+//        price: Float
+//       }
+//     },
+//     measureTypeId: 5
+//   }
+// }

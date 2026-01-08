@@ -21,7 +21,7 @@ router
 router
   .route("/:id/brands")
   .put(supplierController.addSupplierBrands.bind(supplierController))
-  .delete(supplierController.removeSupplierBrandsTags.bind(supplierController));
+  .delete(supplierController.removeSupplierBrands.bind(supplierController));
 router
   .route("/:id/active/")
   .delete(supplierController.deactivate.bind(supplierController))

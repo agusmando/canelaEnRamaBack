@@ -30,11 +30,6 @@ router
     requireRole(["Admin"]),
     brandController.addBrandProducts.bind(brandController)
   )
-  .delete(
-    isAuthenticated,
-    requireRole(["Admin"]),
-    brandController.removeBrandProductsTags.bind(brandController)
-  );
 router
   .route("/:id/active/")
   .delete(

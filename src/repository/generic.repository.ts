@@ -38,13 +38,22 @@ export class GenericRepositoryImpl<T, U, V>
     const postMapping = this.mappingPromise
       ? await this.mappingPromise.post
       : undefined;
+    const searchMapping = this.mappingPromise
+      ? await this.mappingPromise.search
+      : undefined;
     const model = await this.ensureModel("create");
 
     const createData = prismaCreateEntityBuilder(data as any, mapping);
     let newEntity;
+
+    // Agregar el "select" de abajo a modo de include { resultado }
+
+    let includes = searchMapping ? this.includeQuery(searchMapping) : undefined;
+    console.log("includes", includes)
     try {
       newEntity = await model.create({
         data: createData,
+        include: includes,
       });
     } catch (error) {
       throw new DatabaseError();
@@ -113,39 +122,8 @@ export class GenericRepositoryImpl<T, U, V>
 
     //Permite armar el select dinámicamente según si se solicita el detalle
     if (detalle && mapping) {
-      let amount = 0;
-      Object.keys(mapping).forEach((key: string) => {
-        const field = mapping[key]?.field;
-        if (field) {
-          const expandFields = mapping[key]?.expand;
-          if (expandFields) {
-            // ensure select[field] is an object before assigning child fields
-            if (typeof select[field] !== "object") {
-              select[field] = {};
-            }
-            amount++;
-            // support both array and single string for expand
-            if (Array.isArray(expandFields)) {
-              select[field] = { include: {} };
-              expandFields.forEach((childField: string) => {
-                if (childField) {
-                  (select[field].include as Record<string, boolean>)[
-                    childField
-                  ] = true;
-                }
-              });
-            } else if (typeof expandFields === "string") {
-              select[field] = { include: { [expandFields]: true } };
-            } else {
-              // fallback: treat as single key
-              select[field] = { include: { [String(expandFields)]: true } };
-            }
-          } else {
-            amount++;
-            select[field] = true;
-          }
-        }
-      });
+      select = this.includeQuery(mapping);
+      let amount = Object.keys(select).length;
       if (amount > 0) {
         query = { ...query, select: { ...select } };
       }
@@ -272,5 +250,44 @@ export class GenericRepositoryImpl<T, U, V>
     } catch (error) {
       throw new DatabaseError();
     }
+  }
+
+  includeQuery(mapping: any): Record<string, any> {
+    let select: Record<string, any> = {};
+    let amount = 0;
+
+    Object.keys(mapping).forEach((key: string) => {
+      const field = mapping[key]?.field;
+      if (field) {
+        const expandFields = mapping[key]?.expand;
+        if (expandFields) {
+          // ensure select[field] is an object before assigning child fields
+          if (typeof select[field] !== "object") {
+            select[field] = {};
+          }
+          amount++;
+          // support both array and single string for expand
+          if (Array.isArray(expandFields)) {
+            select[field] = { include: {} };
+            expandFields.forEach((childField: string) => {
+              if (childField) {
+                (select[field].include as Record<string, boolean>)[childField] =
+                  true;
+              }
+            });
+          } else if (typeof expandFields === "string") {
+            select[field] = { include: { [expandFields]: true } };
+          } else {
+            // fallback: treat as single key
+            select[field] = { include: { [String(expandFields)]: true } };
+          }
+        } else {
+          amount++;
+          select[field] = true;
+        }
+      }
+    });
+    console.log("select", select);
+    return select;
   }
 }

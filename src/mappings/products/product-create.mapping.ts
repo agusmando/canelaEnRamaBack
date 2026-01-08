@@ -15,9 +15,9 @@ export const productCreateMapping = {
   Tags: { relation: true, connectField: "id" },
 
   // Relación compleja (Crear anidados)
-  variants: {
-    relation: true,
-    allowCreate: true,
-    childMapping: productVariantCreateMapping, // <--- ESTO ACTIVA LA RECURSIÓN
-  },
+  // variants: {
+  //   relation: true,
+  //   allowCreate: true,
+  //   childMapping: productVariantCreateMapping, // <--- ESTO ACTIVA LA RECURSIÓN
+  // },
 };

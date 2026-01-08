@@ -66,6 +66,7 @@ export class ProductService extends GenericServiceImpl<
       uploadedFilesByField
     );
 
+    console.log("product", product)
     // Post-creation processing
     const postMapping = productPostProcessingMapping;
     const postVariants = product.variants.map((variant: any) => {

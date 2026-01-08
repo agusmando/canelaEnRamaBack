@@ -1,86 +1,38 @@
-import { BaseResponse, PaginatedResponse } from "../utils/responseFormat.ts";
-import { PrismaClient } from "@prisma/client";
-
 import { UpdateBrandProductDto } from "../dto/brand/update-brand-product.dto.ts";
 import { GenericServiceImpl } from "./generic-impl.service.ts";
 import { BrandDto } from "../dto/brand/brand.dto.ts";
 import { CreateBrandDto } from "../dto/brand/create-brand.dto.ts";
 import { UpdateBrandDto } from "../dto/brand/update-brand.dto.ts";
+import { NotFoundError } from "../errors/application/NotFoundError.ts";
+import { ValidationError } from "../errors/application/ValidationError.ts";
+import { BrandRepository } from "../repository/brand.repository.ts";
 
 export class BrandService extends GenericServiceImpl<
   BrandDto,
   CreateBrandDto,
   UpdateBrandDto
 > {
-  protected prisma: PrismaClient;
-
+  protected brandRepository: BrandRepository;
   constructor() {
-    super("product");
-    this.prisma = new PrismaClient({
-      log: ["query", "info", "warn", "error"],
-    });
+    super("brand");
+    this.brandRepository = new BrandRepository();
   }
 
-  addBrandProducts: (
+  async addRemoveProducts(
     brandId: number,
-    productData: UpdateBrandProductDto
-  ) => Promise<BaseResponse<BrandDto>> = async (
-    brandId: number,
-    productData: UpdateBrandProductDto
-  ) => {
-    try {
-      console.log(productData);
-      const updatedBrand = await this.prisma.brand.update({
-        where: { id: Number(brandId) },
-        data: {
-          products: {
-            connect: productData.productsId.map((productId: any) => ({
-              id: productId.id,
-            })),
-          },
-        } as any,
-        select: {
-          id: true,
-          name: true,
-          description: true,
-          products: true,
-          suppliers: true,
-        },
-      });
-      return new BaseResponse(200, "Marca editada correctamente", updatedBrand);
-    } catch (error) {
-      throw new AppError(ErrorsEnum.NOT_FOUND);
+    productData: UpdateBrandProductDto,
+    addingProduct: boolean
+  ): Promise<BrandDto> {
+    if (!brandId || brandId == 0) {
+      throw new NotFoundError();
     }
-  };
-
-  removeBrandProduct: (
-    brandId: number,
-    productData: UpdateBrandProductDto
-  ) => Promise<BaseResponse<BrandDto>> = async (
-    brandId: number,
-    productData: UpdateBrandProductDto
-  ) => {
-    try {
-      const updatedBrand = await this.prisma.brand.update({
-        where: { id: Number(brandId) },
-        data: {
-          products: {
-            disconnect: productData.productsId.map((product: any) => ({
-              id: product.id,
-            })),
-          },
-        } as any,
-        select: {
-          id: true,
-          name: true,
-          description: true,
-          products: true,
-          suppliers: true,
-        },
-      });
-      return new BaseResponse(200, "Marca editada correctamente", updatedBrand);
-    } catch (error) {
-      throw new AppError(ErrorsEnum.NOT_FOUND);
+    if (!productData.productsId || productData.productsId.length == 0) {
+      throw new ValidationError();
     }
-  };
+    return await this.brandRepository.addRemoveProducts(
+      Number(brandId),
+      productData,
+      addingProduct
+    );
+  }
 }

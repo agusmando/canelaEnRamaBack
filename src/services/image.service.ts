@@ -57,6 +57,13 @@ export class ImageService {
       foundImages.forEach((image: any) => {
         imagePromises.push(this.deleteImage(image.public_id));
       });
+      imagePromises.push(
+        this.imageRepository.prisma.image.deleteMany({
+          where: {
+            id: { in: imageIds },
+          },
+        })
+      );
       await Promise.all(imagePromises);
     }
   }

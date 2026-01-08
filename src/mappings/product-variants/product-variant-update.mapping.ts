@@ -36,7 +36,13 @@ export const productVariantUpdateMapping = {
     }),
   },
   images: {
-    field: "images",
-    connectField: "id",
+    transform: (imgs: any[], fullData: any) => ({
+      images: {
+        create: imgs.map((image) => ({
+          public_id: image.public_id,
+          secure_url: image.secure_url,
+        })),
+      },  
+    })
   },
 };

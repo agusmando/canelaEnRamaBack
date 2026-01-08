@@ -29,7 +29,7 @@ export class ProductRepository extends GenericRepositoryImpl<
   }
   async create(
     createData: CreateProductDto,
-    uploadedFilesByField?: Record<string, any[]>
+    uploadedFilesByField?: any[]
   ): Promise<any> {
     const mapping = productCreateMapping;
 
@@ -40,6 +40,7 @@ export class ProductRepository extends GenericRepositoryImpl<
     );
 
     // Crea la query para el producto y agrega las variantes
+    // SI LLAMA A SUPER() ES PROBABLE QUE ESTO DE ACÁ NO HAGA FALTA PORQUE YA SE HACE
     const finalQuery = prismaCreateEntityBuilder(createData, mapping);
     const data: any = {
       ...finalQuery,
@@ -90,7 +91,7 @@ export class ProductRepository extends GenericRepositoryImpl<
     let updateData = prismaUpdateEntityBuilder(data, mapping);
 
     // Crea la query para las imagenes
-    // if (!!uploadedFilesByField) {
+    //  if (uploadedFilesByField && uploadedFilesByField.length > 0) {
     //   const images = this.imageService.createImageQuery(
     //     uploadedFilesByField?.[id]
     //   );

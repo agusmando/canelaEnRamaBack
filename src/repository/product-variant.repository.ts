@@ -6,8 +6,6 @@ import { CreateProductVariantDto } from "../dto/product-variant/create-product-v
 import { ProductVariantDto } from "../dto/product-variant/product-variant.dto.ts";
 import { UpdateProductVariantDto } from "../dto/product-variant/update-product-variant.dto.ts";
 import { ImageService } from "../services/image.service.ts";
-import { productVariantUpdateMapping } from "../mappings/product-variants/product-variant-update.mapping.ts";
-import { prismaUpdateEntityBuilder } from "../utils/prismaUpdateEntityBuilder.ts";
 
 export class ProductVariantRepository extends GenericRepositoryImpl<
   ProductVariantDto,
@@ -17,7 +15,7 @@ export class ProductVariantRepository extends GenericRepositoryImpl<
   protected prisma: PrismaClient;
   protected imageService: ImageService;
   constructor() {
-    super("product-variant");
+    super("productVariant");
     this.prisma = new PrismaClient({
       log: ["query", "info", "warn", "error"],
     });
@@ -27,20 +25,18 @@ export class ProductVariantRepository extends GenericRepositoryImpl<
   async updateVariant(
     id: number,
     data: UpdateProductVariantDto,
-    uploadedFilesByField?: Record<string, any[]>
+    uploadedFilesByField?: any[]
   ) {
-    // Crea la query para actualizar el producto (campos normales)
-    const mapping = productVariantUpdateMapping;
-    let updateData = prismaUpdateEntityBuilder(data, mapping);
-
+    let updateData = data;
     // Crea la query para las imagenes
-    if (!!uploadedFilesByField) {
-      const images = this.imageService.createImageQuery(
-        uploadedFilesByField?.[id]
-      );
+    if (
+      uploadedFilesByField &&
+      Array.isArray(uploadedFilesByField) &&
+      uploadedFilesByField.length > 0
+    ) {
       updateData = {
         ...updateData,
-        ...images,
+        images: uploadedFilesByField,
       };
     }
 
@@ -63,7 +59,7 @@ export class ProductVariantRepository extends GenericRepositoryImpl<
    */
   async createBaseVariantQuery(
     variants: CreateProductVariantDto[],
-    uploadedFilesByField?: Record<string, any[]>
+    uploadedFilesByField?: any[]
   ): Promise<any> {
     const variantMapping = productVariantCreateMapping;
     let result: any;
@@ -72,10 +68,8 @@ export class ProductVariantRepository extends GenericRepositoryImpl<
       result = {
         ...basic,
       };
-      if (!!uploadedFilesByField) {
-        const images = this.imageService.createImageQuery(
-          uploadedFilesByField?.[variant.id]
-        );
+      if (uploadedFilesByField && uploadedFilesByField.length > 0) {
+        const images = this.imageService.createImageQuery(uploadedFilesByField);
         result = {
           ...result,
           ...images,
@@ -179,7 +173,8 @@ export class ProductVariantRepository extends GenericRepositoryImpl<
     });
   }
 
-  async addComponentToVariant( // Revisar si esto funciona
+  async addComponentToVariant(
+    // Revisar si esto funciona
     productVariantId: number,
     mixVariantId: number,
     quantity: number

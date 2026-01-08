@@ -12,6 +12,7 @@ export class UpdateProductVariantDto {
   stockIncrement?: number;
   currentStock?: number;
   removeImages?: { id: number }[];
+  images?: any[];
 
   constructor(
     name?: string,
@@ -26,8 +27,8 @@ export class UpdateProductVariantDto {
     addComponents?: { productId: number; quantity: number }[],
     removeComponents?: { productId: number }[],
     editComponents?: { productId: number; quantity: number }[],
-    removeImages?: { id: number }[]
-
+    removeImages?: { id: number }[],
+    images?: any[]
   ) {
     this.name = name;
     this.active = active;
@@ -42,5 +43,6 @@ export class UpdateProductVariantDto {
     this.removeComponents = removeComponents;
     this.editComponents = editComponents;
     this.removeImages = removeImages
+    this.images = images
   }
 }

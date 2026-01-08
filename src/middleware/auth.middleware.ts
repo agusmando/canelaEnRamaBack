@@ -3,7 +3,7 @@ import UserRoles from "supertokens-node/recipe/userroles";
 import { BaseResponse } from "../utils/responseFormat.ts";
 // import { Response } from "express";
 
-// 1. Middleware básico para verificar que está logueado (ya lo conoces)
+// 1. Middleware básico para verificar que está logueado
 export const isAuthenticated = verifySession();
 
 // 2. Middleware para verificar roles específicos

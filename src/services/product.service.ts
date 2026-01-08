@@ -1,4 +1,4 @@
-import { BaseResponse } from "../utils/responseFormat.ts";
+
 import { CreateProductDto } from "./../dto/products/create-product.dto.ts";
 import { ProductDto } from "../dto/products/product.dto.ts";
 import { UpdateProductDto } from "../dto/products/update-product.dto.ts";
@@ -37,7 +37,7 @@ export class ProductService extends GenericServiceImpl<
 
   async createProduct(
     createData: CreateProductDto,
-    uploadedFilesByField: Record<string, any[]>
+    uploadedFilesByField: any[]
   ): Promise<ProductDto> {
     if (createData.variants.length == 0 || !createData.variants) {
       uploadedFilesByField &&

@@ -20,7 +20,7 @@ export class ImageService {
     );
   }
 
-  async abortImageUpload(uploadedFilesByField?: Record<string, any[]>) {
+  async abortImageUpload(uploadedFilesByField?: any[]) {
     if (!uploadedFilesByField) return;
     return this.imageRepository.abortImageUpload(uploadedFilesByField);
   }
@@ -46,7 +46,7 @@ export class ImageService {
   async deleteImage(publicId: string) {
     return this.imageRepository.cloudinaryDelete(publicId);
   }
-  
+
   async removeImages(removeImages?: { id: number }[]) {
     let imagePromises: any[] = [];
     if (removeImages && removeImages.length > 0) {
@@ -55,9 +55,7 @@ export class ImageService {
       const foundImages = await this.imageRepository.findManyImagesDb(imageIds);
       console.log("foundImages", foundImages);
       foundImages.forEach((image: any) => {
-        imagePromises.push(
-          this.deleteImage(image.public_id)
-        );
+        imagePromises.push(this.deleteImage(image.public_id));
       });
       await Promise.all(imagePromises);
     }

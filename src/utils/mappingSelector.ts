@@ -29,7 +29,7 @@ export default function mappingSelector(entity: string) {
         ).then((module) => module.productVariantUpdateMapping),
         post: import(
           "../mappings/product-variants/product-variant-post-procesing.mapping.ts"
-        ).then((module) => module.productVariantPostProcessingQueryMapping),
+        ).then((module) => module.productVariantPostProcessingMapping),
       };
     case "brand":
       return {

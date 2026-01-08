@@ -56,7 +56,7 @@ export class ImageRepository {
     });
   }
 
-  async abortImageUpload(uploadedFilesByField: Record<string, any[]>) {
+  async abortImageUpload(uploadedFilesByField: any[]) {
     const allUploaded = Object.values(uploadedFilesByField).flat();
     await Promise.allSettled(
       allUploaded.map((u: any) =>

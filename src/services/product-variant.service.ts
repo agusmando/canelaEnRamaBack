@@ -24,7 +24,7 @@ export class ProductVariantService extends GenericServiceImpl<
   async updateVariant(
     id: number,
     data: UpdateProductVariantDto,
-    uploadedFilesByField: Record<string, any[]>
+    uploadedFilesByField: any[]
   ): Promise<ProductVariantDto> {
     const postMapping = productVariantPostProcessingMapping;
 

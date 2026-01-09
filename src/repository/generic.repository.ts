@@ -46,7 +46,7 @@ export class GenericRepositoryImpl<T, U, V>
     const createData = prismaCreateEntityBuilder(data as any, mapping);
     let newEntity;
 
-    // Agregar el "select" de abajo a modo de include { resultado }
+    // Agregar el "select" de abajo a modo de include { resultado } //algo no está funcionadno aca
 
     let includes = searchMapping ? this.includeQuery(searchMapping) : undefined;
     console.log("includes", includes)

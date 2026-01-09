@@ -64,6 +64,9 @@ model ProductVariant {
   measureTypeId Int
   offers        Offer[]
   images        Image[]
+
+  // CartItem    CartItem[]
+
 }
 
 model MeasureType {
@@ -240,7 +243,7 @@ enum UserRole {
 //   order Order @relation(fields: [orderId], references: [id])
 // }
 
-// model cart {
+// model Cart {
 //   id        Int      @id @default(autoincrement())
 //   userId    Int
 //   createdAt DateTime @default(now())
@@ -253,13 +256,13 @@ enum UserRole {
 // model CartItem {
 //   id        Int      @id @default(autoincrement())
 //   cartId    Int
-//   productId Int
+//   productVariantId Int
 //   quantity  Int
 //   createdAt DateTime @default(now())
 //   updatedAt DateTime @updatedAt
 
-//   cart    cart    @relation(fields: [cartId], references: [id])
-//   product Product @relation(fields: [productId], references: [id])
+//   cart    Cart    @relation(fields: [cartId], references: [id])
+//   productVariant ProductVariant @relation(fields: [productVariantId], references: [id])
 // }
 model Image {
   id               Int    @id @default(autoincrement())

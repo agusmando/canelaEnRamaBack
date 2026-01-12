@@ -78,53 +78,52 @@ export class ProductVariantService extends GenericServiceImpl<
 
   // añade, elimina y edita componentes de un mix. Luego recalcula el precio del mix
   async handleVariantsUpdate(
-    productVariantId: number,
-    removeComponents?: { productId: number }[],
-    editComponents?: { productId: number; quantity: number }[],
-    addComponents?: { productId: number; quantity: number }[]
+    mixVariantId: number,
+    removeComponents?: { productVariantId: number }[],
+    editComponents?: { productVariantId: number; quantity: number }[],
+    addComponents?: { productVariantId: number; quantity: number }[]
   ) {
     if (removeComponents) {
       const componentPromises = removeComponents.map(async (component: any) => {
         return await this.productVariantRepository.removeVariant(
-          productVariantId,
+          mixVariantId,
           component.productVariantId
         );
       });
       await Promise.all(componentPromises);
       await this.productVariantRepository.recalculateSingleMixPrice(
-        productVariantId
+        mixVariantId
       );
     }
     if (editComponents) {
       const componentPromises = editComponents.map(
-        async (component: { productId: number; quantity: number }) => {
+        async (component: { productVariantId: number; quantity: number }) => {
           return await this.productVariantRepository.updateMixVariant(
-            productVariantId,
-            component.productId,
+            mixVariantId,
+            component.productVariantId,
             component.quantity
           );
         }
       );
       await Promise.all(componentPromises);
       await this.productVariantRepository.recalculateSingleMixPrice(
-        productVariantId
+        mixVariantId
       );
     }
     if (addComponents) {
-      const componentPromises = addComponents.map(async(component: any) => {
+      const componentPromises = addComponents.map(async (component: any) => {
         return await this.productVariantRepository.addComponentToVariant(
-          component.productId,
-          productVariantId,
-          component.quantity 
-        )
+          component.productVariantId,
+          mixVariantId,
+          component.quantity
+        );
       });
       await Promise.all(componentPromises);
       await this.productVariantRepository.recalculateSingleMixPrice(
-        productVariantId
+        mixVariantId
       );
     }
   }
-
 
   // Actualiza situaciones de stock y precio relacionadas con el stock de un mix, y el precio de sus componentes
   async mixRelatedStockQueries(

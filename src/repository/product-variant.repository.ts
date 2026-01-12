@@ -6,6 +6,7 @@ import { CreateProductVariantDto } from "../dto/product-variant/create-product-v
 import { ProductVariantDto } from "../dto/product-variant/product-variant.dto.ts";
 import { UpdateProductVariantDto } from "../dto/product-variant/update-product-variant.dto.ts";
 import { ImageService } from "../services/image.service.ts";
+import { StoreProcedureError } from "../errors/infra/StoreProcedureError.ts";
 
 export class ProductVariantRepository extends GenericRepositoryImpl<
   ProductVariantDto,
@@ -118,18 +119,30 @@ export class ProductVariantRepository extends GenericRepositoryImpl<
   }
 
   async recalculateSingleMixPrice(mixVariantId: number) {
-    await this.prisma
-      .$executeRaw`SELECT public.recalculate_mix_price(${mixVariantId}::INT)`;
+    try {
+      await this.prisma
+        .$executeRaw`SELECT public.recalculate_mix_price(${mixVariantId}::INT)`;
+    } catch (error) {
+      throw new StoreProcedureError("recalculate_mix_price");
+    }
   }
 
   async recalculateAllMixesFromProduct(productId: number) {
-    await this.prisma
-      .$executeRaw`SELECT public.recalculate_all_mixes_from_product(${productId}::INT)`;
+    try {
+      await this.prisma
+        .$executeRaw`SELECT public.recalculate_all_mixes_from_product(${productId}::INT)`;
+    } catch (error) {
+      throw new StoreProcedureError("recalculate_all_mixes_from_product");
+    }
   }
 
   async processMixProduction(mixVariantId: number, newStock: number) {
-    await this.prisma
-      .$executeRaw`SELECT public.create_stock_movement(${mixVariantId}::INT, ${newStock}::INT, ${"ADJUSTMENT"}::TEXT)`;
+    try {
+      await this.prisma
+        .$executeRaw`SELECT public.create_stock_movement(${mixVariantId}::INT, ${newStock}::INT, ${"ADJUSTMENT"}::TEXT)`;
+    } catch (error) {
+      throw new StoreProcedureError("create_stock_movement");
+    }
   }
 
   async createStockMovement(
@@ -137,8 +150,12 @@ export class ProductVariantRepository extends GenericRepositoryImpl<
     newStock: number,
     type: string
   ) {
-    await this.prisma
-      .$executeRaw`SELECT public.create_stock_movement(${mixVariantId}::INT, ${newStock}::INT, ${type}::TEXT)`;
+    try {
+      await this.prisma
+        .$executeRaw`SELECT public.create_stock_movement(${mixVariantId}::INT, ${newStock}::INT, ${type}::TEXT)`;
+    } catch (error) {
+      throw new StoreProcedureError("create_stock_movement");
+    }
   }
 
   async removeVariant(mixVariantId: number, productVariantId: number) {
@@ -176,7 +193,11 @@ export class ProductVariantRepository extends GenericRepositoryImpl<
     mixVariantId: number,
     quantity: number
   ) {
-    return await this.prisma
-      .$executeRaw`SELECT public.add_component_to_variant(${productVariantId}::INT, ${mixVariantId}::INT, ${quantity}::INT)`;
+    try {
+      return await this.prisma
+        .$executeRaw`SELECT public.add_component_to_variant(${productVariantId}::INT, ${mixVariantId}::INT, ${quantity}::INT)`;
+    } catch (error) {
+      throw new StoreProcedureError("add_component_to_variant");
+    }
   }
 }

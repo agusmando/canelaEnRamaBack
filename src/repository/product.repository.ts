@@ -39,8 +39,6 @@ export class ProductRepository extends GenericRepositoryImpl<
       uploadedFilesByField
     );
 
-    // Crea la query para el producto y agrega las variantes
-    // SI LLAMA A SUPER() ES PROBABLE QUE ESTO DE ACÁ NO HAGA FALTA PORQUE YA SE HACE
     // const finalQuery = prismaCreateEntityBuilder(createData, mapping);
     const data: any = {
       ...createData,
@@ -78,36 +76,36 @@ export class ProductRepository extends GenericRepositoryImpl<
     return product;
   }
 
-  async update(
-    id: number,
-    data: UpdateProductDto
-    // uploadedFilesByField?: Record<string, any[]>
-  ): Promise<ProductDto> {
-    // Crea la query para actualizar el producto (campos normales)
-    const mapping = productUpdateMapping;
-    let updateData = prismaUpdateEntityBuilder(data, mapping);
+  // async update(
+  //   id: number,
+  //   data: UpdateProductDto
+  //   // uploadedFilesByField?: Record<string, any[]>
+  // ): Promise<ProductDto> {
+  //   // Crea la query para actualizar el producto (campos normales)
+  //   const mapping = productUpdateMapping;
+  //   let updateData = prismaUpdateEntityBuilder(data, mapping);
 
-    // Crea la query para las imagenes
-    //  if (uploadedFilesByField && uploadedFilesByField.length > 0) {
-    //   const images = this.imageService.createImageQuery(
-    //     uploadedFilesByField?.[id]
-    //   );
-    //   updateData = {
-    //     ...updateData,
-    //     ...images,
-    //   };
-    // }
+  //   // Crea la query para las imagenes
+  //   //  if (uploadedFilesByField && uploadedFilesByField.length > 0) {
+  //   //   const images = this.imageService.createImageQuery(
+  //   //     uploadedFilesByField?.[id]
+  //   //   );
+  //   //   updateData = {
+  //   //     ...updateData,
+  //   //     ...images,
+  //   //   };
+  //   // }
 
-    let updatedProduct;
+  //   let updatedProduct;
 
-    console.log("a ver la data updateada", updateData);
-    if (!updateData || Object.keys(updateData).length === 0) {
-      updatedProduct = await super.getById(id);
-    } else {
-      updatedProduct = await super.update(id, updateData);
-    }
-    return updatedProduct;
-  }
+  //   console.log("a ver la data updateada", updateData);
+  //   if (!updateData || Object.keys(updateData).length === 0) {
+  //     updatedProduct = await super.getById(id);
+  //   } else {
+  //     updatedProduct = await super.update(id, updateData);
+  //   }
+  //   return updatedProduct;
+  // }
 
   async addRemoveTags(
     id: number,

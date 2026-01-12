@@ -43,11 +43,8 @@ export class ProductVariantRepository extends GenericRepositoryImpl<
     let updatedProductVariant;
 
     console.log("a ver la data updateada", updateData);
-    if (!updateData || Object.keys(updateData).length === 0) {
-      updatedProductVariant = await super.getById(id);
-    } else {
-      updatedProductVariant = await super.update(id, updateData);
-    }
+    updatedProductVariant = await super.update(id, updateData);
+
     return updatedProductVariant;
   }
 

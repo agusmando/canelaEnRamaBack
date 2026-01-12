@@ -15,43 +15,52 @@ const app = express();
 app.use(express.json());
 
 
-const corsMiddleware = cors({
-  origin: function (origin, callback) {
-    const allowedOrigins = [
-      "http://localhost:3000",
-      "https://ecommercedesignforcanelaenrama.vercel.app",
-      "https://846e52c106c6.ngrok-free.app",
-    ];
+app.use(
+  cors({
+    origin: "http://localhost:3000",
+    allowedHeaders: ["content-type", ...supertokens.getAllCORSHeaders()],
+    credentials: true,
+  })
+);
+// const corsMiddleware = cors({
+//   origin: function (origin, callback) {
+//     const allowedOrigins = [
+//       "http://localhost:3000",
+//       "https://ecommercedesignforcanelaenrama.vercel.app",
+//       "https://846e52c106c6.ngrok-free.app",
+//       //supertokens dashboard
+//       "https://localhost:8080/api/auth"
+//     ];
 
-    if (!origin) return callback(null, true);
-    if (allowedOrigins.includes(origin)) {
-      return callback(null, true);
-    }
+//     if (!origin) return callback(null, true);
+//     if (allowedOrigins.includes(origin)) {
+//       return callback(null, true);
+//     }
 
-    return callback(new Error("Not allowed by CORS"));
-  },
-  credentials: true,
-  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"], 
-  allowedHeaders: [
-    "content-type",
-    "ngrok-skip-browser-warning", // 🔥 ESTA ES LA CLAVE
-    ...supertokens.getAllCORSHeaders(),
-  ],
-});
+//     return callback(new Error("Not allowed by CORS"));
+//   },
+//   credentials: true,
+//   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"], 
+//   allowedHeaders: [
+//     "content-type",
+//     "ngrok-skip-browser-warning", // 🔥 ESTA ES LA CLAVE
+//     ...supertokens.getAllCORSHeaders(),
+//   ],
+// });
 
-app.use(corsMiddleware);
+// app.use(corsMiddleware);
 
 /**
  * ⚠️ ESTO ES LO CLAVE
  * SuperTokens necesita que el mismo CORS
  * esté activo cuando él responde OPTIONS
  */
-app.use((req, res, next) => {
-  if (req.method === "OPTIONS") {
-    return corsMiddleware(req, res, next);
-  }
-  next();
-});
+// app.use((req, res, next) => {
+//   if (req.method === "OPTIONS") {
+//     return corsMiddleware(req, res, next);
+//   }
+//   next();
+// });
 
 app.use(middleware());
 app.use("/api", rutas);

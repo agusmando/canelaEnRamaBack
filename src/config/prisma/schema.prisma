@@ -65,8 +65,7 @@ model ProductVariant {
   offers        Offer[]
   images        Image[]
 
-  // CartItem    CartItem[]
-
+  CartItem CartItem[]
 }
 
 model MeasureType {
@@ -88,7 +87,7 @@ model Dependency {
   componentProduct ProductVariant @relation("ComponentVariant", fields: [productVariantId], references: [id])
 
   @@id([mixVariantId, productVariantId])
-} 
+}
 
 model Brand {
   id          Int     @id @default(autoincrement())
@@ -154,7 +153,7 @@ model Supplier {
 }
 
 model Offer {
-  id               Int            @id @default(autoincrement())
+  id               Int             @id @default(autoincrement())
   productVariantId Int?
   ProductVariant   ProductVariant? @relation(fields: [productVariantId], references: [id])
   productId        Int?
@@ -165,8 +164,8 @@ model Offer {
   discountType     DiscountType
   discountQuantity Int? // (La cantidad de productos que tienen que comprar para obtener el descuento)
   quantityToGet    Int? // (la cantidad total de items que se lleva el cliente, o la cantidad gratis)
-  stockThreshold    Int? // (La cantidad mínima de stock necesaria para que la oferta sea válida)
-  active           Boolean @default(true)
+  stockThreshold   Int? // (La cantidad mínima de stock necesaria para que la oferta sea válida)
+  active           Boolean         @default(true)
 }
 
 enum DiscountType {
@@ -176,6 +175,71 @@ enum DiscountType {
   BUY_MORE_GET_MORE // Compra muchos producto y obtienes una cantidad gratis (usa discountQuantity para saber la cantidad mínima que tiene que comprar para obtenerlo, quantityToGet te diría cuántos gratis)
   BUY_MORE_GET_DISCOUNT // Compra un producto y obtienes un descuento (usa discountQuantity igual, pero usa discountValue para saber el porcentaje de descuento)
   BUY_MORE_GET_FIXED_DISCOUNT // Compra un producto y obtienes un descuento fijo (usa discountQuantity igual, pero usa discountValue para saber el descuento fijo)
+}
+
+
+
+// model Review {
+//   id        Int      @id @default(autoincrement())
+//   productId Int
+//   userId    Int
+//   rating    Int
+//   comment   String?
+//   createdAt DateTime @default(now())
+//   updatedAt DateTime @updatedAt
+
+//   product Product @relation(fields: [productId], references: [id])
+//   user    User    @relation(fields: [userId], references: [id])
+// }
+
+model Image {
+  id               Int            @id @default(autoincrement())
+  productVariantId Int
+  public_id        String // El ID de Cloudinary (para borrar/editar).
+  secure_url       String // La URL para mostrar la imagen en el frontend.
+  ProductVariant   ProductVariant @relation(fields: [productVariantId], references: [id])
+}
+
+model User {
+  id            Int      @id @default(autoincrement())
+  supertokensId String   @unique // vínculo con SuperTokens
+  email         String?
+  name          String?
+  avatarUrl     String?
+  role          UserRole @default(CONSUMER)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  cart          Cart?
+  // Ejemplo: si después quieres órdenes:
+  // orders        Order[]
+}
+
+enum UserRole {
+  ADMIN
+  EMPLOYEE
+  CONSUMER
+}
+
+model Cart {
+  id        Int      @id @default(autoincrement())
+  userId    Int?     @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  sessionId String?  @unique // identificador de sesión para guests
+  user  User?       @relation(fields: [userId], references: [id])
+  items CartItem[]
+}
+
+model CartItem {
+  cartId           Int
+  productVariantId Int
+  quantity         Int
+  createdAt        DateTime @default(now())
+
+  cart           Cart           @relation(fields: [cartId], references: [id])
+  productVariant ProductVariant @relation(fields: [productVariantId], references: [id])
+
+  @@id([cartId, productVariantId])
 }
 
 // model Order {
@@ -199,39 +263,6 @@ enum DiscountType {
 //   productVariantId Int?
 // }
 
-model User {
-  id            Int      @id @default(autoincrement())
-  supertokensId String   @unique // vínculo con SuperTokens
-  email         String?
-  name          String?
-  avatarUrl     String?
-  role          UserRole @default(CONSUMER)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-
-  // Ejemplo: si después quieres órdenes:
-  // orders        Order[]
-}
-
-enum UserRole {
-  ADMIN
-  EMPLOYEE
-  CONSUMER
-}
-
-// model Review {
-//   id        Int      @id @default(autoincrement())
-//   productId Int
-//   userId    Int
-//   rating    Int
-//   comment   String?
-//   createdAt DateTime @default(now())
-//   updatedAt DateTime @updatedAt
-
-//   product Product @relation(fields: [productId], references: [id])
-//   user    User    @relation(fields: [userId], references: [id])
-// }
-
 // model Shipment {
 //   id        Int       @id @default(autoincrement())
 //   orderId   Int
@@ -243,31 +274,3 @@ enum UserRole {
 //   order Order @relation(fields: [orderId], references: [id])
 // }
 
-// model Cart {
-//   id        Int      @id @default(autoincrement())
-//   userId    Int
-//   createdAt DateTime @default(now())
-//   updatedAt DateTime @updatedAt
-
-//   user  User       @relation(fields: [userId], references: [id])
-//   items CartItem[]
-// }
-
-// model CartItem {
-//   id        Int      @id @default(autoincrement())
-//   cartId    Int
-//   productVariantId Int
-//   quantity  Int
-//   createdAt DateTime @default(now())
-//   updatedAt DateTime @updatedAt
-
-//   cart    Cart    @relation(fields: [cartId], references: [id])
-//   productVariant ProductVariant @relation(fields: [productVariantId], references: [id])
-// }
-model Image {
-  id               Int    @id @default(autoincrement())
-  productVariantId Int
-  public_id        String // Obligatorio: El ID que te dio Cloudinary (para borrar/editar).
-  secure_url       String // La URL para mostrar la imagen en el frontend.
-  ProductVariant ProductVariant @relation(fields: [productVariantId], references: [id])
-}

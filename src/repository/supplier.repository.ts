@@ -12,7 +12,7 @@ export class SupplierRepository extends GenericRepositoryImpl<
   protected prisma: PrismaClient;
   // protected imageService: ImageService;
   constructor() {
-    super("product");
+    super("supplier");
     this.prisma = new PrismaClient({
       log: ["query", "info", "warn", "error"],
     });

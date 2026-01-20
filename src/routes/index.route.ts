@@ -9,6 +9,8 @@ import supplierRoutes from "./supplier.route.ts";
 import movementRoutes from "./movement.route.ts";
 import brandRoutes from "./brand.route.ts";
 import offerRoutes from "./offer.route.ts";
+import cartRoutes from "./cart.route.ts";
+import cartItemRoutes from "./cart-item.route.ts";
 
 router.use("/product", productRoutes);
 router.use("/product/variant", productVariantRoutes);
@@ -18,5 +20,7 @@ router.use("/supplier", supplierRoutes);
 router.use("/brand", brandRoutes);
 router.use("/movement", movementRoutes);
 router.use("/offer", offerRoutes);
+router.use("/cart", cartRoutes);
+router.use("/cart/item", cartItemRoutes);
 
 export default router;

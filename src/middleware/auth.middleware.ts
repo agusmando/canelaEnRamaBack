@@ -39,3 +39,7 @@ export const requireRole = (allowedRoles: string[]) => {
     next();
   };
 };
+
+export const optionalSession = verifySession({
+    sessionRequired: false
+});

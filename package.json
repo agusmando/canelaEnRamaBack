@@ -24,6 +24,7 @@
     "@types/express": "^5.0.3",
     "@types/multer": "^2.0.0",
     "@types/streamifier": "^0.1.2",
+    "@types/uuid": "^10.0.0",
     "node-fetch": "^3.3.2",
     "nodemon": "^3.1.11",
     "prisma": "^6.7.0"
@@ -36,6 +37,7 @@
     "express": "^5.1.0",
     "multer": "^2.0.2",
     "streamifier": "^0.1.1",
-    "supertokens-node": "^24.0.0"
+    "supertokens-node": "^24.0.0",
+    "uuid": "^13.0.0"
   }
 }

@@ -1,7 +1,7 @@
 export const cartUpdateMapping = {
   // Relaciones simples
   sessionId: { relation: true, connectField: "id" },
-  userId: { relation: true, connectField: "id" },
+  userSuperTokensId: { relation: true, connectField: "id" },
 
   // addItem?: CreateCartItemDto[];
   // removeItem?: number[];

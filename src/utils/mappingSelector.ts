@@ -90,6 +90,27 @@ export default function mappingSelector(entity: string) {
           (module) => module.productUpdateMapping
         ),
       };
+      case "cart":
+        return {
+        search: import(
+          "../mappings/cart/cart-search.mapping.ts"
+        ).then((module) => module.cartSearchQueryMapping),
+        create: import("../mappings/cart/cart-create.mapping.ts").then(
+          (module) => module.cartCreateMapping
+        ),
+        update: import("../mappings/cart/cart-update.mapping.ts").then(
+          (module) => module.cartUpdateMapping
+        ),
+      };
+    case "cartItem":
+      return {
+        create: import("../mappings/cart-item/cart-item-create.mapping.ts").then(
+          (module) => module.cartItemCreateMapping
+        ),
+        update: import("../mappings/cart-item/cart-item-update.mapping.ts").then(
+          (module) => module.cartItemUpdateMapping
+        ),
+      };
   }
 
   // throw new Error(`No mapping found for entity: ${entity}`);

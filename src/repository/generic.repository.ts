@@ -135,18 +135,18 @@ export class GenericRepositoryImpl<T, U, V>
     let totalElements, entityList;
 
     // const model = await this.ensureModel("search");
-    let query: { where: any; select?: any; take?: number; skip?: number } = {
+    let query: { where: any; include?: any; take?: number; skip?: number } = {
       where: { ...where },
     };
-    let select: Record<string, any> = {};
+    let include: Record<string, any> = {};
     let pagination = {};
 
     //Permite armar el select dinámicamente según si se solicita el detalle
     if (detalle && mapping) {
-      select = this.includeQuery(mapping);
-      let amount = Object.keys(select).length;
+      include = this.includeQuery(mapping);
+      let amount = Object.keys(include).length;
       if (amount > 0) {
-        query = { ...query, select: { ...select } };
+        query = { ...query, include: { ...include } };
       }
     }
 

@@ -1,7 +1,7 @@
-export const CartCreateMapping = {
+export const cartCreateMapping = {
   // Campos simples del producto
-  sessionId: { parseInt: true },
-  userId: { parseInt: true },
+  sessionId: { parseString: true },
+  userSuperTokensId: { string: true },
 
   // Relaciones simples (Conectar)
   user: { relation: true, connectField: "id" },

@@ -3,15 +3,15 @@ import { CreateCartItemDto } from "../cart-item/create-cart-item.dto.ts";
 export class CreateCartDto {
 
   sessionId?: string;
-  userId?: number;
+  userSuperTokensId?: string;
   items: CreateCartItemDto[] = [];
   constructor( 
     sessionId?: string,
-    userId?: number,
+    userSuperTokensId?: string,
     items: CreateCartItemDto[] = [],
   ) {
     this.sessionId = sessionId;
-    this.userId = userId;
+    this.userSuperTokensId = userSuperTokensId;
     this.items = items;
   }
 }

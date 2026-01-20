@@ -182,14 +182,14 @@ enum DiscountType {
 // model Review {
 //   id        Int      @id @default(autoincrement())
 //   productId Int
-//   userId    Int
+//   userSuperTokensId    Int
 //   rating    Int
 //   comment   String?
 //   createdAt DateTime @default(now())
 //   updatedAt DateTime @updatedAt
 
 //   product Product @relation(fields: [productId], references: [id])
-//   user    User    @relation(fields: [userId], references: [id])
+//   user    User    @relation(fields: [userSuperTokensId], references: [id])
 // }
 
 model Image {
@@ -222,11 +222,11 @@ enum UserRole {
 
 model Cart {
   id        Int      @id @default(autoincrement())
-  userId    Int?     @unique
+  userSuperTokensId    String?     @unique
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   sessionId String?  @unique // identificador de sesión para guests
-  user  User?       @relation(fields: [userId], references: [id])
+  user  User?       @relation(fields: [userSuperTokensId], references: [supertokensId])
   items CartItem[]
 }
 

@@ -46,7 +46,7 @@ export class CartController extends GenericControllerImpl<
       const data = req.body;
       const sessionId = req.params.id;
       const response = await this.cartService.updateCart(sessionId, data);
-      res.status(200).json(new BaseResponse(200, "Cart updated", response));
+      res.status(201).json(new BaseResponse(201, "Cart updated", response));
     } catch (error) {
       next(error);
     }

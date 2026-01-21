@@ -1,19 +1,22 @@
-import { CreateCartItemDto } from "../cart-item/create-cart-item.dto.ts";
+import { UpdateCartItemDto } from "../cart-item/update-cart-item.dto.ts";
 
 export class UpdateCartDto {
   sessionId?: string;
   userSuperTokensId?: string;
-  addItem?: CreateCartItemDto[];
-  removeItem?: number[];
+  addItem?: UpdateCartItemDto[];
+  removeItem?: {productVariantId: number}[];
+  editItem?: UpdateCartItemDto[];
   constructor(
     sessionId?: string,
     userSuperTokensId?: string,
-    addItem?: CreateCartItemDto[],
-    removeItem?: number[],
+    addItem?: UpdateCartItemDto[],
+    removeItem?: {productVariantId: number}[],
+    editItem?: UpdateCartItemDto[],
   ) {
     this.sessionId = sessionId;
     this.userSuperTokensId = userSuperTokensId;
     this.addItem = addItem;
     this.removeItem = removeItem;
+    this.editItem = editItem;
   }
 }

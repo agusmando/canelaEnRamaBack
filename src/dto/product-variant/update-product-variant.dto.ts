@@ -6,9 +6,9 @@ export class UpdateProductVariantDto {
   measureTypeId?: number;
   contentAmount?: number;
   requestTime?: string;
-  addComponents?: { productId: number; quantity: number }[];
-  removeComponents?: { productId: number }[];
-  editComponents?: { productId: number; quantity: number }[];
+  addComponents?: { productVariantId: number; quantity: number }[];
+  removeComponents?: { productVariantId: number }[];
+  editComponents?: { productVariantId: number; quantity: number }[];
   stockIncrement?: number;
   currentStock?: number;
   removeImages?: { id: number }[];
@@ -24,9 +24,9 @@ export class UpdateProductVariantDto {
     currentStock?: number,
     stockIncrement?: number,
     requestTime?: string,
-    addComponents?: { productId: number; quantity: number }[],
-    removeComponents?: { productId: number }[],
-    editComponents?: { productId: number; quantity: number }[],
+    addComponents?: { productVariantId: number; quantity: number }[],
+    removeComponents?: { productVariantId: number }[],
+    editComponents?: { productVariantId: number; quantity: number }[],
     removeImages?: { id: number }[],
     images?: any[]
   ) {

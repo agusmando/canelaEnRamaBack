@@ -244,10 +244,22 @@ model CartItem {
 
 // model Order {
 //   id         Int           @id @default(autoincrement())
+//   userSuperTokensId String
+//   user  User?       @relation(fields: [userSuperTokensId], references: [supertokensId])
 //   createdAt  DateTime      @default(now())
+//   updatedAt  DateTime      @updatedAt
 //   totalPrice Float
+//   totalItems Int
+//   paymentType  String
 //   details    OrderDetail[]
+//   orderStatusId Int
+//   orderStatus OrderStatus @relation(fields: [orderStatusId], references: [id])
 // }
+
+// model OrderStatus { // PENDING, ,CANCELLED, PROCESSING, DELIVERED
+//   id        Int      @id @default(autoincrement())
+//   name      String
+// }  
 
 // model OrderDetail {
 //   id        Int   @id @default(autoincrement())

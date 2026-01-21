@@ -8,6 +8,10 @@ import { cartCreateMapping } from "../mappings/cart/cart-create.mapping.ts";
 import { CartItemService } from "../services/cart-item.service.ts";
 import { cartUpdateMapping } from "../mappings/cart/cart-update.mapping.ts";
 import { prismaUpdateEntityBuilder } from "../utils/prismaUpdateEntityBuilder.ts";
+import { StoreProcedureError } from "../errors/infra/StoreProcedureError.ts";
+import { CreateCartItemDto } from "../dto/cart-item/create-cart-item.dto.ts";
+import { UpdateCartItemDto } from "../dto/cart-item/update-cart-item.dto.ts";
+import { DatabaseError } from "../errors/infra/DatabaseError.ts";
 
 export class CartRepository extends GenericRepositoryImpl<
   CartDto,
@@ -44,30 +48,155 @@ export class CartRepository extends GenericRepositoryImpl<
   }
 
   async getCart(value: string): Promise<any> {
-    console.log("value", value)
-    return await this.prisma.cart.findFirst({
-      where: { OR: [{ sessionId: value }, { userSuperTokensId: value }] },
-      include: {
-        items: {
-          include: {
-            productVariant: true,
+    console.log("value", value);
+    try {
+      return await this.prisma.cart.findFirst({
+        where: { OR: [{ sessionId: value }, { userSuperTokensId: value }] },
+        include: {
+          items: {
+            include: {
+              productVariant: {
+                include: {
+                  product: true,
+                },
+              },
+            },
           },
         },
-      },
-    });
+      });
+    } catch (error) {
+      throw new DatabaseError();
+    }
   }
 
   async updateCart(cartToken: string, data: UpdateCartDto): Promise<any> {
-
     const updateMapping = cartUpdateMapping;
 
-    const updateData = prismaUpdateEntityBuilder(data, updateMapping);  
+    const updateData = prismaUpdateEntityBuilder(data, updateMapping);
 
-    console.log("updateData", updateData)
+    console.log("updateData", updateData);
 
     return await this.prisma.cart.update({
       where: { sessionId: cartToken },
       data: updateData,
     });
+  }
+
+  async deleteCart(cartToken: string): Promise<any> {
+    return await this.prisma.cart.deleteMany({
+      where: {
+        OR: [{ sessionId: cartToken }, { userSuperTokensId: cartToken }],
+      },
+    });
+  }
+
+  async mergeSessionCartToUserCart(
+    sessionId: string,
+    userSuperTokensId: string,
+  ) {
+    try {
+      await this.prisma
+        .$executeRaw`SELECT public.merge_session_cart_to_user_cart(${sessionId}::VARCHAR, ${userSuperTokensId}::VARCHAR)`;
+      return this.updateTimeOnCart(userSuperTokensId);
+    } catch (error) {
+      throw new StoreProcedureError("merge_session_cart_to_user_cart");
+    }
+  }
+
+  async addItemsToCart(cartToken: string, items: UpdateCartItemDto[]) {
+    try {
+      const promises: Promise<any>[] = [];
+      items.forEach(async (item) => {
+        promises.push(
+          this.prisma
+            .$executeRaw`SELECT public.add_item_to_cart(${cartToken}::VARCHAR, ${item.productVariantId}::INT, ${item.quantity}::INT)`,
+        );
+        return Promise.all(promises);
+      });
+    } catch (error) {
+      throw new StoreProcedureError("add_item_to_cart");
+    }
+  }
+
+  async removeItemsFromCart(
+    cartToken: string,
+    items: { productVariantId: number }[],
+  ) {
+    try {
+      const currentCart = await this.getCart(cartToken);
+      const promises: Promise<any>[] = [];
+      items.forEach(async (item) => {
+        promises.push(
+          this.prisma.cartItem.deleteMany({
+            where: {
+              cartId: currentCart.id,
+              productVariantId: item.productVariantId,
+            },
+          }),
+        );
+      });
+      await Promise.all(promises);
+
+      return this.updateTimeOnCart(cartToken);
+    } catch (error) {
+      throw new DatabaseError();
+    }
+  }
+
+  async editItemOfCart(cartToken: string, items: UpdateCartItemDto[]) {
+    try {
+      const currentCart = await this.getCart(cartToken);
+      const promises: Promise<any>[] = [];
+      items.forEach(async (item) => {
+        if (item.quantity === 0) {
+          promises.push(
+            this.prisma.cartItem.deleteMany({
+              where: {
+                cartId: currentCart.id,
+                productVariantId: item.productVariantId,
+              },
+            }),
+          );
+        }
+        promises.push(
+          this.prisma.cartItem.updateMany({
+            where: {
+              cartId: currentCart.id,
+              productVariantId: item.productVariantId,
+            },
+            data: {
+              quantity: item.quantity,
+            },
+          }),
+        );
+      });
+      await Promise.all(promises);
+      return this.updateTimeOnCart(cartToken);
+    } catch (error) {
+      throw new DatabaseError();
+    }
+  }
+
+  async updateTimeOnCart(cartToken: string) {
+    try {
+      const currentCart = await this.getCart(cartToken);
+      return await this.prisma.cart.update({
+        where: { id: currentCart.id },
+        data: { updatedAt: new Date() },
+        include: {
+          items: {
+            include: {
+              productVariant: {
+                include: {
+                  product: true,
+                },
+              }
+            },
+          },
+        },
+      });
+    } catch (error) {
+      throw new StoreProcedureError("update_time_on_cart");
+    }
   }
 }

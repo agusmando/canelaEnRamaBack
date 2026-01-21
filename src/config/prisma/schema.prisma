@@ -66,6 +66,7 @@ model ProductVariant {
   images        Image[]
 
   CartItem CartItem[]
+  orderItems OrderItem[]
 }
 
 model MeasureType {
@@ -210,8 +211,9 @@ model User {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
   cart          Cart?
+  orders        Order[]
+
   // Ejemplo: si después quieres órdenes:
-  // orders        Order[]
 }
 
 enum UserRole {
@@ -242,38 +244,44 @@ model CartItem {
   @@id([cartId, productVariantId])
 }
 
-// model Order {
-//   id         Int           @id @default(autoincrement())
-//   userSuperTokensId String
-//   user  User?       @relation(fields: [userSuperTokensId], references: [supertokensId])
-//   createdAt  DateTime      @default(now())
-//   updatedAt  DateTime      @updatedAt
-//   totalPrice Float
-//   totalItems Int
-//   paymentType  String
-//   details    OrderDetail[]
-//   orderStatusId Int
-//   orderStatus OrderStatus @relation(fields: [orderStatusId], references: [id])
-// }
+model Order {
+  id                Int           @id @default(autoincrement())
+  userSuperTokensId String
+  user              User?         @relation(fields: [userSuperTokensId], references: [supertokensId])
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  
+  totalPrice        Float
+  totalItems        Int
+  paymentType       String
+  
+  // Usar un Enum o mantener tu modelo OrderStatus
+  status            OrderStatus   @default(PENDING) 
+  orderItems        OrderItem[]
+}
 
-// model OrderStatus { // PENDING, ,CANCELLED, PROCESSING, DELIVERED
-//   id        Int      @id @default(autoincrement())
-//   name      String
-// }  
+enum OrderStatus {
+  PENDING
+  PROCESSING
+  SHIPPED
+  DELIVERED
+  CANCELLED
+}
 
-// model OrderDetail {
-//   id        Int   @id @default(autoincrement())
-//   orderId   Int
-//   productId Int
-//   quantity  Int
-//   unitPrice Float
-//   subtotal  Float
-
-//   Order            Order           @relation(fields: [orderId], references: [id])
-//   Product          Product         @relation(fields: [productId], references: [id])
-//   productVariant   ProductVariant? @relation(fields: [productVariantId], references: [id])
-//   productVariantId Int?
-// }
+model OrderItem {
+  id               Int            @id @default(autoincrement())
+  orderId          Int
+  productVariantId Int?           // Opcional por si el producto se borra del catálogo
+  
+  productNameSnapshot  String     // Ej: "Yogurt"
+  variantNameSnapshot  String     // Ej: "Vainilla"
+  unitPriceSnapshot    Float      // El precio al que se vendió EXACTAMENTE ese día
+  
+  quantity         Int
+  
+  Order            Order          @relation(fields: [orderId], references: [id])
+  productVariant   ProductVariant? @relation(fields: [productVariantId], references: [id])
+}
 
 // model Shipment {
 //   id        Int       @id @default(autoincrement())

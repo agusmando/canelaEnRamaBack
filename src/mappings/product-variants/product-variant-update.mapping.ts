@@ -9,6 +9,8 @@ export const productVariantUpdateMapping = {
   contentMeasure: { field: "contentMeasure" },
   contentAmount: { field: "contentAmount" },
   requestTime: { field: "requestTime" },
+  availableWeb: { field: "availableWeb" },
+  availablePedidosYa: { field: "availablePedidosYa" },
 
   // Relaciones simples
   measureTypeId: { relation: true, connectField: "id" },

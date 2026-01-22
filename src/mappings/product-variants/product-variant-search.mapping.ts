@@ -32,5 +32,7 @@ export const productVariantSearchQueryMapping = {
     field: "images",
     type: "relationArray",
     childField: "id",
-  }
+  },
+  availableWeb: { field: "availableWeb", type: "boolean" },
+  availablePedidosYa: { field: "availablePedidosYa", type: "boolean" },
 };

@@ -10,11 +10,15 @@ export class UpdateProductVariantDto {
   removeComponents?: { productVariantId: number }[];
   editComponents?: { productVariantId: number; quantity: number }[];
   stockIncrement?: number;
+  availableWeb?: boolean;
+  availablePedidosYa?: boolean;
   currentStock?: number;
   removeImages?: { id: number }[];
   images?: any[];
 
   constructor(
+    availableWeb?: boolean,
+    availablePedidosYa?: boolean,
     name?: string,
     active?: boolean,
     measureTypeId?: number,
@@ -28,7 +32,7 @@ export class UpdateProductVariantDto {
     removeComponents?: { productVariantId: number }[],
     editComponents?: { productVariantId: number; quantity: number }[],
     removeImages?: { id: number }[],
-    images?: any[]
+    images?: any[],
   ) {
     this.name = name;
     this.active = active;
@@ -42,7 +46,9 @@ export class UpdateProductVariantDto {
     this.requestTime = requestTime;
     this.removeComponents = removeComponents;
     this.editComponents = editComponents;
-    this.removeImages = removeImages
-    this.images = images
+    this.removeImages = removeImages;
+    this.images = images;
+    this.availableWeb = availableWeb;
+    this.availablePedidosYa = availablePedidosYa;
   }
 }

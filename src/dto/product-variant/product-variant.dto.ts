@@ -10,6 +10,8 @@ export class ProductVariantDto {
   profitMargin?: number;
   currentStock: number;
   active: boolean;
+  availableWeb: boolean;
+  availablePedidosYa: boolean;
   contentMeasure?: { id: number; name: string };
   contentAmount: number;
   requestTime: string;
@@ -28,6 +30,8 @@ export class ProductVariantDto {
     contentAmount: number,
     requestTime: string,
     measureTypeId: number,
+    availableWeb: boolean,
+    availablePedidosYa: boolean,
     contentMeasure?: { id: number; name: string },
     profitMargin?: number,
     price?: number,
@@ -35,7 +39,7 @@ export class ProductVariantDto {
     isComponentOf?: DependencyDto[],
     hasComponents?: DependencyDto[],
     movements?: MovementDto[],
-    finalPrice?: number
+    finalPrice?: number,
   ) {
     this.id = id;
     this.productId = productId;
@@ -53,5 +57,7 @@ export class ProductVariantDto {
     this.hasComponents = hasComponents;
     this.movements = movements;
     this.finalPrice = finalPrice;
+    this.availableWeb = availableWeb;
+    this.availablePedidosYa = availablePedidosYa;
   }
 }

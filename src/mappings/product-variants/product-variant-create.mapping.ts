@@ -12,6 +12,8 @@ export const productVariantCreateMapping = {
 
   // Booleans
   active: { parseBoolean: true },
+  availableWeb: { parseBoolean: true },
+  availablePedidosYa: { parseBoolean: true },
 
   // Relaciones Anidadas dentro de la variante
   movements: { 

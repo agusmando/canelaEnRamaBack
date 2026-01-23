@@ -7,6 +7,7 @@ export class CreateOrderDto {
   paymentType: string;
   status: string;
   orderItems: CreateOrderItemDto[] = [];
+  estimatedReadyAt?: Date;
 
   constructor(
     userSuperTokensId: number,
@@ -15,6 +16,7 @@ export class CreateOrderDto {
     paymentType: string,
     status: string,
     orderItems: CreateOrderItemDto[],
+    estimatedReadyAt?: Date
   ) {
     this.userSuperTokensId = userSuperTokensId;
     this.totalPrice = totalPrice;
@@ -22,5 +24,6 @@ export class CreateOrderDto {
     this.paymentType = paymentType;
     this.status = status;
     this.orderItems = orderItems;
+    this.estimatedReadyAt = estimatedReadyAt;
   }
 }

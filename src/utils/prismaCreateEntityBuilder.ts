@@ -2,7 +2,7 @@
 
 export const prismaCreateEntityBuilder = (data: any, mapping?: any) => {
   if (!data || typeof data !== "object") return data;
-  
+
   // Clonamos para no mutar el original
   const result: any = Array.isArray(data) ? [...data] : { ...data };
 
@@ -24,13 +24,12 @@ export const prismaCreateEntityBuilder = (data: any, mapping?: any) => {
     }
     if (map.parseBoolean) {
       // Maneja "true", "false", 1, 0
-      result[key] = val === 'true' || val === true || val === '1' || val === 1;
+      result[key] = val === "true" || val === true || val === "1" || val === 1;
       continue;
     }
 
     // 3. Manejo de Relaciones
     if (map.relation) {
-      
       // CASO A: Arrays (ej: variants, Tags)
       if (Array.isArray(val)) {
         if (val.length === 0) {
@@ -41,32 +40,44 @@ export const prismaCreateEntityBuilder = (data: any, mapping?: any) => {
         // Si es para CREAR anidados (ej: variants dentro de Product)
         if (map.allowCreate && map.childMapping) {
           result[key] = {
-            create: val.map((item: any) => 
+            create: val.map((item: any) =>
               // AQUÍ ESTÁ LA CLAVE: Llamada Recursiva con el mapping del hijo
               prismaCreateEntityBuilder(item, map.childMapping)
             ),
           };
-        } 
+        }
         // Si es para CONECTAR por ID (ej: Tags)
         else {
-          result[key] = {
-            connect: val.map((it: any) => ({
-              [map.connectField || "id"]: Number(it.id || it),
-            })),
-          };
+          if (!Number.isNaN(val[0].id)) {
+            result[key] = {
+              connect: val.map((it: any) => ({
+                [map.connectField || "id"]: Number(it.id || it),
+              })),
+            };
+          } else {
+            result[key] = {
+              connect: val.map((it: any) => ({
+                [map.connectField || "id"]: it.id || it,
+              })),
+            };
+          }
         }
-      } 
-      
+      }
+
       // CASO B: Objetos o Valores únicos (ej: categoryId, brandId implícitos)
       else if (typeof val === "object") {
-         // Lógica similar para objetos simples si fuera necesario
-         if (val.id) {
-            result[key] = { connect: { [map.connectField || "id"]: Number(val.id) } };
-         } else if (map.allowCreate && map.childMapping) {
-            result[key] = { create: prismaCreateEntityBuilder(val, map.childMapping) };
-         }
-      } 
-      
+        // Lógica similar para objetos simples si fuera necesario
+        if (val.id) {
+          result[key] = {
+            connect: { [map.connectField || "id"]: Number(val.id) },
+          };
+        } else if (map.allowCreate && map.childMapping) {
+          result[key] = {
+            create: prismaCreateEntityBuilder(val, map.childMapping),
+          };
+        }
+      }
+
       // CASO C: Primitivos que son FK directas (a veces pasa)
       else {
         // Normalmente esto no se mapea como 'relation', pero por si acaso

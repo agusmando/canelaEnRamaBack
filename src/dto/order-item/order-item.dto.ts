@@ -1,19 +1,3 @@
-
-/**
- *  id               Int  @id @default(autoincrement())
-  orderId          Int
-  productVariantId Int? // Opcional por si el producto se borra del catálogo
-
-  productNameSnapshot String // Ej: "Yogurt"
-  variantNameSnapshot String // Ej: "Vainilla"
-  unitPriceSnapshot   Float // El precio al que se vendió EXACTAMENTE ese día
-
-  quantity Int
-
-  Order          Order           @relation(fields: [orderId], references: [id])
-  productVariant ProductVariant? @relation(fields: [productVariantId], references: [id])
- */
-
 import { OrderDto } from "../order/order.dto.ts";
 import { ProductVariantDto } from "../product-variant/product-variant.dto.ts";
 
@@ -23,11 +7,14 @@ export class OrderItemDto {
   productVariantId: number;
   productVariant?: ProductVariantDto;
   order?: OrderDto;
-  
+
   productNameSnapshot: string;
   variantNameSnapshot: string;
   unitPriceSnapshot: number;
   quantity: number;
+
+  status: string;
+  awaitingStockAt?: Date;
 
   constructor(
     id: number,
@@ -37,8 +24,10 @@ export class OrderItemDto {
     variantNameSnapshot: string,
     unitPriceSnapshot: number,
     quantity: number,
+    status: string,
     productVariant?: ProductVariantDto,
-    order?: OrderDto
+    order?: OrderDto,
+    awaitingStockAt?: Date
   ) {
     this.id = id;
     this.orderId = orderId;
@@ -49,5 +38,7 @@ export class OrderItemDto {
     this.quantity = quantity;
     this.productVariant = productVariant;
     this.order = order;
-  } 
-};
+    this.status = status;
+    this.awaitingStockAt = awaitingStockAt;
+  }
+}

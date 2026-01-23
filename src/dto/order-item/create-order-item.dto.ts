@@ -5,6 +5,8 @@ export class CreateOrderItemDto {
   variantNameSnapshot: string;
   unitPriceSnapshot: number;
   quantity: number;
+  status: string;
+  awaitingStockAt?: Date;
   constructor(
     orderId: number,
     productVariantId: number,
@@ -12,6 +14,8 @@ export class CreateOrderItemDto {
     variantNameSnapshot: string,
     unitPriceSnapshot: number,
     quantity: number,
+    status: string,
+    awaitingStockAt?: Date
   ) {
     this.orderId = orderId;
     this.productVariantId = productVariantId;
@@ -19,5 +23,7 @@ export class CreateOrderItemDto {
     this.variantNameSnapshot = variantNameSnapshot;
     this.unitPriceSnapshot = unitPriceSnapshot;
     this.quantity = quantity;
+    this.status = status;
+    this.awaitingStockAt = awaitingStockAt;
   }
 }

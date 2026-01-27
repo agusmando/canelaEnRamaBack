@@ -1,6 +1,7 @@
 export const productVariantSearchQueryMapping = {
   ofuscatedId: { field: "id", type: "number" }, // Not supposed to be used directly
   ofuscatedProductId: { field: "product", type: "number" }, // Not supposed to be used directly
+  ofuscatedProduct: { field: "product", type: "object", childField: "name" },
   name: { field: "name", type: "string" },    
   ofuscatedProfitMargin: { field: "profitMargin", type: "number" }, // Not supposed to be used directly
   ofuscatedMeasure: { field: "contentMeasure", type: "string" }, // Not supposed to be used directly

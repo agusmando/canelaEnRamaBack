@@ -11,6 +11,8 @@ import brandRoutes from "./brand.route.ts";
 import offerRoutes from "./offer.route.ts";
 import cartRoutes from "./cart.route.ts";
 import cartItemRoutes from "./cart-item.route.ts";
+import orderRoutes from "./order.route.ts";
+import orderItemRoutes from "./order-item.route.ts";
 
 router.use("/product", productRoutes);
 router.use("/product/variant", productVariantRoutes);
@@ -22,5 +24,7 @@ router.use("/movement", movementRoutes);
 router.use("/offer", offerRoutes);
 router.use("/cart", cartRoutes);
 router.use("/cart/item", cartItemRoutes);
+router.use("/order", orderRoutes)
+router.use("/order/item", orderItemRoutes)
 
 export default router;

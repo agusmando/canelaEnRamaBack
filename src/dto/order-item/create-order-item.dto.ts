@@ -1,5 +1,4 @@
 export class CreateOrderItemDto {
-  orderId: number;
   productVariantId: number;
   productNameSnapshot: string;
   variantNameSnapshot: string;
@@ -8,7 +7,6 @@ export class CreateOrderItemDto {
   status: string;
   awaitingStockAt?: Date;
   constructor(
-    orderId: number,
     productVariantId: number,
     productNameSnapshot: string,
     variantNameSnapshot: string,
@@ -17,7 +15,6 @@ export class CreateOrderItemDto {
     status: string,
     awaitingStockAt?: Date
   ) {
-    this.orderId = orderId;
     this.productVariantId = productVariantId;
     this.productNameSnapshot = productNameSnapshot;
     this.variantNameSnapshot = variantNameSnapshot;

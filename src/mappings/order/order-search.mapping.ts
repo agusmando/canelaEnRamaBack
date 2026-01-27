@@ -1,6 +1,6 @@
 
 
-export const cartSearchQueryMapping = {
+export const orderSearchQueryMapping = {
   ofuscatedId: { field: "id", type: "number" },
   ofuscateduserSuperTokensId: { field: "userSuperTokensId", type: "string" },
   ofuscatedItems: { field: "orderItems", type: "relationArray", childField: "id", expand: ["productVariant"] },

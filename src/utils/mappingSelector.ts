@@ -4,43 +4,46 @@ export default function mappingSelector(entity: string) {
     case "product":
       return {
         search: import("../mappings/products/product-search.mapping.ts").then(
-          (module) => module.productSearchQueryMapping
+          (module) => module.productSearchQueryMapping,
         ),
         create: import("../mappings/products/product-create.mapping.ts").then(
-          (module) => module.productCreateMapping
+          (module) => module.productCreateMapping,
         ),
         update: import("../mappings/products/product-update.mapping.ts").then(
-          (module) => module.productUpdateMapping
+          (module) => module.productUpdateMapping,
         ),
-        post: import(
-          "../mappings/products/product-post-procesing.mapping.ts"
-        ).then((module) => module.productPostProcessingMapping),
+        post: import("../mappings/products/product-post-procesing.mapping.ts").then(
+          (module) => module.productPostProcessingMapping,
+        ),
       };
     case "productVariant":
       return {
-        search: import(
-          "../mappings/product-variants/product-variant-search.mapping.ts"
-        ).then((module) => module.productVariantSearchQueryMapping),
-        create: import(
-          "../mappings/product-variants/product-variant-create.mapping.ts"
-        ).then((module) => module.productVariantCreateMapping),
-        update: import(
-          "../mappings/product-variants/product-variant-update.mapping.ts"
-        ).then((module) => module.productVariantUpdateMapping),
-        post: import(
-          "../mappings/product-variants/product-variant-post-procesing.mapping.ts"
-        ).then((module) => module.productVariantPostProcessingMapping),
+        search:
+          import("../mappings/product-variants/product-variant-search.mapping.ts").then(
+            (module) => module.productVariantSearchQueryMapping,
+          ),
+        create:
+          import("../mappings/product-variants/product-variant-create.mapping.ts").then(
+            (module) => module.productVariantCreateMapping,
+          ),
+        update:
+          import("../mappings/product-variants/product-variant-update.mapping.ts").then(
+            (module) => module.productVariantUpdateMapping,
+          ),
+        post: import("../mappings/product-variants/product-variant-post-procesing.mapping.ts").then(
+          (module) => module.productVariantPostProcessingMapping,
+        ),
       };
     case "brand":
       return {
         search: import("../mappings/brand/brand-search.mapping.ts").then(
-          (module) => module.brandSearchQueryMapping
+          (module) => module.brandSearchQueryMapping,
         ),
         create: import("../mappings/brand/brand-create.mapping.ts").then(
-          (module) => module.brandCreateMapping
+          (module) => module.brandCreateMapping,
         ),
         update: import("../mappings/brand/brand-update.mapping.ts").then(
-          (module) => module.brandUpdateMapping
+          (module) => module.brandUpdateMapping,
         ),
         // post: import(
         //   "../mappings/brand/brand-post-procesing.mapping.ts"
@@ -49,67 +52,94 @@ export default function mappingSelector(entity: string) {
     case "tag":
       return {
         search: import("../mappings/tags/tag-search.mapping.ts").then(
-          (module) => module.tagSearchQueryMapping
+          (module) => module.tagSearchQueryMapping,
         ),
         // create: import('../mappings/products/products-create.mapping.ts').then(module => module.productCreateMapping)
       };
     case "category":
       return {
         search: import("../mappings/category/category-search.mappings.ts").then(
-          (module) => module.categorySearchQueryMapping
+          (module) => module.categorySearchQueryMapping,
         ),
       };
     case "supplier":
       return {
-        search: import(
-          "../mappings/suppliers/suppliers-search.mapping.ts"
-        ).then((module) => module.supplierSearchQueryMapping),
+        search:
+          import("../mappings/suppliers/suppliers-search.mapping.ts").then(
+            (module) => module.supplierSearchQueryMapping,
+          ),
         create: import("../mappings/suppliers/supplier-create.mapping.ts").then(
-          (module) => module.supplierCreateMapping
+          (module) => module.supplierCreateMapping,
         ),
         update: import("../mappings/suppliers/supplier-update.mapping.ts").then(
-          (module) => module.supplierUpdateMapping
+          (module) => module.supplierUpdateMapping,
         ),
       };
     case "stockMovement":
       return {
-        search: import(
-          "../mappings/movements/movements-search.mapping.ts"
-        ).then((module) => module.movementSearchQueryMapping),
+        search:
+          import("../mappings/movements/movements-search.mapping.ts").then(
+            (module) => module.movementSearchQueryMapping,
+          ),
       };
 
     case "offer":
       return {
-        search: import(
-          "../mappings/offers/offer-search.mapping.ts"
-        ).then((module) => module.offerSearchQueryMapping),
+        search: import("../mappings/offers/offer-search.mapping.ts").then(
+          (module) => module.offerSearchQueryMapping,
+        ),
         create: import("../mappings/offers/offer-create.mapping.ts").then(
-          (module) => module.offerCreateMapping
+          (module) => module.offerCreateMapping,
         ),
         update: import("../mappings/offers/offer-update.mapping.ts").then(
-          (module) => module.productUpdateMapping
+          (module) => module.productUpdateMapping,
         ),
       };
-      case "cart":
-        return {
-        search: import(
-          "../mappings/cart/cart-search.mapping.ts"
-        ).then((module) => module.cartSearchQueryMapping),
+    case "cart":
+      return {
+        search: import("../mappings/cart/cart-search.mapping.ts").then(
+          (module) => module.cartSearchQueryMapping,
+        ),
         create: import("../mappings/cart/cart-create.mapping.ts").then(
-          (module) => module.cartCreateMapping
+          (module) => module.cartCreateMapping,
         ),
         update: import("../mappings/cart/cart-update.mapping.ts").then(
-          (module) => module.cartUpdateMapping
+          (module) => module.cartUpdateMapping,
         ),
       };
     case "cartItem":
       return {
-        create: import("../mappings/cart-item/cart-item-create.mapping.ts").then(
-          (module) => module.cartItemCreateMapping
+        create:
+          import("../mappings/cart-item/cart-item-create.mapping.ts").then(
+            (module) => module.cartItemCreateMapping,
+          ),
+        update:
+          import("../mappings/cart-item/cart-item-update.mapping.ts").then(
+            (module) => module.cartItemUpdateMapping,
+          ),
+      };
+    case "order":
+      return {
+        search: import("../mappings/order/order-search.mapping.ts").then(
+          (module) => module.orderSearchQueryMapping,
         ),
-        update: import("../mappings/cart-item/cart-item-update.mapping.ts").then(
-          (module) => module.cartItemUpdateMapping
+        create: import("../mappings/order/order-create.mapping.ts").then(
+          (module) => module.orderCreateMapping,
         ),
+        update: import("../mappings/order/order-update.mapping.ts").then(
+          (module) => module.orderUpdateMapping,
+        ),
+      };
+    case "orderItem":
+      return {
+        create:
+          import("../mappings/order-item/order-item-create.mapping.ts").then(
+            (module) => module.orderItemCreateMapping,
+          ),
+        update:
+          import("../mappings/order-item/order-item-update.mapping.ts").then(
+            (module) => module.orderItemUpdateMapping,
+          ),
       };
   }
 

@@ -1,4 +1,4 @@
-import { OrderStatus } from "../enums/order-status.enum.ts";
+
 import { UserDto } from "../user/user.dto.ts";
 import { OrderItemDto } from "../order-item/order-item.dto.ts";
 export class OrderDto {
@@ -13,7 +13,7 @@ export class OrderDto {
   paymentType: string;
 
   estimatedReadyAt: Date;
-  status: OrderStatus;
+  status: string;
   orderItems: OrderItemDto[];
   constructor(
     id: number,
@@ -24,7 +24,7 @@ export class OrderDto {
     totalPrice: number,
     totalItems: number,
     paymentType: string,
-    status: OrderStatus,
+    status: string,
     orderItems: OrderItemDto[],
     estimatedReadyAt: Date
   ) {

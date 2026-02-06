@@ -25,18 +25,18 @@ export class OrderItemRepository extends GenericRepositoryImpl<
    * @param items Order items to create
    * @returns A query for the order item
    */
-  async createBaseItemQuery(
-    items: CreateOrderItemDto[],
-  ): Promise<any> {
-    const orderItemMapping = orderItemCreateMapping;
-    let result: any;
-    items?.forEach((item: any) => {
-      const basic = prismaCreateEntityBuilder(item, orderItemMapping);
-      result = {
-        ...basic,
-      };
-    });
-    console.log("result" ,result)
-    return result;
-  }
+  // async createBaseItemQuery(
+  //   items: CreateOrderItemDto[],
+  // ): Promise<any> {
+  //   let result: any[] = [];
+  //   // items?.forEach((item: any) => {
+  //   //   const basic = prismaCreateEntityBuilder(item, orderItemCreateMapping);
+  //   //   console.log("individual" ,basic)
+
+  //   //   result.push(basic);
+  //   // });
+  //   return {
+  //     create: items
+  //   };
+  // }
 }

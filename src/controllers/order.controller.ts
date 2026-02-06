@@ -19,7 +19,8 @@ export class OrderController extends GenericControllerImpl<
   async create(req: any, res: any, next: any) {
     try {
       const data = req.body;
-      const response = await this.orderService.createOrder(data);
+      const sessionId = req.session?.userId;
+      const response = await this.orderService.createOrder(data, sessionId);
       res.status(201).json(new BaseResponse(200, "Order created", response));
     } catch (error) {
       next(error);

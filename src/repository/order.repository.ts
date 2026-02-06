@@ -1,3 +1,4 @@
+
 import { OrderItemRepository } from "./order-item.repository.ts";
 import { PrismaClient } from "@prisma/client";
 import { OrderDto } from "../dto/order/order.dto.ts";
@@ -29,10 +30,6 @@ export class OrderRepository extends GenericRepositoryImpl<
   }
 
   async create(createData: CreateOrderDto): Promise<any> {
-    const orderItems = await this.orderItemRepository.createBaseItemQuery(
-      createData.orderItems,
-    );
-    console.log("orderItems", orderItems);
 
     // const finalQuery = prismaCreateEntityBuilder(createData, mapping);
     // const data: any = {
@@ -42,9 +39,7 @@ export class OrderRepository extends GenericRepositoryImpl<
 
     // console.log("data", data);
 
-    // let order = await super.create(data);
-
-    return await super.getById(1);
+    return await super.create(createData);
   }
 
   async getOrder(value: string): Promise<any> {

@@ -20,19 +20,28 @@ export class OrderService extends GenericServiceImpl<
     this.productVariantService = new ProductVariantService();
   }
 
-  async createOrder(data: CreateOrderDto): Promise<any> {
+  async createOrder(data: CreateOrderDto, sessionId?: number): Promise<any> {
     console.log("data", data);
     if (data.orderItems.length == 0) {
       throw new ValidationError();
     }
+    if (!sessionId) {
+      throw new ValidationError();
+    }
+
+    
+    let totalPrice = 0;
     const itemsForCreation: Promise<CreateOrderItemDto>[] = data.orderItems.map(
       async (item) => {
         const productVariant = await this.productVariantService.findOne(
           item.productVariantId,
         );
-        if (!productVariant) {
+        if (!productVariant ) {
           throw new ValidationError();
-        }
+        } 
+
+
+        totalPrice += productVariant?.finalPrice || 0 * item.quantity;
         return {
           quantity: item.quantity,
           productVariantId: item.productVariantId,
@@ -45,10 +54,20 @@ export class OrderService extends GenericServiceImpl<
     );
 
     const orderItems = await Promise.all(itemsForCreation);
-    return await this.orderRepository.create({
-      ...data,
+
+    let createOrderDto: CreateOrderDto = {
+      userSuperTokensId: sessionId,
+      totalPrice,
+      totalItems: itemsForCreation.length,
+      paymentType: "DEBIT",
+      status: "PENDING",
       orderItems,
-    });
+    };   
+
+    
+
+    console.log("createOrderDto", createOrderDto);
+    return await this.orderRepository.create(createOrderDto);
   }
 
   async getOrder(sessionId: string) {

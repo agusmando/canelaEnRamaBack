@@ -5,6 +5,7 @@ import { CreateOrderItemDto } from "../dto/order-item/create-order-item.dto.ts";
 import { UpdateOrderItemDto } from "../dto/order-item/update-order-item.dto.ts";
 import { prismaCreateEntityBuilder } from "../utils/prismaCreateEntityBuilder.ts";
 import { orderItemCreateMapping } from "../mappings/order-item/order-item-create.mapping.ts";
+import { DatabaseError } from "../errors/infra/DatabaseError.ts";
 
 export class OrderItemRepository extends GenericRepositoryImpl<
   OrderItemDto,
@@ -39,4 +40,12 @@ export class OrderItemRepository extends GenericRepositoryImpl<
   //     create: items
   //   };
   // }
+
+  async update(id: number, data: UpdateOrderItemDto) {
+    try {
+      await super.update(id, data);
+    } catch (error) {
+      throw new DatabaseError();
+    }
+  }
 }

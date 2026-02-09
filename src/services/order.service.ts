@@ -6,6 +6,9 @@ import { ValidationError } from "../errors/application/ValidationError.ts";
 import { OrderRepository } from "../repository/order.repository.ts";
 import { ProductVariantService } from "./product-variant.service.ts";
 import { CreateOrderItemDto } from "../dto/order-item/create-order-item.dto.ts";
+import { NotFoundError } from "../errors/application/NotFoundError.ts";
+import { UpdateOrderItemDto } from "../dto/order-item/update-order-item.dto.ts";
+import { OrderItemService } from "./order-item.service.ts";
 
 export class OrderService extends GenericServiceImpl<
   OrderDto,
@@ -14,14 +17,15 @@ export class OrderService extends GenericServiceImpl<
 > {
   protected orderRepository: OrderRepository;
   private productVariantService: ProductVariantService;
+  private orderItemService: OrderItemService;
   constructor() {
     super("order");
     this.orderRepository = new OrderRepository();
     this.productVariantService = new ProductVariantService();
+    this.orderItemService = new OrderItemService();
   }
 
-  async createOrder(data: CreateOrderDto, sessionId?: number): Promise<any> {
-    console.log("data", data);
+  async createOrder(data: CreateOrderDto, sessionId?: string): Promise<any> {
     if (data.orderItems.length == 0) {
       throw new ValidationError();
     }
@@ -29,26 +33,37 @@ export class OrderService extends GenericServiceImpl<
       throw new ValidationError();
     }
 
-    
     let totalPrice = 0;
+    let awaitingStockAt: Date = new Date();
     const itemsForCreation: Promise<CreateOrderItemDto>[] = data.orderItems.map(
       async (item) => {
         const productVariant = await this.productVariantService.findOne(
           item.productVariantId,
         );
-        if (!productVariant ) {
+        if (!productVariant) {
           throw new ValidationError();
-        } 
+        }
 
+        if (productVariant.requestTime) {
+          const days = Number(productVariant.requestTime) || 0;
+          const awaitingDate = new Date();
+          awaitingDate.setDate(awaitingDate.getDate() + days);
+          item.awaitingStockAt = awaitingDate;
+        }
 
-        totalPrice += productVariant?.finalPrice || 0 * item.quantity;
+        if (item.awaitingStockAt && item.awaitingStockAt > awaitingStockAt) {
+          awaitingStockAt = item.awaitingStockAt;
+        }
+
+        totalPrice += (productVariant?.finalPrice || 0) * item.quantity;
         return {
           quantity: item.quantity,
           productVariantId: item.productVariantId,
           productNameSnapshot: productVariant.product?.name || "",
           variantNameSnapshot: productVariant.name,
           unitPriceSnapshot: productVariant.finalPrice || 0,
-          status: "PENDING",
+          status: "FULFILLED",
+          awaitingStockAt: item.awaitingStockAt,
         };
       },
     );
@@ -62,69 +77,102 @@ export class OrderService extends GenericServiceImpl<
       paymentType: "DEBIT",
       status: "PENDING",
       orderItems,
-    };   
+      estimatedReadyAt: awaitingStockAt,
+    };
 
-    
-
-    console.log("createOrderDto", createOrderDto);
     return await this.orderRepository.create(createOrderDto);
   }
 
-  async getOrder(sessionId: string) {
-    return await this.orderRepository.getOrder(sessionId);
+  async getOrder(id: number) {
+    return await this.orderRepository.getOrder(id);
   }
 
-  async updateOrder(sessionId: string, data: UpdateOrderDto) {
-    if (!sessionId) {
+  async updateOrder(id: number, data: UpdateOrderDto) {
+    if (!id || id == 0) {
+      throw new NotFoundError();
+    }
+    const currentOrder = await this.getOrder(id);
+    console.log("data", data);
+    if (data.editItem && data.editItem.length > 0) {
+      for (let item of data.editItem) {
+        if (!item.productVariantId) {
+          throw new ValidationError();
+        }
+        await this.applyItemChange(currentOrder, item);
+      }
+    }
+
+    this.recalculateOrderStatus(currentOrder);
+
+    console.log("currentOrder", currentOrder)
+    // if data.status === confirmed (resto el stock con el servicio de StockMovement)
+    return await this.orderRepository.update(id, currentOrder);
+  }
+
+  async applyItemChange(order: OrderDto, item: UpdateOrderItemDto) {
+    console.log("item", item);
+    let currentItem = order.orderItems.find((i) => i.productVariantId == item.productVariantId);
+    console.log("currentItem", currentItem);
+
+    if (!currentItem) {
       throw new ValidationError();
     }
-    console.log("data", data);
-    if (data.userSuperTokensId) {
-      return await this.orderRepository.mergeSessionOrderToUserOrder(
-        sessionId,
-        data.userSuperTokensId,
-      );
-    }
-    if (data.addItem && data.addItem.length > 0) {
-      await this.orderRepository.addItemsToOrder(sessionId, data.addItem);
-    }
-    if (data.removeItem && data.removeItem.length > 0) {
-      const response = await this.orderRepository.removeItemsFromOrder(
-        sessionId,
-        data.removeItem,
-      );
-      if (response.items && response.items.length == 0) {
-        this.orderRepository.deleteOrder(sessionId);
+
+    let itemData: any = {};
+    if (item.quantity) {
+      if (
+        currentItem.quantity < item.quantity ||
+        item.quantity == 0 ||
+        item.quantity === currentItem.quantity
+      ) {
+        return new ValidationError();
       }
-      return response;
-    }
-    if (data.editItem && data.editItem.length > 0) {
-      const response = await this.orderRepository.editItemOfOrder(
-        sessionId,
-        data.editItem,
-      );
-      if (response.items && response.items.length == 0) {
-        this.orderRepository.deleteOrder(sessionId);
+      itemData.quantity = Number(item.quantity);
+      itemData.status = "PARTIALLY_RETURNED";
+      if (item.quantity == 0) {
+        itemData.status = "RETURNED";
       }
-      return response;
     }
-    return await this.orderRepository.updateTimeOnOrder(sessionId);
+    if (item.status) {
+      itemData.status = item.status;
+    }
+    if (item.awaitingStockAt) {
+      itemData.awaitingStockAt = item.awaitingStockAt;
+      itemData.status = "AWAITING_STOCK";
+      if (
+        order.estimatedReadyAt &&
+        item.awaitingStockAt > order.estimatedReadyAt
+      ) {
+        order.estimatedReadyAt = item.awaitingStockAt;
+      }
+    }
+    if (itemData && Object.keys(itemData).length > 0) {
+      // await this.orderItemService.update(item.id, itemData);
+      const index = order.orderItems.findIndex((i) => i.id == item.id);
+      order.orderItems[index] = {
+        ...order.orderItems[index],
+        ...itemData,
+      };
+
+    }
   }
-  //   async addRemoveProducts(
-  //     orderId: number,
-  //     productData: UpdateOrderProductDto,
-  //     addingProduct: boolean
-  //   ): Promise<OrderDto> {
-  //     if (!orderId || orderId == 0) {
-  //       throw new NotFoundError();
-  //     }
-  //     if (!productData.productsId || productData.productsId.length == 0) {
-  //       throw new ValidationError();
-  //     }
-  //     return await this.orderRepository.addRemoveProducts(
-  //       Number(orderId),
-  //       productData,
-  //       addingProduct
-  //     );
-  //   }
+
+  private recalculateOrderStatus(order: OrderDto) {
+    const activeItems = order.orderItems.filter(
+      (i) => i.status !== "CANCELLED" && i.status !== "RETURNED",
+    );
+
+    if (activeItems.length === 0) {
+      order.status = "CANCELLED";
+      return;
+    }
+
+    if (activeItems.length < order.orderItems.length) {
+      order.status = "PROCESSING";
+      return;
+    }
+
+    order.status = "PROCESSING";
+  }
 }
+// No está entendiendo la actualización de los items, el resto bien

@@ -3,7 +3,7 @@ import { UserDto } from "../user/user.dto.ts";
 import { OrderItemDto } from "../order-item/order-item.dto.ts";
 export class OrderDto {
   id: number;
-  userSuperTokensId?: number;
+  userSuperTokensId?: string;
   user: UserDto;
   createdAt: Date;
   updatedAt: Date;
@@ -19,7 +19,7 @@ export class OrderDto {
     id: number,
     createdAt: Date,
     updatedAt: Date,
-    userSuperTokensId: number,
+    userSuperTokensId: string,
     user: UserDto,
     totalPrice: number,
     totalItems: number,

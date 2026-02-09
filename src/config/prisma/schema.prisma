@@ -288,6 +288,7 @@ enum OrderItemStatus {
   FULFILLED // Disponible y asignado
   AWAITING_STOCK // Sin stock, esperando reposición
   CANCELLED // El cliente o el local lo quitaron
+  PARTIALLY_RETURNED // El cliente lo regresa parcial
   RETURNED // El cliente lo regresa
 }
 

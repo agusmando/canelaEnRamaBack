@@ -28,16 +28,14 @@ export class OrderController extends GenericControllerImpl<
   }
    
   async findOne(req: any, res: any, next: any) {
-    const sessionId = req.params.id; 
-    const response = await this.orderService.getOrder(sessionId);
+    const response = await this.orderService.getOrder(Number(req.params.id));
     res.status(200).json(new BaseResponse(200, "Order found", response));
   }
 
   async update(req: any, res: any, next: any) {
     try {
       const data = req.body;
-      const sessionId = req.params.id;
-      const response = await this.orderService.updateOrder(sessionId, data);
+      const response = await this.orderService.updateOrder(Number(req.params.id), data);
       res.status(201).json(new BaseResponse(201, "Order updated", response));
     } catch (error) {
       next(error);

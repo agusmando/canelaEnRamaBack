@@ -1,7 +1,7 @@
 import { CreateOrderItemDto } from "../order-item/create-order-item.dto.ts";
 
 export class CreateOrderDto {
-  userSuperTokensId: number;
+  userSuperTokensId: string;
   totalPrice: number;
   totalItems: number;
   paymentType: string;
@@ -10,7 +10,7 @@ export class CreateOrderDto {
   estimatedReadyAt?: Date;
 
   constructor(
-    userSuperTokensId: number,
+    userSuperTokensId: string,
     totalPrice: number,
     totalItems: number,
     paymentType: string,

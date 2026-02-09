@@ -1,8 +1,9 @@
+import { orderItemCreateMapping } from "../order-item/order-item-create.mapping.ts";
 
 
 export const orderCreateMapping = {
   // Campos simples del producto
-  userSuperTokensId: { parseInt: true },
+  userSuperTokensId: { field: "userSuperTokensId" },
   totalPrice: { parseFloat: true },
   totalItems: { parseInt: true },
   paymentType: { field: "paymentType" },
@@ -11,5 +12,5 @@ export const orderCreateMapping = {
   // Relaciones simples (Conectar)
   user: { relation: true, connectField: "userSuperTokensId" },
   // Relaciones multiples (Conectar)
-  orderItems: { relation: true, connectField: "id" },
+  orderItems: { relation: true, allowCreate: true, childMapping: orderItemCreateMapping },
 };

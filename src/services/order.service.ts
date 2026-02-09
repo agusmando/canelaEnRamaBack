@@ -9,6 +9,7 @@ import { CreateOrderItemDto } from "../dto/order-item/create-order-item.dto.ts";
 import { NotFoundError } from "../errors/application/NotFoundError.ts";
 import { UpdateOrderItemDto } from "../dto/order-item/update-order-item.dto.ts";
 import { OrderItemService } from "./order-item.service.ts";
+import { OrderItemDto } from "../dto/order-item/order-item.dto.ts";
 
 export class OrderService extends GenericServiceImpl<
   OrderDto,
@@ -33,7 +34,6 @@ export class OrderService extends GenericServiceImpl<
       throw new ValidationError();
     }
 
-    let totalPrice = 0;
     let awaitingStockAt: Date = new Date();
     const itemsForCreation: Promise<CreateOrderItemDto>[] = data.orderItems.map(
       async (item) => {
@@ -55,7 +55,6 @@ export class OrderService extends GenericServiceImpl<
           awaitingStockAt = item.awaitingStockAt;
         }
 
-        totalPrice += (productVariant?.finalPrice || 0) * item.quantity;
         return {
           quantity: item.quantity,
           productVariantId: item.productVariantId,
@@ -68,6 +67,7 @@ export class OrderService extends GenericServiceImpl<
       },
     );
 
+    const totalPrice = await this.calculateTotalPrice(itemsForCreation);
     const orderItems = await Promise.all(itemsForCreation);
 
     let createOrderDto: CreateOrderDto = {
@@ -93,25 +93,32 @@ export class OrderService extends GenericServiceImpl<
     }
     const currentOrder = await this.getOrder(id);
     console.log("data", data);
+
     if (data.editItem && data.editItem.length > 0) {
       for (let item of data.editItem) {
         if (!item.productVariantId) {
           throw new ValidationError();
         }
         await this.applyItemChange(currentOrder, item);
+        const foundItem = currentOrder.orderItems.find(
+          (i: any) => i.productVariantId == item.productVariantId,
+        );
       }
+      currentOrder.totalPrice = this.calculateTotalPrice(currentOrder.orderItems);
     }
 
     this.recalculateOrderStatus(currentOrder);
 
-    console.log("currentOrder", currentOrder)
+    console.log("currentOrder", currentOrder);
     // if data.status === confirmed (resto el stock con el servicio de StockMovement)
     return await this.orderRepository.update(id, currentOrder);
   }
 
   async applyItemChange(order: OrderDto, item: UpdateOrderItemDto) {
     console.log("item", item);
-    let currentItem = order.orderItems.find((i) => i.productVariantId == item.productVariantId);
+    let currentItem = order.orderItems.find(
+      (i) => i.productVariantId == item.productVariantId,
+    );
     console.log("currentItem", currentItem);
 
     if (!currentItem) {
@@ -119,41 +126,46 @@ export class OrderService extends GenericServiceImpl<
     }
 
     let itemData: any = {};
-    if (item.quantity) {
+
+    if (item.status) {
+      itemData.status = item.status;
+    }
+    if (item.quantity != null) {
       if (
         currentItem.quantity < item.quantity ||
-        item.quantity == 0 ||
         item.quantity === currentItem.quantity
       ) {
         return new ValidationError();
       }
       itemData.quantity = Number(item.quantity);
-      itemData.status = "PARTIALLY_RETURNED";
-      if (item.quantity == 0) {
-        itemData.status = "RETURNED";
-      }
-    }
-    if (item.status) {
-      itemData.status = item.status;
+      itemData.status = item.quantity == 0 ? "RETURNED" : "PARTIALLY_RETURNED";
     }
     if (item.awaitingStockAt) {
       itemData.awaitingStockAt = item.awaitingStockAt;
       itemData.status = "AWAITING_STOCK";
       if (
         order.estimatedReadyAt &&
-        item.awaitingStockAt > order.estimatedReadyAt
+        new Date(item.awaitingStockAt) > order.estimatedReadyAt
       ) {
         order.estimatedReadyAt = item.awaitingStockAt;
       }
     }
     if (itemData && Object.keys(itemData).length > 0) {
       // await this.orderItemService.update(item.id, itemData);
-      const index = order.orderItems.findIndex((i) => i.id == item.id);
+      const index = order.orderItems.findIndex(
+        (i) => i.productVariantId == item.productVariantId,
+      );
       order.orderItems[index] = {
         ...order.orderItems[index],
         ...itemData,
       };
 
+      await this.orderRepository.editItemOfOrder(
+        order.orderItems[index].id,
+        order.orderItems[index],
+      );
+
+      console.log("order.orderItems[index]", order.orderItems[index]);
     }
   }
 
@@ -174,5 +186,10 @@ export class OrderService extends GenericServiceImpl<
 
     order.status = "PROCESSING";
   }
+
+  private calculateTotalPrice(orderItems: any[]) {
+    return orderItems.reduce((total, item) => {
+      return total + item.unitPriceSnapshot * item.quantity;
+    }, 0);
+  } 
 }
-// No está entendiendo la actualización de los items, el resto bien

@@ -118,4 +118,14 @@ export class OrderRepository extends GenericRepositoryImpl<
   }
 
 
+  async editItemOfOrder(id: number, data: UpdateOrderItemDto) {
+    if (!id || id == 0) {
+      throw new NotFoundError();
+    }
+    if (!data.productVariantId) {
+      throw new ValidationError();
+    }
+    return await this.orderItemRepository.update(id, data);
+  }
+
 }

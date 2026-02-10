@@ -30,7 +30,7 @@ export class SupplierService extends GenericServiceImpl<
       throw new NotFoundError();
     }
     if (!brandData.brandsId || brandData.brandsId.length == 0) {
-      throw new ValidationError();
+      throw new ValidationError("Brand ids are required for adding brands to supplier");
     }
     return await this.supplierRepository.addRemoveBrands(
       Number(supplierId),

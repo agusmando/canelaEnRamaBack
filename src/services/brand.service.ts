@@ -27,7 +27,7 @@ export class BrandService extends GenericServiceImpl<
       throw new NotFoundError();
     }
     if (!productData.productsId || productData.productsId.length == 0) {
-      throw new ValidationError();
+      throw new ValidationError("Product ids are required for adding products to brand");
     }
     return await this.brandRepository.addRemoveProducts(
       Number(brandId),

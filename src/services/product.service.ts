@@ -57,7 +57,7 @@ export class ProductService extends GenericServiceImpl<
     if (!createData.name || createData.description == "") {
       uploadedFilesByField &&
         (await this.imageService.abortImageUpload(uploadedFilesByField));
-      throw new ValidationError();
+      throw new ValidationError("Product name and description are required for creating a product");
     }
 
     // Creating the product
@@ -145,7 +145,7 @@ export class ProductService extends GenericServiceImpl<
       throw new NotFoundError();
     }
     if (!tagData.tagsId || tagData.tagsId.length == 0) {
-      throw new ValidationError();
+      throw new ValidationError("Tag ids are required for adding tags to product");
     }
     return await this.productRepository.addRemoveTags(
       Number(productId),

@@ -1,6 +1,6 @@
 export class ValidationError extends Error {
-  constructor() {
-    super("Entity could not be validated");
+  constructor(message: string) {
+    super("Entity could not be validated: " + message);
     this.name = "ValidationError";
   }
 }

@@ -20,6 +20,7 @@ export class OrderController extends GenericControllerImpl<
     try {
       const data = req.body;
       const sessionId = req.session?.userId;
+      console.log(sessionId)
       const response = await this.orderService.createOrder(data, sessionId);
       res.status(201).json(new BaseResponse(200, "Order created", response));
     } catch (error) {
@@ -28,8 +29,12 @@ export class OrderController extends GenericControllerImpl<
   }
    
   async findOne(req: any, res: any, next: any) {
-    const response = await this.orderService.getOrder(Number(req.params.id));
-    res.status(200).json(new BaseResponse(200, "Order found", response));
+    try {
+      const response = await this.orderService.getOrder(Number(req.params.id));
+      res.status(200).json(new BaseResponse(200, "Order found", response));
+    } catch (error) {
+      next(error);
+    }
   }
 
   async update(req: any, res: any, next: any) {

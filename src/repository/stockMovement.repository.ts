@@ -1,0 +1,24 @@
+
+import { PrismaClient } from "@prisma/client";
+import { StoreProcedureError } from "../errors/infra/StoreProcedureError.ts";
+export class StockMovementRepository {
+  prisma: PrismaClient;
+  constructor() {
+    this.prisma = new PrismaClient({
+      log: ["query", "info", "warn", "error"],
+    });
+  }
+
+  async createStockMovement(
+    mixVariantId: number,
+    newStock: number,
+    type: string
+  ) {
+    try {
+      await this.prisma
+        .$executeRaw`SELECT public.create_stock_movement(${mixVariantId}::INT, ${newStock}::INT, ${type}::TEXT)`;
+    } catch (error) {
+      throw new StoreProcedureError("create_stock_movement" + error);
+    }
+  }
+}

@@ -37,7 +37,7 @@ export class CartService extends GenericServiceImpl<
 
   async updateCart(sessionId: string, data: UpdateCartDto) {
     if (!sessionId) {
-      throw new ValidationError();
+      throw new ValidationError("Session id is required for updating cart");
     }
     console.log("data", data);
     if (data.userSuperTokensId) {

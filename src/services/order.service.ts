@@ -10,6 +10,7 @@ import { NotFoundError } from "../errors/application/NotFoundError.ts";
 import { UpdateOrderItemDto } from "../dto/order-item/update-order-item.dto.ts";
 import { OrderItemService } from "./order-item.service.ts";
 import { OrderItemDto } from "../dto/order-item/order-item.dto.ts";
+import { StockMovementService } from "./stockMovement.service.ts";
 
 export class OrderService extends GenericServiceImpl<
   OrderDto,
@@ -18,33 +19,38 @@ export class OrderService extends GenericServiceImpl<
 > {
   protected orderRepository: OrderRepository;
   private productVariantService: ProductVariantService;
+  private stockMovementService: StockMovementService;
   private orderItemService: OrderItemService;
   constructor() {
     super("order");
     this.orderRepository = new OrderRepository();
     this.productVariantService = new ProductVariantService();
     this.orderItemService = new OrderItemService();
+    this.stockMovementService = new StockMovementService();
   }
 
-  async createOrder(data: CreateOrderDto, sessionId?: string): Promise<any> {
+  async createOrder(data: CreateOrderDto, sessionId: string): Promise<any> {
     if (data.orderItems.length == 0) {
-      throw new ValidationError();
+      throw new ValidationError("Order must have at least one item");
     }
-    if (!sessionId) {
-      throw new ValidationError();
+    if (!sessionId || sessionId == "") {
+      throw new ValidationError("Session id is required");
     }
 
     let awaitingStockAt: Date = new Date();
+    let currentDate: Date = new Date(awaitingStockAt);
     const itemsForCreation: Promise<CreateOrderItemDto>[] = data.orderItems.map(
       async (item) => {
         const productVariant = await this.productVariantService.findOne(
           item.productVariantId,
         );
         if (!productVariant) {
-          throw new ValidationError();
+          throw new ValidationError(
+            "Product variant with id " + item.productVariantId + " not found",
+          );
         }
 
-        if (productVariant.requestTime) {
+        if (productVariant.requestTime !== null) {
           const days = Number(productVariant.requestTime) || 0;
           const awaitingDate = new Date();
           awaitingDate.setDate(awaitingDate.getDate() + days);
@@ -67,8 +73,8 @@ export class OrderService extends GenericServiceImpl<
       },
     );
 
-    const totalPrice = await this.calculateTotalPrice(itemsForCreation);
     const orderItems = await Promise.all(itemsForCreation);
+    const totalPrice = await this.calculateTotalPrice(orderItems);
 
     let createOrderDto: CreateOrderDto = {
       userSuperTokensId: sessionId,
@@ -77,10 +83,17 @@ export class OrderService extends GenericServiceImpl<
       paymentType: "DEBIT",
       status: "PENDING",
       orderItems,
-      estimatedReadyAt: awaitingStockAt,
+      estimatedReadyAt:
+        awaitingStockAt > currentDate ? awaitingStockAt : undefined,
     };
 
-    return await this.orderRepository.create(createOrderDto);
+    const response = await this.orderRepository.create(createOrderDto);
+    if (response) {
+      orderItems.forEach(async (item: any) => {
+        await this.updateItemStock(item.productVariantId, item.quantity, 0);
+      });
+    }
+    return response;
   }
 
   async getOrder(id: number) {
@@ -88,26 +101,43 @@ export class OrderService extends GenericServiceImpl<
   }
 
   async updateOrder(id: number, data: UpdateOrderDto) {
-    if (!id || id == 0) {
+    if (!id || id == 0) { 
       throw new NotFoundError();
     }
     const currentOrder = await this.getOrder(id);
     console.log("data", data);
 
+    if (currentOrder.status === "CANCELLED") {
+      throw new ValidationError("Order is already cancelled");
+    }
+
+    if (data.status) {
+      currentOrder.status = data.status;
+      if (data.status === "CANCELLED") {
+        currentOrder.orderItems.forEach(async (item: any) => {
+          return await this.applyItemChange(currentOrder, {
+            productVariantId: item.productVariantId,
+            status: "CANCELLED",
+          } as UpdateOrderItemDto);
+        });
+        return await this.orderRepository.update(id, currentOrder);
+      }
+    }
+
     if (data.editItem && data.editItem.length > 0) {
       for (let item of data.editItem) {
         if (!item.productVariantId) {
-          throw new ValidationError();
+          throw new ValidationError(
+            "Product variant id is required for adding items",
+          );
         }
         await this.applyItemChange(currentOrder, item);
-        const foundItem = currentOrder.orderItems.find(
-          (i: any) => i.productVariantId == item.productVariantId,
-        );
       }
-      currentOrder.totalPrice = this.calculateTotalPrice(currentOrder.orderItems);
+      currentOrder.totalPrice = this.calculateTotalPrice(
+        currentOrder.orderItems,
+      );
+      this.recalculateOrderStatus(currentOrder);
     }
-
-    this.recalculateOrderStatus(currentOrder);
 
     console.log("currentOrder", currentOrder);
     // if data.status === confirmed (resto el stock con el servicio de StockMovement)
@@ -122,7 +152,9 @@ export class OrderService extends GenericServiceImpl<
     console.log("currentItem", currentItem);
 
     if (!currentItem) {
-      throw new ValidationError();
+      throw new ValidationError(
+        "Item with id " + item.productVariantId + " not found in order",
+      );
     }
 
     let itemData: any = {};
@@ -135,10 +167,17 @@ export class OrderService extends GenericServiceImpl<
         currentItem.quantity < item.quantity ||
         item.quantity === currentItem.quantity
       ) {
-        return new ValidationError();
+        return new ValidationError(
+          "Quantity must be lower than current quantity",
+        );
       }
       itemData.quantity = Number(item.quantity);
       itemData.status = item.quantity == 0 ? "RETURNED" : "PARTIALLY_RETURNED";
+      this.updateItemStock(
+        currentItem.productVariantId,
+        item.quantity,
+        currentItem.quantity,
+      );
     }
     if (item.awaitingStockAt) {
       itemData.awaitingStockAt = item.awaitingStockAt;
@@ -191,5 +230,25 @@ export class OrderService extends GenericServiceImpl<
     return orderItems.reduce((total, item) => {
       return total + item.unitPriceSnapshot * item.quantity;
     }, 0);
-  } 
+  }
+
+  private async updateItemStock(
+    productVariantId: number,
+    oldQuantity: number,
+    newQty?: number,
+  ) {
+    if (newQty == null) {
+      throw new ValidationError("New quantity is required for updating stock");
+    }
+
+    const diff = newQty - oldQuantity;
+
+    if (diff === 0) return;
+
+    await this.stockMovementService.createStockMovement(
+      productVariantId,
+      diff,
+      diff < 0 ? "OUT" : "RETURN",
+    );
+  }
 }

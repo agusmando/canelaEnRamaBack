@@ -10,13 +10,13 @@ export class ImageService {
     buffer: Buffer,
     mimetype: string,
     folder?: string,
-    publicId?: string
+    publicId?: string,
   ) {
     return this.imageRepository.uploadBuffer(
       buffer,
       mimetype,
       folder,
-      publicId
+      publicId,
     );
   }
 
@@ -43,28 +43,26 @@ export class ImageService {
     return result;
   }
 
-  async deleteImage(publicId: string) {
-    return this.imageRepository.cloudinaryDelete(publicId);
+  async deleteImage(foundImages: { public_id: string; id: number }[]) {
+    let imagePromises: any[] = [];
+    return this.imageRepository.withTransaction(async (tx) => {
+      foundImages.forEach(async (image: any) => {
+        imagePromises.push(
+          this.imageRepository.deleteImageDb(image.id, tx),
+        );
+        imagePromises.push(
+          this.imageRepository.cloudinaryDelete(image.publicId),
+        );
+      });
+      return await Promise.all(imagePromises);
+    });
   }
 
   async removeImages(removeImages?: { id: number }[]) {
-    let imagePromises: any[] = [];
     if (removeImages && removeImages.length > 0) {
       const imageIds = removeImages.map((image: any) => image.id);
-      console.log("imageIds", imageIds);
       const foundImages = await this.imageRepository.findManyImagesDb(imageIds);
-      console.log("foundImages", foundImages);
-      foundImages.forEach((image: any) => {
-        imagePromises.push(this.deleteImage(image.public_id));
-      });
-      imagePromises.push(
-        this.imageRepository.prisma.image.deleteMany({
-          where: {
-            id: { in: imageIds },
-          },
-        })
-      );
-      await Promise.all(imagePromises);
+      return await this.deleteImage(foundImages);
     }
   }
 }

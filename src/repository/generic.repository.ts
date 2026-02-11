@@ -6,9 +6,11 @@ import { prismaUpdateEntityBuilder } from "../utils/prismaUpdateEntityBuilder.ts
 import mappingSelector from "../utils/mappingSelector.ts";
 import { DatabaseError } from "../errors/infra/DatabaseError.ts";
 
-export class GenericRepositoryImpl<T, U, V>
-  implements GenericRepositoryInterface<T, U, V>
-{
+export class GenericRepositoryImpl<
+  T,
+  U,
+  V,
+> implements GenericRepositoryInterface<T, U, V> {
   model: any;
   protected prisma = new PrismaClient({
     log: ["query", "info", "warn", "error"],
@@ -20,18 +22,29 @@ export class GenericRepositoryImpl<T, U, V>
     this.mappingPromise = mappingSelector(prismaName) as any;
     this.model = this.ensureModel();
   }
-  async ensureModel(type: "search" | "create" | "update" = "search") {
-    if (this.model) return this.model;
+  async ensureModel(
+    type: "search" | "create" | "update" = "search",
+    tx?: PrismaClient,
+  ) {
+    const client = tx ?? this.prisma;
+    if (this.model && !tx) return this.model;
+
     const mapping = this.mappingPromise
       ? await this.mappingPromise[type]
       : undefined;
+
     const modelName = mapping?.modelName || this.prismaName;
-    const m = (this.prisma as any)[modelName];
+    const m = (client as any)[modelName];
+
     if (!m) console.log("Model not found:", modelName);
-    this.model = m;
-    return this.model;
+    if (!tx) {
+      this.model = m; // solo cacheamos cuando no hay tx
+    }
+
+    return m;
   }
-  async create(data: any): Promise<any> {
+
+  async create(data: any, tx?: PrismaClient): Promise<any> {
     const mapping = this.mappingPromise
       ? await this.mappingPromise.create
       : undefined;
@@ -41,7 +54,7 @@ export class GenericRepositoryImpl<T, U, V>
     const searchMapping = this.mappingPromise
       ? await this.mappingPromise.search
       : undefined;
-    const model = await this.ensureModel("create");
+    const model = await this.ensureModel("create", tx);
 
     const createData = prismaCreateEntityBuilder(data as any, mapping);
     let newEntity;
@@ -71,7 +84,7 @@ export class GenericRepositoryImpl<T, U, V>
     }
     return newEntity;
   }
-  async update(id: number, data: any): Promise<any> {
+  async update(id: number, data: any, tx?: PrismaClient): Promise<any> {
     const mapping = this.mappingPromise
       ? await this.mappingPromise.update
       : undefined;
@@ -81,7 +94,7 @@ export class GenericRepositoryImpl<T, U, V>
     const searchMapping = this.mappingPromise
       ? await this.mappingPromise.search
       : undefined;
-    const model = await this.ensureModel("update");
+    const model = await this.ensureModel("update", tx);
 
     let include: Record<string, any> = {};
 
@@ -94,14 +107,14 @@ export class GenericRepositoryImpl<T, U, V>
     let updatedEntity;
     try {
       if (!updateData || Object.keys(updateData).length === 0) {
-      updatedEntity = await this.getById(id);
-    } else {
-      updatedEntity = await model.update({
-        where: { id: Number(id) },
-        data: updateData,
-        include,
-      });
-    }
+        updatedEntity = await this.getById(id);
+      } else {
+        updatedEntity = await model.update({
+          where: { id: Number(id) },
+          data: updateData,
+          include,
+        });
+      }
     } catch (error) {
       throw new DatabaseError();
     }
@@ -116,7 +129,8 @@ export class GenericRepositoryImpl<T, U, V>
     paginate: boolean,
     currentPage: number,
     amountPerPage: number,
-    detalle: boolean
+    detalle: boolean,
+    tx?: PrismaClient,
   ): Promise<{
     entityList?: T[];
     currentPage: number;
@@ -177,14 +191,14 @@ export class GenericRepositoryImpl<T, U, V>
 
     return { entityList, currentPage, amountPerPage, totalElements };
   }
-  async getById(id: number): Promise<T> {
+  async getById(id: number, tx?: PrismaClient): Promise<T> {
     const mapping = this.mappingPromise
       ? await this.mappingPromise.search
       : undefined;
     const postMapping = this.mappingPromise
       ? await this.mappingPromise.post
       : undefined;
-    const model = await this.ensureModel("search");
+    const model = await this.ensureModel("search", tx);
 
     let include: Record<string, any> = {};
 
@@ -208,14 +222,14 @@ export class GenericRepositoryImpl<T, U, V>
     return entity;
   }
 
-  async deactivate(id: number): Promise<T> {
+  async deactivate(id: number, tx?: PrismaClient): Promise<T> {
     const mapping = this.mappingPromise
       ? await this.mappingPromise.create
       : undefined;
     const postMapping = this.mappingPromise
       ? await this.mappingPromise.post
       : undefined;
-    const model = await this.ensureModel("create");
+    const model = await this.ensureModel("create", tx);
     try {
       return await model.update({
         where: { id: Number(id) },
@@ -225,14 +239,14 @@ export class GenericRepositoryImpl<T, U, V>
       throw new DatabaseError();
     }
   }
-  async activate(id: number): Promise<T> {
+  async activate(id: number, tx?: PrismaClient): Promise<T> {
     const mapping = this.mappingPromise
       ? await this.mappingPromise.create
       : undefined;
     const postMapping = this.mappingPromise
       ? await this.mappingPromise.post
       : undefined;
-    const model = await this.ensureModel("create");
+    const model = await this.ensureModel("create", tx);
     try {
       return await model.update({
         where: { id: Number(id) },
@@ -281,5 +295,11 @@ export class GenericRepositoryImpl<T, U, V>
     });
     console.log("select", select);
     return select;
+  }
+
+  async withTransaction<R>(
+    callback: (tx: PrismaClient) => Promise<R>,
+  ): Promise<R> {
+    return this.prisma.$transaction(callback as any, { timeout: 60000 }) as Promise<R>; // esto debe cambiar cuando se use un mejor server para DB
   }
 }

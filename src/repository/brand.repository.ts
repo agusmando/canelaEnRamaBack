@@ -26,7 +26,8 @@ export class BrandRepository extends GenericRepositoryImpl<
   async addRemoveProducts(
     brandId: number,
     productData: UpdateBrandProductDto,
-    addingProduct: boolean
+    addingProduct: boolean,
+    tx?: PrismaClient
   ): Promise<any> {
     let data = {
       products: {
@@ -43,6 +44,6 @@ export class BrandRepository extends GenericRepositoryImpl<
         products: true,
         suppliers: true,
       },
-    });
+    }, tx);
   }
 }

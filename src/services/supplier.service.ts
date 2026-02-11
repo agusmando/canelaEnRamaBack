@@ -24,18 +24,24 @@ export class SupplierService extends GenericServiceImpl<
   async addRemoveBrands(
     supplierId: number,
     brandData: UpdateSupplierBrandDto,
-    addingBrand: boolean
+    addingBrand: boolean,
   ): Promise<SupplierDto> {
     if (!supplierId || supplierId == 0) {
       throw new NotFoundError();
     }
     if (!brandData.brandsId || brandData.brandsId.length == 0) {
-      throw new ValidationError("Brand ids are required for adding brands to supplier");
+      throw new ValidationError(
+        "Brand ids are required for adding brands to supplier",
+      );
     }
-    return await this.supplierRepository.addRemoveBrands(
-      Number(supplierId),
-      brandData,
-      addingBrand
-    );
+
+    return this.supplierRepository.withTransaction(async (tx) => {
+      return await this.supplierRepository.addRemoveBrands(
+        Number(supplierId),
+        brandData,
+        addingBrand,
+        tx,
+      );
+    });
   }
 }

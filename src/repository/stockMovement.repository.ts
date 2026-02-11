@@ -12,10 +12,12 @@ export class StockMovementRepository {
   async createStockMovement(
     mixVariantId: number,
     newStock: number,
-    type: string
+    type: string,
+    tx?: PrismaClient
   ) {
     try {
-      await this.prisma
+      const model = tx ?? this.prisma;
+      await model
         .$executeRaw`SELECT public.create_stock_movement(${mixVariantId}::INT, ${newStock}::INT, ${type}::TEXT)`;
     } catch (error) {
       throw new StoreProcedureError("create_stock_movement" + error);

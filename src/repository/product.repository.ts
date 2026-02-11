@@ -27,9 +27,10 @@ export class ProductRepository extends GenericRepositoryImpl<
     this.productVariantRepository = new ProductVariantRepository();
     this.imageService = new ImageService();
   }
-  async create(
+  async createProduct(
     createData: CreateProductDto,
-    uploadedFilesByField?: any[]
+    uploadedFilesByField?: any[],
+    tx?: PrismaClient
   ): Promise<any> {
     const mapping = productCreateMapping;
 
@@ -71,46 +72,16 @@ export class ProductRepository extends GenericRepositoryImpl<
     console.log(data);
     console.log(JSON.stringify(data.variants));
     // Crea el producto
-    let product = await super.create(data);
+    let product = await super.create(data, tx);
 
     return product;
   }
 
-  // async update(
-  //   id: number,
-  //   data: UpdateProductDto
-  //   // uploadedFilesByField?: Record<string, any[]>
-  // ): Promise<ProductDto> {
-  //   // Crea la query para actualizar el producto (campos normales)
-  //   const mapping = productUpdateMapping;
-  //   let updateData = prismaUpdateEntityBuilder(data, mapping);
-
-  //   // Crea la query para las imagenes
-  //   //  if (uploadedFilesByField && uploadedFilesByField.length > 0) {
-  //   //   const images = this.imageService.createImageQuery(
-  //   //     uploadedFilesByField?.[id]
-  //   //   );
-  //   //   updateData = {
-  //   //     ...updateData,
-  //   //     ...images,
-  //   //   };
-  //   // }
-
-  //   let updatedProduct;
-
-  //   console.log("a ver la data updateada", updateData);
-  //   if (!updateData || Object.keys(updateData).length === 0) {
-  //     updatedProduct = await super.getById(id);
-  //   } else {
-  //     updatedProduct = await super.update(id, updateData);
-  //   }
-  //   return updatedProduct;
-  // }
-
   async addRemoveTags(
     id: number,
     tagData: UpdateProductTagDto,
-    addingTag: boolean
+    addingTag: boolean,
+    tx?: PrismaClient
   ): Promise<any> {
     let data = {
       Tags: {
@@ -120,7 +91,9 @@ export class ProductRepository extends GenericRepositoryImpl<
       },
     };
     console.log(JSON.stringify(data));
-    return await this.prisma.product.update({
+    
+    const model = tx ?? this.prisma;
+    return await model.product.update({
       where: { id },
       data,
       include: {
@@ -133,51 +106,3 @@ export class ProductRepository extends GenericRepositoryImpl<
     });
   }
 }
-
-
-// const creation={
-//   data: {
-//     name: "Producto prueba completa",
-//     description: "Descripción editable",
-//     categoryId: 2,
-//     brandId: 3,
-//     Tags: {
-//       connect: [
-//         {
-//           id: 1
-//         },
-//         {
-//           id: 2
-//         }
-//       ]
-//     },
-//     variants: {
-//       create: {
-//         create: {
-//           name: "Variante prueba mix",
-//           price: 300,
-//           profitMargin: 0.4,
-//           measureTypeId: 1,
-//           contentAmount: 100,
-//           currentStock: 3000,
-//           movements: {
-//             create: {
-//               quantity: 3000,
-//               type: "IN"
-//             }
-//           },
-//           images: {
-//             create: [
-//               {
-//                 public_id: "products/d0kffxubmwj5nxirhzm8",
-//                 secure_url: "https://res.cloudinary.com/dyyn5wgmm/image/upload/v1767883025/products/d0kffxubmwj5nxirhzm8.png"
-//               }
-//             ]
-//           }
-//         },
-//        price: Float
-//       }
-//     },
-//     measureTypeId: 5
-//   }
-// }

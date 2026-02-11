@@ -4,12 +4,9 @@ import { CartDto } from "../dto/cart/cart.dto.ts";
 import { CreateCartDto } from "../dto/cart/create-cart.dto.ts";
 import { UpdateCartDto } from "../dto/cart/update-cart.dto.ts";
 import { GenericRepositoryImpl } from "./generic.repository.ts";
-import { cartCreateMapping } from "../mappings/cart/cart-create.mapping.ts";
-import { CartItemService } from "../services/cart-item.service.ts";
 import { cartUpdateMapping } from "../mappings/cart/cart-update.mapping.ts";
 import { prismaUpdateEntityBuilder } from "../utils/prismaUpdateEntityBuilder.ts";
 import { StoreProcedureError } from "../errors/infra/StoreProcedureError.ts";
-import { CreateCartItemDto } from "../dto/cart-item/create-cart-item.dto.ts";
 import { UpdateCartItemDto } from "../dto/cart-item/update-cart-item.dto.ts";
 import { DatabaseError } from "../errors/infra/DatabaseError.ts";
 
@@ -28,7 +25,7 @@ export class CartRepository extends GenericRepositoryImpl<
     this.cartItemRepository = new CartItemRepository();
   }
 
-  async create(createData: CreateCartDto): Promise<any> {
+  async create(createData: CreateCartDto, tx?: PrismaClient): Promise<any> {
     const items = await this.cartItemRepository.createBaseItemQuery(
       createData.items,
     );
@@ -42,15 +39,16 @@ export class CartRepository extends GenericRepositoryImpl<
 
     console.log("data", data);
 
-    let cart = await super.create(data);
+    let cart = await super.create(data, tx);
 
     return cart;
   }
 
-  async getCart(value: string): Promise<any> {
+  async getCart(value: string, tx?: PrismaClient): Promise<any> {
     console.log("value", value);
     try {
-      return await this.prisma.cart.findFirst({
+      const model = tx ?? this.prisma;
+      return await model.cart.findFirst({
         where: { OR: [{ sessionId: value }, { userSuperTokensId: value }] },
         include: {
           items: {
@@ -82,8 +80,9 @@ export class CartRepository extends GenericRepositoryImpl<
     });
   }
 
-  async deleteCart(cartToken: string): Promise<any> {
-    return await this.prisma.cart.deleteMany({
+  async deleteCart(cartToken: string, tx?: PrismaClient): Promise<any> {
+    const model = tx ?? this.prisma;
+    return await model.cart.deleteMany({
       where: {
         OR: [{ sessionId: cartToken }, { userSuperTokensId: cartToken }],
       },
@@ -93,9 +92,11 @@ export class CartRepository extends GenericRepositoryImpl<
   async mergeSessionCartToUserCart(
     sessionId: string,
     userSuperTokensId: string,
+    tx?: PrismaClient,
   ) {
     try {
-      await this.prisma
+      const model = tx ?? this.prisma;
+      await model
         .$executeRaw`SELECT public.merge_session_cart_to_user_cart(${sessionId}::VARCHAR, ${userSuperTokensId}::VARCHAR)`;
       return this.updateTimeOnCart(userSuperTokensId);
     } catch (error) {
@@ -103,12 +104,13 @@ export class CartRepository extends GenericRepositoryImpl<
     }
   }
 
-  async addItemsToCart(cartToken: string, items: UpdateCartItemDto[]) {
+  async addItemsToCart(cartToken: string, items: UpdateCartItemDto[], tx?: PrismaClient) {
     try {
       const promises: Promise<any>[] = [];
+      const model = tx ?? this.prisma;
       items.forEach(async (item) => {
         promises.push(
-          this.prisma
+          model
             .$executeRaw`SELECT public.add_item_to_cart(${cartToken}::VARCHAR, ${item.productVariantId}::INT, ${item.quantity}::INT)`,
         );
         return Promise.all(promises);
@@ -121,13 +123,15 @@ export class CartRepository extends GenericRepositoryImpl<
   async removeItemsFromCart(
     cartToken: string,
     items: { productVariantId: number }[],
+    tx?: PrismaClient
   ) {
     try {
       const currentCart = await this.getCart(cartToken);
       const promises: Promise<any>[] = [];
+      const model = tx ?? this.prisma;
       items.forEach(async (item) => {
         promises.push(
-          this.prisma.cartItem.deleteMany({
+          model.cartItem.deleteMany({
             where: {
               cartId: currentCart.id,
               productVariantId: item.productVariantId,
@@ -143,14 +147,15 @@ export class CartRepository extends GenericRepositoryImpl<
     }
   }
 
-  async editItemOfCart(cartToken: string, items: UpdateCartItemDto[]) {
+  async editItemOfCart(cartToken: string, items: UpdateCartItemDto[], tx?: PrismaClient) {
     try {
       const currentCart = await this.getCart(cartToken);
       const promises: Promise<any>[] = [];
+      const model = tx ?? this.prisma;
       items.forEach(async (item) => {
         if (item.quantity === 0) {
           promises.push(
-            this.prisma.cartItem.deleteMany({
+            model.cartItem.deleteMany({
               where: {
                 cartId: currentCart.id,
                 productVariantId: item.productVariantId,
@@ -159,7 +164,7 @@ export class CartRepository extends GenericRepositoryImpl<
           );
         }
         promises.push(
-          this.prisma.cartItem.updateMany({
+          model.cartItem.updateMany({
             where: {
               cartId: currentCart.id,
               productVariantId: item.productVariantId,
@@ -177,10 +182,11 @@ export class CartRepository extends GenericRepositoryImpl<
     }
   }
 
-  async updateTimeOnCart(cartToken: string) {
+  async updateTimeOnCart(cartToken: string, tx?: PrismaClient) {
     try {
       const currentCart = await this.getCart(cartToken);
-      return await this.prisma.cart.update({
+      const model = tx ?? this.prisma;
+      return await model.cart.update({
         where: { id: currentCart.id },
         data: { updatedAt: new Date() },
         include: {

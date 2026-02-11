@@ -21,7 +21,8 @@ export class SupplierRepository extends GenericRepositoryImpl<
   async addRemoveBrands(
     supplierId: number,
     brandData: UpdateSupplierBrandDto,
-    addingBrand: boolean
+    addingBrand: boolean,
+    tx?: PrismaClient
   ): Promise<any> {
     let data = {
       brands: {
@@ -30,8 +31,10 @@ export class SupplierRepository extends GenericRepositoryImpl<
         ),
       },
     };
+
+    const model = tx ?? this.prisma;
     console.log(JSON.stringify(data));
-    return await this.prisma.supplier.update({
+    return await model.supplier.update({
       where: { id: supplierId },
       data,
       include: {

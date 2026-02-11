@@ -26,7 +26,8 @@ export class ProductVariantRepository extends GenericRepositoryImpl<
   async updateVariant(
     id: number,
     data: UpdateProductVariantDto,
-    uploadedFilesByField?: any[]
+    uploadedFilesByField?: any[],
+    tx?: PrismaClient,
   ) {
     let updateData = data;
     // Crea la query para las imagenes
@@ -44,7 +45,7 @@ export class ProductVariantRepository extends GenericRepositoryImpl<
     let updatedProductVariant;
 
     console.log("a ver la data updateada", updateData);
-    updatedProductVariant = await super.update(id, updateData);
+    updatedProductVariant = await super.update(id, updateData, tx);
 
     return updatedProductVariant;
   }
@@ -57,7 +58,8 @@ export class ProductVariantRepository extends GenericRepositoryImpl<
    */
   async createBaseVariantQuery(
     variants: CreateProductVariantDto[],
-    uploadedFilesByField?: any[]
+    uploadedFilesByField?: any[],
+    tx?: PrismaClient,
   ): Promise<any> {
     const variantMapping = productVariantCreateMapping;
     let result: any;
@@ -83,16 +85,18 @@ export class ProductVariantRepository extends GenericRepositoryImpl<
     activate?: number[],
     deactivate?: number[],
     addVariants?: CreateProductVariantDto[],
-    removeVariants?: number[]
+    removeVariants?: number[],
+    tx?: PrismaClient,
   ) {
+    const model = tx ?? this.prisma;
     if (activate) {
-      await this.prisma.productVariant.updateMany({
+      await model.productVariant.updateMany({
         where: { id: { in: activate } },
         data: { active: true },
       });
     }
     if (deactivate) {
-      await this.prisma.productVariant.updateMany({
+      await model.productVariant.updateMany({
         where: { id: { in: deactivate } },
         data: { active: false },
       });
@@ -103,43 +107,47 @@ export class ProductVariantRepository extends GenericRepositoryImpl<
       for (const variant of addVariants) {
         const variantData = prismaCreateEntityBuilder(
           { ...variant, productId },
-          mapping
+          mapping,
         );
 
-        await this.prisma.productVariant.create({
+        await model.productVariant.create({
           data: variantData,
         });
       }
     }
     if (removeVariants) {
-      await this.prisma.productVariant.deleteMany({
+      await model.productVariant.deleteMany({
         where: { id: { in: removeVariants } },
       });
     }
   }
 
-  async recalculateSingleMixPrice(mixVariantId: number) {
+  async recalculateSingleMixPrice(mixVariantId: number, tx?: PrismaClient) {
     try {
-      await this.prisma
-        .$executeRaw`SELECT public.recalculate_mix_price(${mixVariantId}::INT)`;
+      const model = tx ?? this.prisma;
+      await model.$executeRaw`SELECT public.recalculate_mix_price(${mixVariantId}::INT)`;
     } catch (error) {
       throw new StoreProcedureError("recalculate_mix_price");
     }
   }
 
-  async recalculateAllMixesFromProduct(productId: number) {
+  async recalculateAllMixesFromProduct(productId: number, tx?: PrismaClient) {
     try {
-      await this.prisma
-        .$executeRaw`SELECT public.recalculate_all_mixes_from_product(${productId}::INT)`;
+      const model = tx ?? this.prisma;
+      await model.$executeRaw`SELECT public.recalculate_all_mixes_from_product(${productId}::INT)`;
     } catch (error) {
       throw new StoreProcedureError("recalculate_all_mixes_from_product");
     }
   }
 
-  async processMixProduction(mixVariantId: number, newStock: number) {
+  async processMixProduction(
+    mixVariantId: number,
+    newStock: number,
+    tx?: PrismaClient,
+  ) {
     try {
-      await this.prisma
-        .$executeRaw`SELECT public.create_stock_movement(${mixVariantId}::INT, ${newStock}::INT, ${"ADJUSTMENT"}::TEXT)`;
+      const model = tx ?? this.prisma;
+      await model.$executeRaw`SELECT public.create_stock_movement(${mixVariantId}::INT, ${newStock}::INT, ${"ADJUSTMENT"}::TEXT)`;
     } catch (error) {
       throw new StoreProcedureError("create_stock_movement");
     }
@@ -148,18 +156,24 @@ export class ProductVariantRepository extends GenericRepositoryImpl<
   async createStockMovement(
     mixVariantId: number,
     newStock: number,
-    type: string
+    type: string,
+    tx?: PrismaClient,
   ) {
     try {
-      await this.prisma
-        .$executeRaw`SELECT public.create_stock_movement(${mixVariantId}::INT, ${newStock}::INT, ${type}::TEXT)`;
+      const model = tx ?? this.prisma;
+      await model.$executeRaw`SELECT public.create_stock_movement(${mixVariantId}::INT, ${newStock}::INT, ${type}::TEXT)`;
     } catch (error) {
       throw new StoreProcedureError("create_stock_movement");
     }
   }
 
-  async removeVariant(mixVariantId: number, productVariantId: number) {
-    return this.prisma.dependency.delete({
+  async removeVariant(
+    mixVariantId: number,
+    productVariantId: number,
+    tx?: PrismaClient,
+  ) {
+    const model = tx ?? this.prisma;
+    return model.dependency.delete({
       where: {
         mixVariantId_productVariantId: {
           mixVariantId: Number(mixVariantId),
@@ -172,9 +186,11 @@ export class ProductVariantRepository extends GenericRepositoryImpl<
   async updateMixVariant(
     mixVariantId: number,
     productVariantId: number,
-    quantity: number
+    quantity: number,
+    tx?: PrismaClient,
   ) {
-    return this.prisma.dependency.update({
+    const model = tx ?? this.prisma;
+    return model.dependency.update({
       where: {
         mixVariantId_productVariantId: {
           mixVariantId: Number(mixVariantId),
@@ -191,11 +207,12 @@ export class ProductVariantRepository extends GenericRepositoryImpl<
     // Revisar si esto funciona
     productVariantId: number,
     mixVariantId: number,
-    quantity: number
+    quantity: number,
+    tx?: PrismaClient,
   ) {
     try {
-      return await this.prisma
-        .$executeRaw`SELECT public.add_component_to_variant(${productVariantId}::INT, ${mixVariantId}::INT, ${quantity}::INT)`;
+      const model = tx ?? this.prisma;
+      return await model.$executeRaw`SELECT public.add_component_to_variant(${productVariantId}::INT, ${mixVariantId}::INT, ${quantity}::INT)`;
     } catch (error) {
       throw new StoreProcedureError("add_component_to_variant");
     }

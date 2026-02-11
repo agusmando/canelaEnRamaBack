@@ -8,7 +8,6 @@ import { ProductVariantService } from "./product-variant.service.ts";
 import { CreateOrderItemDto } from "../dto/order-item/create-order-item.dto.ts";
 import { NotFoundError } from "../errors/application/NotFoundError.ts";
 import { UpdateOrderItemDto } from "../dto/order-item/update-order-item.dto.ts";
-import { OrderItemService } from "./order-item.service.ts";
 import { OrderItemDto } from "../dto/order-item/order-item.dto.ts";
 import { StockMovementService } from "./stockMovement.service.ts";
 
@@ -20,12 +19,10 @@ export class OrderService extends GenericServiceImpl<
   protected orderRepository: OrderRepository;
   private productVariantService: ProductVariantService;
   private stockMovementService: StockMovementService;
-  private orderItemService: OrderItemService;
   constructor() {
     super("order");
     this.orderRepository = new OrderRepository();
     this.productVariantService = new ProductVariantService();
-    this.orderItemService = new OrderItemService();
     this.stockMovementService = new StockMovementService();
   }
 
@@ -37,114 +34,132 @@ export class OrderService extends GenericServiceImpl<
       throw new ValidationError("Session id is required");
     }
 
-    let awaitingStockAt: Date = new Date();
-    let currentDate: Date = new Date(awaitingStockAt);
-    const itemsForCreation: Promise<CreateOrderItemDto>[] = data.orderItems.map(
-      async (item) => {
-        const productVariant = await this.productVariantService.findOne(
-          item.productVariantId,
-        );
-        if (!productVariant) {
-          throw new ValidationError(
-            "Product variant with id " + item.productVariantId + " not found",
+    return this.orderRepository.withTransaction(async (tx) => {
+      let awaitingStockAt: Date = new Date();
+      let currentDate: Date = new Date(awaitingStockAt);
+      const itemsForCreation: Promise<CreateOrderItemDto>[] =
+        data.orderItems.map(async (item) => {
+          const productVariant = await this.productVariantService.findOne(
+            item.productVariantId,
           );
-        }
+          if (!productVariant) {
+            throw new ValidationError(
+              "Product variant with id " + item.productVariantId + " not found",
+            );
+          }
 
-        if (productVariant.requestTime !== null) {
-          const days = Number(productVariant.requestTime) || 0;
-          const awaitingDate = new Date();
-          awaitingDate.setDate(awaitingDate.getDate() + days);
-          item.awaitingStockAt = awaitingDate;
-        }
+          if (productVariant.requestTime !== null) {
+            const days = Number(productVariant.requestTime) || 0;
+            const awaitingDate = new Date();
+            awaitingDate.setDate(awaitingDate.getDate() + days);
+            item.awaitingStockAt = awaitingDate;
+          }
 
-        if (item.awaitingStockAt && item.awaitingStockAt > awaitingStockAt) {
-          awaitingStockAt = item.awaitingStockAt;
-        }
+          if (item.awaitingStockAt && item.awaitingStockAt > awaitingStockAt) {
+            awaitingStockAt = item.awaitingStockAt;
+          }
 
-        return {
-          quantity: item.quantity,
-          productVariantId: item.productVariantId,
-          productNameSnapshot: productVariant.product?.name || "",
-          variantNameSnapshot: productVariant.name,
-          unitPriceSnapshot: productVariant.finalPrice || 0,
-          status: "FULFILLED",
-          awaitingStockAt: item.awaitingStockAt,
-        };
-      },
-    );
+          return {
+            quantity: item.quantity,
+            productVariantId: item.productVariantId,
+            productNameSnapshot: productVariant.product?.name || "",
+            variantNameSnapshot: productVariant.name,
+            unitPriceSnapshot: productVariant.finalPrice || 0,
+            status: "FULFILLED",
+            awaitingStockAt: item.awaitingStockAt,
+          };
+        });
 
-    const orderItems = await Promise.all(itemsForCreation);
-    const totalPrice = await this.calculateTotalPrice(orderItems);
+      const orderItems = await Promise.all(itemsForCreation);
+      const totalPrice = await this.calculateTotalPrice(orderItems);
 
-    let createOrderDto: CreateOrderDto = {
-      userSuperTokensId: sessionId,
-      totalPrice,
-      totalItems: itemsForCreation.length,
-      paymentType: "DEBIT",
-      status: "PENDING",
-      orderItems,
-      estimatedReadyAt:
-        awaitingStockAt > currentDate ? awaitingStockAt : undefined,
-    };
+      let createOrderDto: CreateOrderDto = {
+        userSuperTokensId: sessionId,
+        totalPrice,
+        totalItems: itemsForCreation.length,
+        paymentType: "DEBIT",
+        status: "PENDING",
+        orderItems,
+        estimatedReadyAt:
+          awaitingStockAt > currentDate ? awaitingStockAt : undefined,
+      };
 
-    const response = await this.orderRepository.create(createOrderDto);
-    if (response) {
-      orderItems.forEach(async (item: any) => {
-        await this.updateItemStock(item.productVariantId, item.quantity, 0);
-      });
-    }
-    return response;
+      const response = await this.orderRepository.create(createOrderDto);
+      if (response) {
+        orderItems.forEach(async (item: any) => {
+          await this.updateItemStock(
+            item.productVariantId,
+            item.quantity,
+            0,
+            tx,
+          );
+        });
+      }
+      return response;
+    });
   }
 
-  async getOrder(id: number) {
-    return await this.orderRepository.getOrder(id);
+  async getOrder(id: number, tx: any) {
+    return await this.orderRepository.getOrder(id, tx);
   }
 
   async updateOrder(id: number, data: UpdateOrderDto) {
-    if (!id || id == 0) { 
+    if (!id || id == 0) {
       throw new NotFoundError();
     }
-    const currentOrder = await this.getOrder(id);
-    console.log("data", data);
+    return this.orderRepository.withTransaction(async (tx) => {
+      const currentOrder = await this.getOrder(id, tx);
+      console.log("data", data);
 
-    if (currentOrder.status === "CANCELLED") {
-      throw new ValidationError("Order is already cancelled");
-    }
-
-    if (data.status) {
-      currentOrder.status = data.status;
-      if (data.status === "CANCELLED") {
-        currentOrder.orderItems.forEach(async (item: any) => {
-          return await this.applyItemChange(currentOrder, {
-            productVariantId: item.productVariantId,
-            status: "CANCELLED",
-          } as UpdateOrderItemDto);
-        });
-        return await this.orderRepository.update(id, currentOrder);
+      if (currentOrder.status === "CANCELLED") {
+        throw new ValidationError("Order is already cancelled");
       }
-    }
 
-    if (data.editItem && data.editItem.length > 0) {
-      for (let item of data.editItem) {
-        if (!item.productVariantId) {
-          throw new ValidationError(
-            "Product variant id is required for adding items",
+      if (data.status) {
+        currentOrder.status = data.status;
+        if (data.status === "CANCELLED") {
+          currentOrder.orderItems.forEach(async (item: any) => {
+            return await this.applyItemChange(
+              currentOrder,
+              {
+                productVariantId: item.productVariantId,
+                status: "CANCELLED",
+              } as UpdateOrderItemDto,
+              tx,
+            );
+          });
+          return await this.orderRepository.updateOrder(
+            id,
+            currentOrder,
+            tx,
           );
         }
-        await this.applyItemChange(currentOrder, item);
       }
-      currentOrder.totalPrice = this.calculateTotalPrice(
-        currentOrder.orderItems,
-      );
-      this.recalculateOrderStatus(currentOrder);
-    }
 
-    console.log("currentOrder", currentOrder);
-    // if data.status === confirmed (resto el stock con el servicio de StockMovement)
-    return await this.orderRepository.update(id, currentOrder);
+      if (data.editItem && data.editItem.length > 0) {
+        for (let item of data.editItem) {
+          if (!item.productVariantId) {
+            throw new ValidationError(
+              "Product variant id is required for adding items",
+            );
+          }
+          await this.applyItemChange(currentOrder, item, tx);
+        }
+        currentOrder.totalPrice = this.calculateTotalPrice(
+          currentOrder.orderItems,
+        );
+        this.recalculateOrderStatus(currentOrder);
+      }
+
+      console.log("currentOrder", currentOrder);
+      // if data.status === confirmed (resto el stock con el servicio de StockMovement)
+      return await this.orderRepository.updateOrder(id, currentOrder, tx);
+    });
   }
 
-  async applyItemChange(order: OrderDto, item: UpdateOrderItemDto) {
+  //FALTA CANCELAR EL ITEM SI NO HAY SUFICIENTE STOCK
+
+  async applyItemChange(order: OrderDto, item: UpdateOrderItemDto, tx?: any) {
     console.log("item", item);
     let currentItem = order.orderItems.find(
       (i) => i.productVariantId == item.productVariantId,
@@ -173,10 +188,11 @@ export class OrderService extends GenericServiceImpl<
       }
       itemData.quantity = Number(item.quantity);
       itemData.status = item.quantity == 0 ? "RETURNED" : "PARTIALLY_RETURNED";
-      this.updateItemStock(
+      await this.updateItemStock(
         currentItem.productVariantId,
         item.quantity,
         currentItem.quantity,
+        tx,
       );
     }
     if (item.awaitingStockAt) {
@@ -190,7 +206,7 @@ export class OrderService extends GenericServiceImpl<
       }
     }
     if (itemData && Object.keys(itemData).length > 0) {
-      // await this.orderItemService.update(item.id, itemData);
+      // await this.orderItemService.updateRepository(item.id, itemData);
       const index = order.orderItems.findIndex(
         (i) => i.productVariantId == item.productVariantId,
       );
@@ -202,6 +218,7 @@ export class OrderService extends GenericServiceImpl<
       await this.orderRepository.editItemOfOrder(
         order.orderItems[index].id,
         order.orderItems[index],
+        tx
       );
 
       console.log("order.orderItems[index]", order.orderItems[index]);
@@ -236,6 +253,7 @@ export class OrderService extends GenericServiceImpl<
     productVariantId: number,
     oldQuantity: number,
     newQty?: number,
+    tx?: any,
   ) {
     if (newQty == null) {
       throw new ValidationError("New quantity is required for updating stock");
@@ -249,6 +267,7 @@ export class OrderService extends GenericServiceImpl<
       productVariantId,
       diff,
       diff < 0 ? "OUT" : "RETURN",
+      tx,
     );
   }
 }

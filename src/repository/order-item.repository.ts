@@ -41,7 +41,7 @@ export class OrderItemRepository extends GenericRepositoryImpl<
   //   };
   // }
 
-  async update(id: number, data: UpdateOrderItemDto) {
+  async update(id: number, data: UpdateOrderItemDto, tx?: PrismaClient) {
     try {
       await super.update(id, data);
     } catch (error) {

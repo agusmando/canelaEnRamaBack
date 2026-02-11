@@ -24,7 +24,7 @@ export class ProductVariantService extends GenericServiceImpl<
   async updateVariant(
     id: number,
     data: UpdateProductVariantDto,
-    uploadedFilesByField: any[]
+    uploadedFilesByField: any[],
   ): Promise<ProductVariantDto> {
     const postMapping = productVariantPostProcessingMapping;
 
@@ -40,40 +40,44 @@ export class ProductVariantService extends GenericServiceImpl<
       throw new BadRequestError();
     }
 
-    let updatedVariant = await this.productVariantRepository.updateVariant(
-      id,
-      data,
-      uploadedFilesByField
-    );
-
-    console.log("a ver la data updateada", updatedVariant);
-
-    //Post processing mapping
-    if (postMapping && updatedVariant) {
-      updatedVariant = postMapping(updatedVariant as any);
-    }
-
-    // Actualiza situaciones de stock y precio relacionadas con el stock de un mix, y el precio de sus componentes.
-    this.mixRelatedStockQueries(data, id, updatedVariant as any);
-
-    if (
-      (data.addComponents && data.addComponents.length > 0) ||
-      (data.removeComponents && data.removeComponents.length > 0) ||
-      (data.editComponents && data.editComponents.length > 0)
-    ) {
-      await this.handleVariantsUpdate(
-        Number(id),
-        data.removeComponents,
-        data.editComponents,
-        data.addComponents
+    return this.productVariantRepository.withTransaction(async (tx) => {
+      let updatedVariant = await this.productVariantRepository.updateVariant(
+        id,
+        data,
+        uploadedFilesByField,
+        tx
       );
-    }
 
-    if (data.removeImages && data.removeImages.length > 0) {
-      await this.imageService.removeImages(data.removeImages);
-    }
+      console.log("a ver la data updateada", updatedVariant);
 
-    return updatedVariant;
+      //Post processing mapping
+      if (postMapping && updatedVariant) {
+        updatedVariant = postMapping(updatedVariant as any);
+      }
+
+      // Actualiza situaciones de stock y precio relacionadas con el stock de un mix, y el precio de sus componentes.
+      this.mixRelatedStockQueries(data, id, updatedVariant as any);
+
+      if (
+        (data.addComponents && data.addComponents.length > 0) ||
+        (data.removeComponents && data.removeComponents.length > 0) ||
+        (data.editComponents && data.editComponents.length > 0)
+      ) {
+        await this.handleVariantsUpdate(
+          Number(id),
+          data.removeComponents,
+          data.editComponents,
+          data.addComponents,
+          tx
+        );
+      }
+
+      if (data.removeImages && data.removeImages.length > 0) {
+        await this.imageService.removeImages(data.removeImages);
+      }
+
+      return updatedVariant;
+    });
   }
 
   // añade, elimina y edita componentes de un mix. Luego recalcula el precio del mix
@@ -81,18 +85,21 @@ export class ProductVariantService extends GenericServiceImpl<
     mixVariantId: number,
     removeComponents?: { productVariantId: number }[],
     editComponents?: { productVariantId: number; quantity: number }[],
-    addComponents?: { productVariantId: number; quantity: number }[]
+    addComponents?: { productVariantId: number; quantity: number }[],
+    tx?: any
   ) {
     if (removeComponents) {
       const componentPromises = removeComponents.map(async (component: any) => {
         return await this.productVariantRepository.removeVariant(
           mixVariantId,
-          component.productVariantId
+          component.productVariantId,
+          tx
         );
       });
       await Promise.all(componentPromises);
       await this.productVariantRepository.recalculateSingleMixPrice(
-        mixVariantId
+        mixVariantId,
+        tx
       );
     }
     if (editComponents) {
@@ -101,13 +108,15 @@ export class ProductVariantService extends GenericServiceImpl<
           return await this.productVariantRepository.updateMixVariant(
             mixVariantId,
             component.productVariantId,
-            component.quantity
+            component.quantity,
+            tx
           );
-        }
+        },
       );
       await Promise.all(componentPromises);
       await this.productVariantRepository.recalculateSingleMixPrice(
-        mixVariantId
+        mixVariantId,
+        tx
       );
     }
     if (addComponents) {
@@ -115,12 +124,14 @@ export class ProductVariantService extends GenericServiceImpl<
         return await this.productVariantRepository.addComponentToVariant(
           component.productVariantId,
           mixVariantId,
-          component.quantity
+          component.quantity,
+          tx
         );
       });
       await Promise.all(componentPromises);
       await this.productVariantRepository.recalculateSingleMixPrice(
-        mixVariantId
+        mixVariantId,
+        tx
       );
     }
   }
@@ -129,7 +140,8 @@ export class ProductVariantService extends GenericServiceImpl<
   async mixRelatedStockQueries(
     requestData: any,
     id: number,
-    updatedVariant: any
+    updatedVariant: any,
+    tx?: any
   ) {
     if (
       (requestData.price || requestData.profitMargin) &&
@@ -137,7 +149,8 @@ export class ProductVariantService extends GenericServiceImpl<
       updatedVariant.isComponentOf.length > 0
     ) {
       await this.productVariantRepository.recalculateAllMixesFromProduct(
-        Number(id)
+        Number(id),
+        tx
       );
     }
     if (requestData.stockIncrement) {
@@ -148,13 +161,15 @@ export class ProductVariantService extends GenericServiceImpl<
       ) {
         await this.productVariantRepository.processMixProduction(
           Number(id),
-          requestData.stockIncrement
+          requestData.stockIncrement,
+          tx
         );
       } else {
         await this.productVariantRepository.createStockMovement(
           Number(id),
           requestData.stockIncrement,
-          requestData.stockIncrement < 0 ? "OUT" : "IN"
+          requestData.stockIncrement < 0 ? "OUT" : "IN",
+          tx
         );
       }
     }
@@ -162,7 +177,8 @@ export class ProductVariantService extends GenericServiceImpl<
     if (requestData.currentStock) {
       await this.productVariantRepository.processMixProduction(
         Number(id),
-        requestData.currentStock
+        requestData.currentStock,
+        tx
       );
     }
   }

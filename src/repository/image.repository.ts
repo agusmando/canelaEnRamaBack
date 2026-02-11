@@ -22,7 +22,7 @@ export class ImageRepository {
     buffer: Buffer,
     mimetype: string,
     folder?: string,
-    publicId?: string
+    publicId?: string,
   ) {
     return new Promise((resolve, reject) => {
       const opts: any = { resource_type: "auto" };
@@ -48,7 +48,7 @@ export class ImageRepository {
             url: result?.secure_url,
           });
           resolve(result);
-        }
+        },
       );
 
       // pipe buffer into upload stream
@@ -65,8 +65,8 @@ export class ImageRepository {
               // crear repo para cloudinary
               resource_type: "image",
             })
-          : Promise.resolve()
-      )
+          : Promise.resolve(),
+      ),
     );
   }
 
@@ -78,11 +78,27 @@ export class ImageRepository {
     }
   }
 
-  async findManyImagesDb(imageIds: any[]) {
-    return await this.prisma.image.findMany({
+  async findManyImagesDb(imageIds: any[], tx?: PrismaClient) {
+    const model = tx ?? this.prisma;
+    return await model.image.findMany({
       where: {
         id: { in: imageIds },
       },
     });
+  }
+
+  async deleteImageDb(imageId: number, tx?: PrismaClient) {
+    const model = tx ?? this.prisma;
+    return await model.image.delete({
+      where: {
+        id: imageId,
+      },
+    });
+  }
+
+  async withTransaction<R>(
+    callback: (tx: PrismaClient) => Promise<R>,
+  ): Promise<R> {
+    return this.prisma.$transaction(callback as any) as Promise<R>;
   }
 }

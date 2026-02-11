@@ -4,12 +4,7 @@ import { OrderDto } from "../dto/order/order.dto.ts";
 import { CreateOrderDto } from "../dto/order/create-order.dto.ts";
 import { UpdateOrderDto } from "../dto/order/update-order.dto.ts";
 import { GenericRepositoryImpl } from "./generic.repository.ts";
-import { orderCreateMapping } from "../mappings/order/order-create.mapping.ts";
-import { OrderItemService } from "../services/order-item.service.ts";
-import { orderUpdateMapping } from "../mappings/order/order-update.mapping.ts";
-import { prismaUpdateEntityBuilder } from "../utils/prismaUpdateEntityBuilder.ts";
 import { StoreProcedureError } from "../errors/infra/StoreProcedureError.ts";
-import { CreateOrderItemDto } from "../dto/order-item/create-order-item.dto.ts";
 import { UpdateOrderItemDto } from "../dto/order-item/update-order-item.dto.ts";
 import { DatabaseError } from "../errors/infra/DatabaseError.ts";
 import { ValidationError } from "../errors/application/ValidationError.ts";
@@ -30,22 +25,11 @@ export class OrderRepository extends GenericRepositoryImpl<
     this.orderItemRepository = new OrderItemRepository();
   }
 
-  async create(createData: CreateOrderDto): Promise<any> {
-    // const finalQuery = prismaCreateEntityBuilder(createData, mapping);
-    // const data: any = {
-    //   ...createData,
-    //   orderItems: { create: orderItems },
-    // };
-
-    // console.log("data", data);
-
-    return await super.create(createData);
-  }
-
-  async getOrder(id: number): Promise<any> {
+  async getOrder(id: number, tx?: PrismaClient): Promise<any> {
     console.log("id", id);
     try {
-      return await this.prisma.order.findFirst({
+      const model = tx ?? this.prisma;
+      return await model.order.findFirst({
         where: { id },
         include: {
           orderItems: {
@@ -77,27 +61,29 @@ export class OrderRepository extends GenericRepositoryImpl<
   //   });
   // }
 
-  async deleteOrder(id: number): Promise<any> {
-    return await this.prisma.order.deleteMany({
+  async deleteOrder(id: number, tx?: PrismaClient): Promise<any> {
+    const model = tx ?? this.prisma;
+    return await model.order.deleteMany({
       where: {
         id,
       },
     });
   }
 
-  async update(id: number, data: UpdateOrderItemDto) {
+  async updateOrder(id: number, data: UpdateOrderItemDto, tx?: PrismaClient) {
     try {
-      await super.update(id, data);
-      return this.updateTimeOnOrder(id);
+      await super.update(id, data, tx);
+      return this.updateTimeOnOrder(id, tx);
     } catch (error) {
       throw new DatabaseError();
     }
   }
 
-  async updateTimeOnOrder(id: number) {
+  async updateTimeOnOrder(id: number, tx?: PrismaClient) {
     try {
       const currentOrder = await this.getOrder(id);
-      return await this.prisma.order.update({
+      const model = tx ?? this.prisma;
+      return await model.order.update({
         where: { id: currentOrder.id },
         data: { updatedAt: new Date() },
         include: {
@@ -117,15 +103,13 @@ export class OrderRepository extends GenericRepositoryImpl<
     }
   }
 
-
-  async editItemOfOrder(id: number, data: UpdateOrderItemDto) {
+  async editItemOfOrder(id: number, data: UpdateOrderItemDto, tx?: PrismaClient) {
     if (!id || id == 0) {
       throw new NotFoundError();
     }
     if (!data.productVariantId) {
-      throw new ValidationError();
+      throw new ValidationError("Product variant id is required for updating order item");
     }
-    return await this.orderItemRepository.update(id, data);
+    return await this.orderItemRepository.update(id, data, tx);
   }
-
 }

@@ -29,10 +29,13 @@ export class BrandService extends GenericServiceImpl<
     if (!productData.productsId || productData.productsId.length == 0) {
       throw new ValidationError("Product ids are required for adding products to brand");
     }
-    return await this.brandRepository.addRemoveProducts(
-      Number(brandId),
-      productData,
-      addingProduct
-    );
+    return this.brandRepository.withTransaction(async (tx) => {
+      return await this.brandRepository.addRemoveProducts(
+        Number(brandId),
+        productData,
+        addingProduct,
+        tx
+      );
+    }); 
   }
 }

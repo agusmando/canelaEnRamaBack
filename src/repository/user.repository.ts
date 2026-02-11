@@ -15,26 +15,4 @@ export class UserRepository extends GenericRepositoryImpl<
       log: ["query", "info", "warn", "error"],
     });
   }
-
-  //   async addRemoveBrands(
-  //     supplierId: number,
-  //     brandData: UpdateCartBrandDto,
-  //     addingBrand: boolean
-  //   ): Promise<any> {
-  //     let data = {
-  //       brands: {
-  //         [addingBrand ? "connect" : "disconnect"]: brandData.brandsId.map(
-  //           (brands: any) => ({ id: brands.id })
-  //         ),
-  //       },
-  //     };
-  //     console.log(JSON.stringify(data));
-  //     return await this.prisma.supplier.update({
-  //       where: { id: supplierId },
-  //       data,
-  //       include: {
-  //         brands: true,
-  //       },
-  //     });
-  //   }
 }

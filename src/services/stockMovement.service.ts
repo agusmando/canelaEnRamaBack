@@ -1,3 +1,4 @@
+import { PrismaClient } from "@prisma/client/extension";
 import { StoreProcedureError } from "../errors/infra/StoreProcedureError.ts";
 import { StockMovementRepository } from "../repository/stockMovement.repository.ts";
 export class StockMovementService {
@@ -10,11 +11,13 @@ export class StockMovementService {
     mixVariantId: number,
     newStock: number,
     type: string,
+    tx?: PrismaClient
   ) {
     return await this.stockMovementRepository.createStockMovement(
       mixVariantId,
       newStock,
       type,
+      tx
     );
   }
 }

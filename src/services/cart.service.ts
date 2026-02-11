@@ -25,14 +25,18 @@ export class CartService extends GenericServiceImpl<
       data.userSuperTokensId = userSession;
     }
     console.log("data", data);
-    return await this.cartRepository.create(data);
+    return this.cartRepository.withTransaction(async (tx) => {
+      return await this.cartRepository.create(data, tx);
+    });
   }
 
   async getCart(sessionId: string) {
     if (!sessionId) {
       throw new NotFoundError();
     }
-    return await this.cartRepository.getCart(sessionId);
+    return this.cartRepository.withTransaction(async (tx) => {
+      return await this.cartRepository.getCart(sessionId, tx);
+    });
   }
 
   async updateCart(sessionId: string, data: UpdateCartDto) {
@@ -40,36 +44,41 @@ export class CartService extends GenericServiceImpl<
       throw new ValidationError("Session id is required for updating cart");
     }
     console.log("data", data);
-    if (data.userSuperTokensId) {
-      return await this.cartRepository.mergeSessionCartToUserCart(
-        sessionId,
-        data.userSuperTokensId,
-      );
-    }
-    if (data.addItem && data.addItem.length > 0) {
-      await this.cartRepository.addItemsToCart(sessionId, data.addItem);
-    }
-    if (data.removeItem && data.removeItem.length > 0) {
-      const response = await this.cartRepository.removeItemsFromCart(
-        sessionId,
-        data.removeItem,
-      );
-      if (response.items && response.items.length == 0) {
-        this.cartRepository.deleteCart(sessionId);
+    return this.cartRepository.withTransaction(async (tx) => {
+      if (data.userSuperTokensId) {
+        return await this.cartRepository.mergeSessionCartToUserCart(
+          sessionId,
+          data.userSuperTokensId,
+          tx
+        );
       }
-      return response;
-    }
-    if (data.editItem && data.editItem.length > 0) {
-      const response = await this.cartRepository.editItemOfCart(
-        sessionId,
-        data.editItem,
-      );
-      if (response.items && response.items.length == 0) {
-        this.cartRepository.deleteCart(sessionId);
+      if (data.addItem && data.addItem.length > 0) {
+        await this.cartRepository.addItemsToCart(sessionId, data.addItem, tx);
       }
-      return response;
-    }
-    return await this.cartRepository.updateTimeOnCart(sessionId);
+      if (data.removeItem && data.removeItem.length > 0) {
+        const response = await this.cartRepository.removeItemsFromCart(
+          sessionId,
+          data.removeItem,
+          tx
+        );
+        if (response.items && response.items.length == 0) {
+          this.cartRepository.deleteCart(sessionId, tx);
+        }
+        return response;
+      }
+      if (data.editItem && data.editItem.length > 0) {
+        const response = await this.cartRepository.editItemOfCart(
+          sessionId,
+          data.editItem,
+          tx
+        );
+        if (response.items && response.items.length == 0) {
+          this.cartRepository.deleteCart(sessionId, tx);
+        }
+        return response;
+      }
+      return await this.cartRepository.updateTimeOnCart(sessionId, tx);
+    });
   }
   //   async addRemoveProducts(
   //     cartId: number,

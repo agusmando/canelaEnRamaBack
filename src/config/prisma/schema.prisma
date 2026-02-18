@@ -45,7 +45,7 @@ model ProductVariant {
   active         Boolean     @default(true) // Apaga solo esta presentación
   contentMeasure MeasureType @relation(fields: [measureTypeId], references: [id]) // Por ejemplo un frasco de 60cc, 150ml, 360g, etc
   contentAmount  Int         @default(0) // Por ejemplo un frasco de 60cc, 150ml, 360g, etc
-
+  minStock       Int         @default(0)
   requestTime String @default("")
 
   // Relación con el padre
@@ -287,8 +287,8 @@ model OrderItem {
 enum OrderItemStatus {
   FULFILLED // Disponible y asignado
   AWAITING_STOCK // Sin stock, esperando reposición
+  PARTIALLY_RETURNED // Parcialmente regresado
   CANCELLED // El cliente o el local lo quitaron
-  PARTIALLY_RETURNED // El cliente lo regresa parcial
   RETURNED // El cliente lo regresa
 }
 

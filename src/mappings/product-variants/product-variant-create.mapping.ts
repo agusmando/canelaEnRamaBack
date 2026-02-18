@@ -30,15 +30,15 @@ export const productVariantCreateMapping = {
   minStock: { parseInt: true },
 
   // Relaciones Mix/Componentes (según tu JSON comentado)
-  // hasComponents: {
-  //    relation: true,
-  //    allowCreate: false,
-  //    connectField: "id",
-  //    childMapping: {
-  //      productId: { parseInt: true },
-  //      quantity: { parseInt: true },
-  //    }
-  // },
+  hasComponents: {
+     relation: true,
+     allowCreate: true,
+     connectField: "id",
+     childMapping: {
+       productVariantId: { parseInt: true },
+       quantity: { parseInt: true },
+     }
+  },
 
   images: {
     relation:  true,

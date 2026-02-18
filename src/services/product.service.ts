@@ -17,6 +17,7 @@ import { GenericServiceImpl } from "./generic-impl.service.ts";
 import { ProductRepository } from "../repository/product.repository.ts";
 import { ProductVariantRepository } from "../repository/product-variant.repository.ts";
 import { ImageService } from "./image.service.ts";
+import { StockMovementService } from "./stockMovement.service.ts";
 
 export class ProductService extends GenericServiceImpl<
   ProductDto,
@@ -25,12 +26,14 @@ export class ProductService extends GenericServiceImpl<
 > {
   productRepository: ProductRepository;
   productVariantRepository: ProductVariantRepository;
+  stockMovementRepository: StockMovementService;
   imageService: ImageService;
 
   constructor() {
     super("product");
     this.productRepository = new ProductRepository();
     this.productVariantRepository = new ProductVariantRepository();
+    this.stockMovementRepository = new StockMovementService();
     this.imageService = new ImageService();
   }
 
@@ -84,16 +87,28 @@ export class ProductService extends GenericServiceImpl<
       product.variants = postVariants;
 
       // Recalculate mix price
-      if (
-        createData?.variants &&
-        createData.variants[0] &&
-        createData.variants[0].hasComponents &&
-        createData.variants[0].hasComponents.length > 0
-      ) {
-        await this.productVariantRepository.recalculateSingleMixPrice(
-          product.variants[0].id,
-          tx,
-        );
+      if (createData?.variants && createData.variants.length > 0) {
+        for (const component of product.variants) {
+          if (component.hasComponents && component.hasComponents.length > 0) {
+            await this.productVariantRepository.recalculateSingleMixPrice(
+              component.id,
+              tx,
+            );
+            await this.stockMovementRepository.processMixProduction(
+              component.id,
+              component.currentStock,
+              tx,
+            );
+          }
+        }
+        // await this.productVariantRepository.recalculateSingleMixPrice(
+        //   product.variants[0].id,
+        //   tx,
+        // );
+        // await this.stockMovementRepository.createStockMovement(
+        //   product.variants[0].id,
+        //   tx,
+        // );
       }
 
       return product;

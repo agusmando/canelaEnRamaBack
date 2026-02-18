@@ -20,4 +20,16 @@ export class StockMovementService {
       tx
     );
   }
+
+  async processMixProduction(
+    mixVariantId: number,
+    amount: number,
+    tx?: PrismaClient,
+  ) {
+    return await this.stockMovementRepository.processMixProduction(
+      mixVariantId,
+      amount,
+      tx
+    );
+  } 
 }

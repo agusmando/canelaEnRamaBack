@@ -39,7 +39,7 @@ export class ProductRepository extends GenericRepositoryImpl<
       createData.variants,
       uploadedFilesByField
     );
-    console.log("Pasa variantes")
+    console.log("Pasa variantes", variants);
 
     // const finalQuery = prismaCreateEntityBuilder(createData, mapping);
     const data: any = {
@@ -51,24 +51,24 @@ export class ProductRepository extends GenericRepositoryImpl<
 
     // TODO: Pensar en la creación múltiple de variantes
     // Si la primera variante tiene componentes, las agrega a su query
-    if (
-      variants.length === 1 &&
-      variants[0].hasComponents &&
-      variants[0].hasComponents.length > 0
-    ) {
-      data.variants = {
-        ...variants[0],
-        hasComponents: {
-          create: variants[0].hasComponents.map(
-            (component: any) =>
-              ({
-                productVariantId: Number(component.productVariantId),
-                quantity: component.quantity,
-              } as any)
-          ),
-        },
-      };
-    }
+    // if (
+    //   variants.length === 1 &&
+    //   variants[0].hasComponents &&
+    //   variants[0].hasComponents.length > 0
+    // ) {
+    //   data.variants = {
+    //     ...variants[0],
+    //     hasComponents: {
+    //       create: variants[0].hasComponents.map(
+    //         (component: any) =>
+    //           ({
+    //             productVariantId: Number(component.productVariantId),
+    //             quantity: component.quantity,
+    //           } as any)
+    //       ),
+    //     },
+    //   };
+    // }
 
     console.log(data);
     console.log(JSON.stringify(data.variants));

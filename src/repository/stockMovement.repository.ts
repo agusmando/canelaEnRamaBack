@@ -1,4 +1,3 @@
-
 import { PrismaClient } from "@prisma/client";
 import { StoreProcedureError } from "../errors/infra/StoreProcedureError.ts";
 export class StockMovementRepository {
@@ -13,14 +12,26 @@ export class StockMovementRepository {
     mixVariantId: number,
     newStock: number,
     type: string,
-    tx?: PrismaClient
+    tx?: PrismaClient,
   ) {
     try {
       const model = tx ?? this.prisma;
-      await model
-        .$executeRaw`SELECT public.create_stock_movement(${mixVariantId}::INT, ${newStock}::INT, ${type}::TEXT)`;
+      await model.$executeRaw`SELECT public.create_stock_movement(${mixVariantId}::INT, ${newStock}::INT, ${type}::TEXT)`;
     } catch (error) {
       throw new StoreProcedureError("create_stock_movement" + error);
+    }
+  }
+
+  async processMixProduction(
+    mixVariantId: number,
+    amount: number,
+    tx?: PrismaClient,
+  ) {
+    try {
+      const model = tx ?? this.prisma;
+      await model.$executeRaw`SELECT public.process_mix_production(${mixVariantId}::INT, ${amount}::INT)`;
+    } catch (error) {
+      throw new StoreProcedureError("process_mix_production");
     }
   }
 }

@@ -62,21 +62,26 @@ export class ProductVariantRepository extends GenericRepositoryImpl<
     tx?: PrismaClient,
   ): Promise<any> {
     const variantMapping = productVariantCreateMapping;
-    let result: any;
-    variants?.forEach((variant: any) => {
-      console.log("result" ,variant, variantMapping)
-      const basic = prismaCreateEntityBuilder(variant, variantMapping);
-      result = {
-        ...basic,
-      };
-      if (uploadedFilesByField && uploadedFilesByField.length > 0) {
-        const images = this.imageService.createImageQuery(uploadedFilesByField);
-        result = {
-          ...result,
-          ...images,
+    const result: any[] = [];
+
+    for (let idx = 0; idx < (variants?.length || 0); idx++) {
+      const variant: any = variants[idx];
+      // construye campos básicos usando tu builder
+      let basic = prismaCreateEntityBuilder(variant, variantMapping);
+
+      // añadir imágenes si vienen (uploadedFilesByField puede ser array donde idx corresponde)
+      if (uploadedFilesByField && Array.isArray(uploadedFilesByField[idx]) && uploadedFilesByField[idx].length > 0) {
+        const imagesQuery = this.imageService.createImageQuery(uploadedFilesByField[idx]);
+        basic = {
+          ...basic,
+          ...imagesQuery,
         };
       }
-    });
+
+      result.push(basic);
+      console.log("result", basic);
+    }
+
     return result;
   }
 

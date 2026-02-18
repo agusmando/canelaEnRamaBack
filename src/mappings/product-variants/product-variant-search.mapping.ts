@@ -34,6 +34,7 @@ export const productVariantSearchQueryMapping = {
     type: "relationArray",
     childField: "id",
   },
+  ofuscatedMinStock: { field: "minStock", type: "number" },
   availableWeb: { field: "availableWeb", type: "boolean" },
   availablePedidosYa: { field: "availablePedidosYa", type: "boolean" },
 };

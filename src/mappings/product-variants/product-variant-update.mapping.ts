@@ -11,6 +11,7 @@ export const productVariantUpdateMapping = {
   requestTime: { field: "requestTime" },
   availableWeb: { field: "availableWeb" },
   availablePedidosYa: { field: "availablePedidosYa" },
+  minStock: { field: "minStock" },
 
   // Relaciones simples
   measureTypeId: { relation: true, connectField: "id" },
@@ -44,7 +45,7 @@ export const productVariantUpdateMapping = {
           public_id: image.public_id,
           secure_url: image.secure_url,
         })),
-      },  
-    })
+      },
+    }),
   },
 };

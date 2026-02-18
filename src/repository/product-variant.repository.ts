@@ -64,6 +64,7 @@ export class ProductVariantRepository extends GenericRepositoryImpl<
     const variantMapping = productVariantCreateMapping;
     let result: any;
     variants?.forEach((variant: any) => {
+      console.log("result" ,variant, variantMapping)
       const basic = prismaCreateEntityBuilder(variant, variantMapping);
       result = {
         ...basic,

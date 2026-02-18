@@ -15,10 +15,12 @@ export class UpdateProductVariantDto {
   currentStock?: number;
   removeImages?: { id: number }[];
   images?: any[];
+  minStock?: number;
 
   constructor(
     availableWeb?: boolean,
     availablePedidosYa?: boolean,
+    minStock?: number,
     name?: string,
     active?: boolean,
     measureTypeId?: number,
@@ -50,5 +52,6 @@ export class UpdateProductVariantDto {
     this.images = images;
     this.availableWeb = availableWeb;
     this.availablePedidosYa = availablePedidosYa;
+    this.minStock = minStock;
   }
 }

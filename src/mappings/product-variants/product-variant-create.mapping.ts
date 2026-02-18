@@ -27,12 +27,18 @@ export const productVariantCreateMapping = {
     // Si movements tuviera campos complejos, definirías un mapping para él aquí:
   },
   
+  minStock: { parseInt: true },
+
   // Relaciones Mix/Componentes (según tu JSON comentado)
-  hasComponents: {
-     relation: true,
-     allowCreate: false,
-     // childMapping: dependencyMapping // (Definir si vas a enviar componentes anidados)
-  },
+  // hasComponents: {
+  //    relation: true,
+  //    allowCreate: false,
+  //    connectField: "id",
+  //    childMapping: {
+  //      productId: { parseInt: true },
+  //      quantity: { parseInt: true },
+  //    }
+  // },
 
   images: {
     relation:  true,

@@ -33,12 +33,13 @@ export class ProductRepository extends GenericRepositoryImpl<
     tx?: PrismaClient
   ): Promise<any> {
     const mapping = productCreateMapping;
-
+    
     // Crea la query para las variantes del producto (campos normales)
     const variants = await this.productVariantRepository.createBaseVariantQuery(
       createData.variants,
       uploadedFilesByField
     );
+    console.log("Pasa variantes")
 
     // const finalQuery = prismaCreateEntityBuilder(createData, mapping);
     const data: any = {

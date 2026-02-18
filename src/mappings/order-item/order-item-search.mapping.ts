@@ -6,9 +6,8 @@ export const orderSearchQueryMapping = {
     field: "productVariant",
     type: "relationArray",
     childField: "id",
-    expand: ["product"],
+    expand: ["product", "offers"],
   },
-
   ofuscatedOrder: { field: "order", type: "object", childField: "id" },
 
   productNameSnapshot: { field: "productNameSnapshot", type: "string" },

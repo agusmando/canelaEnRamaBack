@@ -10,6 +10,7 @@ import { NotFoundError } from "../errors/application/NotFoundError.ts";
 import { UpdateOrderItemDto } from "../dto/order-item/update-order-item.dto.ts";
 import { OrderItemDto } from "../dto/order-item/order-item.dto.ts";
 import { StockMovementService } from "./stockMovement.service.ts";
+import { OfferService } from "./offer.service.ts";
 
 export class OrderService extends GenericServiceImpl<
   OrderDto,
@@ -19,11 +20,13 @@ export class OrderService extends GenericServiceImpl<
   protected orderRepository: OrderRepository;
   private productVariantService: ProductVariantService;
   private stockMovementService: StockMovementService;
+  private offerService: OfferService;
   constructor() {
     super("order");
     this.orderRepository = new OrderRepository();
     this.productVariantService = new ProductVariantService();
     this.stockMovementService = new StockMovementService();
+    this.offerService = new OfferService();
   }
 
   async createOrder(data: CreateOrderDto, sessionId: string): Promise<any> {
@@ -48,11 +51,38 @@ export class OrderService extends GenericServiceImpl<
             );
           }
 
-          if (productVariant.requestTime !== null) {
+          // Si la variante no esta activa o no tiene stock
+          if (
+            productVariant.active == false ||
+            productVariant.currentStock == 0
+          ) {
+            item.status = "CANCELLED";
+          }
+
+          // Si la variante tiene stock pero no alcanza la cantidad del item
+          if (
+            productVariant.currentStock < item.quantity &&
+            productVariant.currentStock != 0
+          ) {
+            item.status = "PARTIALLY_RETURNED";
+            item.quantity = productVariant.currentStock;
+          }
+
+          if (productVariant.requestTime !== "") {
             const days = Number(productVariant.requestTime) || 0;
             const awaitingDate = new Date();
             awaitingDate.setDate(awaitingDate.getDate() + days);
             item.awaitingStockAt = awaitingDate;
+          }
+
+          if (productVariant.offers && productVariant.offers.length > 0) {
+            item.unitPriceSnapshot = await this.offerService.applyOffer(
+              productVariant.finalPrice || 0,
+              item.quantity,
+              productVariant.currentStock,
+              productVariant.offers,  
+            )
+            console.log(item.unitPriceSnapshot)
           }
 
           if (item.awaitingStockAt && item.awaitingStockAt > awaitingStockAt) {
@@ -64,21 +94,22 @@ export class OrderService extends GenericServiceImpl<
             productVariantId: item.productVariantId,
             productNameSnapshot: productVariant.product?.name || "",
             variantNameSnapshot: productVariant.name,
-            unitPriceSnapshot: productVariant.finalPrice || 0,
-            status: "FULFILLED",
+            unitPriceSnapshot: item.unitPriceSnapshot || productVariant.finalPrice || 0,
+            status: item.status || "FULFILLED",
             awaitingStockAt: item.awaitingStockAt,
           };
         });
 
       const orderItems = await Promise.all(itemsForCreation);
       const totalPrice = await this.calculateTotalPrice(orderItems);
+      await this.recalculateOrderStatus(data);
 
       let createOrderDto: CreateOrderDto = {
         userSuperTokensId: sessionId,
         totalPrice,
         totalItems: itemsForCreation.length,
         paymentType: "DEBIT",
-        status: "PENDING",
+        status: data.status || "PENDING",
         orderItems,
         estimatedReadyAt:
           awaitingStockAt > currentDate ? awaitingStockAt : undefined,
@@ -86,14 +117,15 @@ export class OrderService extends GenericServiceImpl<
 
       const response = await this.orderRepository.create(createOrderDto);
       if (response) {
+        let promises: Promise<any>[] = [];
         orderItems.forEach(async (item: any) => {
-          await this.updateItemStock(
-            item.productVariantId,
-            item.quantity,
-            0,
-            tx,
-          );
+          if (item.status !== "CANCELLED") { 
+            promises.push(
+              this.updateItemStock(item.productVariantId, item.quantity, 0, tx),
+            );
+          }
         });
+        await Promise.all(promises);
       }
       return response;
     });
@@ -128,11 +160,7 @@ export class OrderService extends GenericServiceImpl<
               tx,
             );
           });
-          return await this.orderRepository.updateOrder(
-            id,
-            currentOrder,
-            tx,
-          );
+          return await this.orderRepository.updateOrder(id, currentOrder, tx);
         }
       }
 
@@ -156,8 +184,6 @@ export class OrderService extends GenericServiceImpl<
       return await this.orderRepository.updateOrder(id, currentOrder, tx);
     });
   }
-
-  //FALTA CANCELAR EL ITEM SI NO HAY SUFICIENTE STOCK
 
   async applyItemChange(order: OrderDto, item: UpdateOrderItemDto, tx?: any) {
     console.log("item", item);
@@ -218,16 +244,16 @@ export class OrderService extends GenericServiceImpl<
       await this.orderRepository.editItemOfOrder(
         order.orderItems[index].id,
         order.orderItems[index],
-        tx
+        tx,
       );
 
       console.log("order.orderItems[index]", order.orderItems[index]);
     }
   }
 
-  private recalculateOrderStatus(order: OrderDto) {
+  private recalculateOrderStatus(order: any) {
     const activeItems = order.orderItems.filter(
-      (i) => i.status !== "CANCELLED" && i.status !== "RETURNED",
+      (i: any) => i.status !== "CANCELLED" && i.status !== "RETURNED",
     );
 
     if (activeItems.length === 0) {

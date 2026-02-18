@@ -60,19 +60,33 @@ END;
 // * product_id INT
 // * quantity INT
 // * movement_type TEXT 
+DECLARE current_stock INT;
 BEGIN
+  -- Validación opcional del tipo
   IF movement_type NOT IN ('IN', 'OUT', 'ADJUSTMENT', 'PRODUCTION') THEN
     RAISE EXCEPTION 'Tipo de movimiento inválido: %', movement_type;
+  END IF;
+
+  SELECT pv."currentStock" INTO current_stock 
+  FROM "ProductVariant" pv
+  WHERE pv.id = product_id;
+
+  IF (current_stock + quantity) < 0 THEN
+    RAISE EXCEPTION 'No hay suficiente stock para el producto %: %', product_id, quantity;
   END IF;
 
   INSERT INTO "StockMovement" ("productVariantId", quantity, type, "createdAt", "priceAtTime")
   VALUES (
     product_id,
     quantity,
-    movement_type::"MovementType",  -- Usas el parámetro directamente
+    movement_type::"MovementType",
     NOW(),
-    (SELECT price FROM "ProductVariant" pv WHERE pv.id = product_id)
+    (SELECT pv.price + (pv.price * pv."profitMargin")  FROM "ProductVariant" pv WHERE pv.id = product_id)
   );
+
+  UPDATE "ProductVariant" 
+  SET "currentStock" = (current_stock + quantity)
+  WHERE id = product_id;
 END;
 
 

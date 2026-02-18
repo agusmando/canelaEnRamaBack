@@ -37,6 +37,7 @@ export class OrderRepository extends GenericRepositoryImpl<
               productVariant: {
                 include: {
                   product: true,
+                  offers: true
                 },
               },
             },
@@ -47,20 +48,7 @@ export class OrderRepository extends GenericRepositoryImpl<
       throw new DatabaseError();
     }
   }
-
-  // async updateOrder(orderToken: string, data: UpdateOrderDto): Promise<any> {
-  //   const updateMapping = orderUpdateMapping;
-
-  //   const updateData = prismaUpdateEntityBuilder(data, updateMapping);
-
-  //   console.log("updateData", updateData);
-
-  //   return await this.prisma.order.update({
-  //     where: { sessionId: orderToken },
-  //     data: updateData,
-  //   });
-  // }
-
+  
   async deleteOrder(id: number, tx?: PrismaClient): Promise<any> {
     const model = tx ?? this.prisma;
     return await model.order.deleteMany({

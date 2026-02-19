@@ -7,7 +7,7 @@ export const productVariantUpdateMapping = {
   profitMargin: { field: "profitMargin" },
   active: { field: "active" },
   contentMeasure: { field: "contentMeasure" },
-  contentAmount: { field: "contentAmount" },
+  packagingOptions: { field: "packagingOptions" },
   requestTime: { field: "requestTime" },
   availableWeb: { field: "availableWeb" },
   availablePedidosYa: { field: "availablePedidosYa" },

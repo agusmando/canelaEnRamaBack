@@ -28,6 +28,7 @@ export const productVariantCreateMapping = {
   },
   
   minStock: { parseInt: true },
+  packagingOptions: { parseInt: true },
 
   // Relaciones Mix/Componentes (según tu JSON comentado)
   hasComponents: {

@@ -5,7 +5,7 @@ export const productVariantSearchQueryMapping = {
   name: { field: "name", type: "string" },    
   ofuscatedProfitMargin: { field: "profitMargin", type: "number" }, // Not supposed to be used directly
   ofuscatedMeasure: { field: "contentMeasure", type: "string" }, // Not supposed to be used directly
-  ofuscatedMeasureContent: { field: "contentAmount", type: "string" }, // Not supposed to be used directly
+  ofuscatedPackagingOptions: { field: "packagingOptions", type: "string" }, // Not supposed to be used directly
   minPrice: { field: "price", operation: "gte", type: "numberRange" },
   maxPrice: { field: "price", operation: "lte", type: "numberRange" },
   active: { field: "active", type: "boolean" },

@@ -4,7 +4,7 @@ export class UpdateProductVariantDto {
   profitMargin?: number;
   active?: boolean;
   measureTypeId?: number;
-  contentAmount?: number;
+  packagingOptions?: number[];
   requestTime?: string;
   addComponents?: { productVariantId: number; quantity: number }[];
   removeComponents?: { productVariantId: number }[];
@@ -24,7 +24,7 @@ export class UpdateProductVariantDto {
     name?: string,
     active?: boolean,
     measureTypeId?: number,
-    contentAmount?: number,
+    packagingOptions?: number[],
     price?: number,
     profitMargin?: number,
     currentStock?: number,
@@ -39,7 +39,7 @@ export class UpdateProductVariantDto {
     this.name = name;
     this.active = active;
     this.measureTypeId = measureTypeId;
-    this.contentAmount = contentAmount;
+    this.packagingOptions = packagingOptions;
     this.currentStock = currentStock;
     this.price = price;
     this.profitMargin = profitMargin;

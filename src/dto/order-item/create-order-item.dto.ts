@@ -5,6 +5,7 @@ export class CreateOrderItemDto {
   unitPriceSnapshot: number;
   quantity: number;
   status: string;
+  selectedBulkOption?: number;
   awaitingStockAt?: Date;
   constructor(
     productVariantId: number,
@@ -13,6 +14,7 @@ export class CreateOrderItemDto {
     unitPriceSnapshot: number,
     quantity: number,
     status: string,
+    selectedBulkOption?: number,
     awaitingStockAt?: Date
   ) {
     this.productVariantId = productVariantId;
@@ -21,6 +23,7 @@ export class CreateOrderItemDto {
     this.unitPriceSnapshot = unitPriceSnapshot;
     this.quantity = quantity;
     this.status = status;
+    this.selectedBulkOption = selectedBulkOption;
     this.awaitingStockAt = awaitingStockAt;
   }
 }

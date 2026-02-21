@@ -3,4 +3,5 @@ export const orderItemCreateMapping = {
   quantity: { parseInt: true },
   orderId: { parseInt: true },
   unitPriceSnapshot: { parseFloat: true },
+  selectedBulkOption: { parseFloat: true },
 };

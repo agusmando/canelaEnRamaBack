@@ -45,8 +45,8 @@ model ProductVariant {
   active           Boolean     @default(true) // Apaga solo esta presentación
   contentMeasure   MeasureType @relation(fields: [measureTypeId], references: [id]) // Por ejemplo un frasco de 60cc, 150ml, 360g, etc
   packagingOptions Float[]
-  minStock         Int         @default(0)
   requestTime      String      @default("")
+  stockThreshold   Int         @default(0)
 
   // Relación con el padre
   product       Product      @relation(fields: [productId], references: [id])
@@ -270,7 +270,7 @@ enum OrderStatus {
 model OrderItem {
   id               Int  @id @default(autoincrement())
   orderId          Int
-  productVariantId Int? // Opcional por si el producto se borra del catálogo
+  productVariantId Int? 
 
   productNameSnapshot String // Ej: "Yogurt"
   variantNameSnapshot String // Ej: "Vainilla"
@@ -279,6 +279,7 @@ model OrderItem {
   quantity        Int
   status          OrderItemStatus @default(FULFILLED)
   awaitingStockAt DateTime?
+  selectedBulkOption Float?
 
   Order          Order           @relation(fields: [orderId], references: [id])
   productVariant ProductVariant? @relation(fields: [productVariantId], references: [id])

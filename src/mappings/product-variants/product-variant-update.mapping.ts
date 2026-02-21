@@ -11,7 +11,7 @@ export const productVariantUpdateMapping = {
   requestTime: { field: "requestTime" },
   availableWeb: { field: "availableWeb" },
   availablePedidosYa: { field: "availablePedidosYa" },
-  minStock: { field: "minStock" },
+  stockThreshold: { field: "stockThreshold" },
 
   // Relaciones simples
   measureTypeId: { relation: true, connectField: "id" },

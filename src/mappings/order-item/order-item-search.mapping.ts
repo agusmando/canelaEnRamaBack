@@ -15,4 +15,5 @@ export const orderSearchQueryMapping = {
   unitPriceSnapshot: { field: "unitPriceSnapshot", type: "number" },
   status: { field: "status", type: "string" },
   awaitingStockAt: { field: "awaitingStockAt", type: "date", operation: "gte" },
+  ofustactedSelectedBulkOption: { field: "selectedBulkOption", type: "number" },
 };

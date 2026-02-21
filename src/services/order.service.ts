@@ -80,9 +80,9 @@ export class OrderService extends GenericServiceImpl<
               productVariant.finalPrice || 0,
               item.quantity,
               productVariant.currentStock,
-              productVariant.offers,  
-            )
-            console.log(item.unitPriceSnapshot)
+              productVariant.offers,
+            );
+            console.log(item.unitPriceSnapshot);
           }
 
           if (item.awaitingStockAt && item.awaitingStockAt > awaitingStockAt) {
@@ -94,7 +94,9 @@ export class OrderService extends GenericServiceImpl<
             productVariantId: item.productVariantId,
             productNameSnapshot: productVariant.product?.name || "",
             variantNameSnapshot: productVariant.name,
-            unitPriceSnapshot: item.unitPriceSnapshot || productVariant.finalPrice || 0,
+            selectedBulkOption: item.selectedBulkOption,
+            unitPriceSnapshot:
+              item.unitPriceSnapshot || productVariant.finalPrice || 0,
             status: item.status || "FULFILLED",
             awaitingStockAt: item.awaitingStockAt,
           };
@@ -119,9 +121,12 @@ export class OrderService extends GenericServiceImpl<
       if (response) {
         let promises: Promise<any>[] = [];
         orderItems.forEach(async (item: any) => {
-          if (item.status !== "CANCELLED") { 
+          if (item.status !== "CANCELLED") {
+            let quantity = item.selectedBulkOption
+              ? item.quantity * item.selectedBulkOption
+              : item.quantity;
             promises.push(
-              this.updateItemStock(item.productVariantId, item.quantity, 0, tx),
+              this.updateItemStock(item.productVariantId, quantity, 0, tx),
             );
           }
         });
@@ -214,9 +219,13 @@ export class OrderService extends GenericServiceImpl<
       }
       itemData.quantity = Number(item.quantity);
       itemData.status = item.quantity == 0 ? "RETURNED" : "PARTIALLY_RETURNED";
+
+      let quantity = item.selectedBulkOption
+        ? item.quantity * item.selectedBulkOption
+        : item.quantity;
       await this.updateItemStock(
         currentItem.productVariantId,
-        item.quantity,
+        quantity,
         currentItem.quantity,
         tx,
       );
@@ -271,7 +280,10 @@ export class OrderService extends GenericServiceImpl<
 
   private calculateTotalPrice(orderItems: any[]) {
     return orderItems.reduce((total, item) => {
-      return total + item.unitPriceSnapshot * item.quantity;
+      let quantity = item.selectedBulkOption
+        ? item.quantity * item.selectedBulkOption
+        : item.quantity;
+      return total + item.unitPriceSnapshot * quantity;
     }, 0);
   }
 

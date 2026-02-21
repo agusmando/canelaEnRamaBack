@@ -27,7 +27,7 @@ export const productVariantCreateMapping = {
     // Si movements tuviera campos complejos, definirías un mapping para él aquí:
   },
   
-  minStock: { parseInt: true },
+  stockThreshold: { parseInt: true },
   packagingOptions: { parseInt: true },
 
   // Relaciones Mix/Componentes (según tu JSON comentado)

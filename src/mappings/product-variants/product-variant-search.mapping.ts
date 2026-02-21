@@ -10,7 +10,7 @@ export const productVariantSearchQueryMapping = {
   maxPrice: { field: "price", operation: "lte", type: "numberRange" },
   active: { field: "active", type: "boolean" },
   currentStock: { field: "currentStock", type: "number" },
-  minStock: { field: "currentStock", operation: "gte", type: "numberRange" },
+  stockThreshold: { field: "currentStock", operation: "gte", type: "numberRange" },
   maxStock: { field: "currentStock", operation: "lte", type: "numberRange" },
   ofuscatedComponentOf: {
     field: "isComponentOf",
@@ -34,7 +34,7 @@ export const productVariantSearchQueryMapping = {
     type: "relationArray",
     childField: "id",
   },
-  ofuscatedMinStock: { field: "minStock", type: "number" },
+  ofuscatedstockThreshold: { field: "stockThreshold", type: "number" },
   availableWeb: { field: "availableWeb", type: "boolean" },
   availablePedidosYa: { field: "availablePedidosYa", type: "boolean" },
 };

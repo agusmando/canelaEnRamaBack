@@ -12,7 +12,7 @@ export class ProductVariantDto {
   currentStock: number;
   active: boolean;
   availableWeb: boolean;
-  minStock: number;
+  stockThreshold: number;
   availablePedidosYa: boolean;
   contentMeasure?: { id: number; name: string };
   packagingOptions: number[];
@@ -34,7 +34,7 @@ export class ProductVariantDto {
     requestTime: string,
     measureTypeId: number,
     availableWeb: boolean,
-    minStock: number,
+    stockThreshold: number,
     availablePedidosYa: boolean,
     contentMeasure?: { id: number; name: string },
     profitMargin?: number,
@@ -65,6 +65,6 @@ export class ProductVariantDto {
     this.offers = offers;
     this.availableWeb = availableWeb;
     this.availablePedidosYa = availablePedidosYa;
-    this.minStock = minStock;
+    this.stockThreshold = stockThreshold;
   }
 }

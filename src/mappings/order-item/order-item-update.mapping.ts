@@ -9,4 +9,5 @@ export const orderItemUpdateMapping = {
   awaitingStockAt: { field: "awaitingStockAt" },
   productNameSnapshot: { field: "productNameSnapshot" },
   variantNameSnapshot: { field: "variantNameSnapshot" },
+  selectedBulkOption: { field: "selectedBulkOption" },
 };

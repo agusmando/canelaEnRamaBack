@@ -11,7 +11,7 @@ export class CreateProductVariantDto {
   packagingOptions?: number[];
   requestTime?: string;
   hasComponents?: { productId: number; quantity: number }[];
-  minStock: number;
+  stockThreshold: number;
   constructor(
     name: string,
     productId: number,
@@ -22,7 +22,7 @@ export class CreateProductVariantDto {
     measureTypeId: number,
     availableWeb: boolean,
     availablePedidosYa: boolean,
-    minStock: number,
+    stockThreshold: number,
     packagingOptions?: number[],
     requestTime?: string,
     hasComponents?: { productId: number; quantity: number }[]
@@ -37,7 +37,7 @@ export class CreateProductVariantDto {
     this.packagingOptions = packagingOptions;
     this.requestTime = requestTime;
     this.hasComponents = hasComponents;
-    this.minStock = minStock;
+    this.stockThreshold = stockThreshold;
     this.availableWeb = availableWeb;
     this.availablePedidosYa = availablePedidosYa;
   }

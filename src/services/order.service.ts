@@ -51,23 +51,23 @@ export class OrderService extends GenericServiceImpl<
             );
           }
 
-          // Si la variante no esta activa o no tiene stock
-          if (
-            productVariant.active == false ||
-            productVariant.currentStock == 0
-          ) {
+          // compute fulfillment for bulk/unit
+          const requestedPackages = Number(item.quantity || 0);
+          const selectedBulk = item.selectedBulkOption ? Number(item.selectedBulkOption) : undefined;
+          const fulfillment = this.computeFulfillment(productVariant, requestedPackages, selectedBulk);
+
+          // apply results
+          if (fulfillment.status === "CANCELLED") {
             item.status = "CANCELLED";
+            item.quantity = 0;
+            item.selectedBulkOption = fulfillment.finalSize ?? item.selectedBulkOption;
+          } else {
+            item.status = fulfillment.status === "FULFILLED" ? (item.status || "FULFILLED") : "PARTIALLY_RETURNED";
+            item.quantity = fulfillment.finalQty;
+            if (fulfillment.finalSize != null) item.selectedBulkOption = fulfillment.finalSize;
           }
 
-          // Si la variante tiene stock pero no alcanza la cantidad del item
-          if (
-            productVariant.currentStock < item.quantity &&
-            productVariant.currentStock != 0
-          ) {
-            item.status = "PARTIALLY_RETURNED";
-            item.quantity = productVariant.currentStock;
-          }
-
+          // Si hay tiempo de pedido
           if (productVariant.requestTime !== "") {
             const days = Number(productVariant.requestTime) || 0;
             const awaitingDate = new Date();
@@ -75,6 +75,7 @@ export class OrderService extends GenericServiceImpl<
             item.awaitingStockAt = awaitingDate;
           }
 
+          // Aplicar ofertas sobre el precio por paquete (finalPrice representa precio por paquete según tamaño)
           if (productVariant.offers && productVariant.offers.length > 0) {
             item.unitPriceSnapshot = await this.offerService.applyOffer(
               productVariant.finalPrice || 0,
@@ -82,7 +83,6 @@ export class OrderService extends GenericServiceImpl<
               productVariant.currentStock,
               productVariant.offers,
             );
-            console.log(item.unitPriceSnapshot);
           }
 
           if (item.awaitingStockAt && item.awaitingStockAt > awaitingStockAt) {
@@ -195,7 +195,6 @@ export class OrderService extends GenericServiceImpl<
     let currentItem = order.orderItems.find(
       (i) => i.productVariantId == item.productVariantId,
     );
-    console.log("currentItem", currentItem);
 
     if (!currentItem) {
       throw new ValidationError(
@@ -204,6 +203,43 @@ export class OrderService extends GenericServiceImpl<
     }
 
     let itemData: any = {};
+
+    if (item.quantity != null) {
+      if (
+        currentItem.quantity < item.quantity ||
+        item.quantity === currentItem.quantity
+      ) {
+        return new ValidationError(
+          "Quantity must be lower than current quantity",
+        );
+      }
+
+      // obtener variant para calcular tamaños si cambia presentación
+      const productVariant = await this.productVariantService.findOne(currentItem.productVariantId);
+      const packaging = (productVariant?.packagingOptions || []).map((p: any) => Number(p)).filter((n: number)=>!isNaN(n)).sort((a:number,b:number)=>a-b);
+
+      const currentSize = Number(currentItem.selectedBulkOption) || (packaging[0] || 1);
+      const newSize = item.selectedBulkOption != null ? Number(item.selectedBulkOption) : currentSize;
+
+      const currentUnits = currentItem.quantity * currentSize;
+      const newUnits = Number(item.quantity) * newSize;
+      const returnedUnits = currentUnits - newUnits;
+
+      if (returnedUnits <= 0) {
+        return new ValidationError("Resulting returned units must be positive");
+      }
+
+      itemData.quantity = Number(item.quantity);
+      itemData.status = item.quantity == 0 ? "RETURNED" : "PARTIALLY_RETURNED";
+
+      // devolver stock: usamos el patrón (oldQuantity = 0, newQty = returnedUnits) para movimiento RETURN
+      await this.updateItemStock(
+        currentItem.productVariantId,
+        0,
+        returnedUnits,
+        tx,
+      );
+    }
 
     if (item.status) {
       itemData.status = item.status;
@@ -307,5 +343,55 @@ export class OrderService extends GenericServiceImpl<
       diff < 0 ? "OUT" : "RETURN",
       tx,
     );
+  }
+
+  private computeFulfillment(
+    productVariant: any,
+    requestedPackages: number,
+    selectedBulkOption?: number,
+  ) {
+    const currentStock = Number(productVariant.currentStock || 0); // unidades (g o unidades)
+    const packaging = (productVariant.packagingOptions || []).map((p: any) =>
+      Number(p),
+    ).filter((n: number) => !isNaN(n)).sort((a: number, b: number) => a - b);
+
+    // Unidad/simple (no packaging)
+    if (!packaging || packaging.length === 0) {
+      if (currentStock === 0) {
+        return { finalSize: null, finalQty: 0, status: "CANCELLED", units: 0 };
+      }
+      if (currentStock >= requestedPackages) {
+        return { finalSize: null, finalQty: requestedPackages, status: "FULFILLED", units: requestedPackages };
+      }
+      return { finalSize: null, finalQty: currentStock, status: "PARTIALLY_RETURNED", units: currentStock };
+    }
+
+    // Producto a granel
+    if (currentStock === 0) {
+      return { finalSize: null, finalQty: 0, status: "CANCELLED", units: 0 };
+    }
+
+    const selectedSize = Number(selectedBulkOption) || packaging[0];
+    const requestedUnits = selectedSize * requestedPackages;
+
+    if (currentStock >= requestedUnits) {
+      return { finalSize: selectedSize, finalQty: requestedPackages, status: "FULFILLED", units: requestedUnits };
+    }
+
+    // Intenta con la misma presentación pero menos paquetes
+    const maxSame = Math.floor(currentStock / selectedSize);
+    if (maxSame >= 1) {
+      return { finalSize: selectedSize, finalQty: maxSame, status: "PARTIALLY_RETURNED", units: maxSame * selectedSize };
+    }
+
+    // Si no cabe ni una de la presentación seleccionada, buscar presentaciones más pequeñas
+    // Elegimos la presentación más pequeña que permita al menos 1 paquete (maximiza paquetes usando la más pequeña posible)
+    const possible = packaging.filter((s: number) => s <= currentStock);
+    if (possible.length === 0) {
+      return { finalSize: null, finalQty: 0, status: "CANCELLED", units: 0 };
+    }
+    const fallbackSize = possible[0]; // más pequeña que cabe
+    const fallbackQty = Math.floor(currentStock / fallbackSize);
+    return { finalSize: fallbackSize, finalQty: fallbackQty, status: "PARTIALLY_RETURNED", units: fallbackQty * fallbackSize };
   }
 }

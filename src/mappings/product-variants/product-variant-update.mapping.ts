@@ -13,9 +13,6 @@ export const productVariantUpdateMapping = {
   availablePedidosYa: { field: "availablePedidosYa" },
   stockThreshold: { field: "stockThreshold" },
 
-  // Relaciones simples
-  measureTypeId: { relation: true, connectField: "id" },
-
   stockIncrement: {
     transform: (qty: number, fullData: any) => ({
       currentStock: { increment: qty },

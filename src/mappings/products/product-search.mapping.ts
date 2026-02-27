@@ -2,7 +2,7 @@ export const productSearchQueryMapping = {
   ofuscatedId: { field: "id", type: "number" },
   name: { field: "name", type: "string" },
   description: { field: "description", type: "string" },
-  ofuscatedMeasure: { field: "measure", type: "object" },
+  ofuscatedMeasure: { field: "measure", type: "string" },
   active: { field: "active", type: "boolean" },
   category: { field: "Category", type: "object", childField: "name"},
   tags: { field: "Tags", type: "relationArray", childField: "name" },

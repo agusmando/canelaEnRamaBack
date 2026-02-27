@@ -10,7 +10,7 @@ export class ProductDto {
   finalPrice?: number;
   category?: CategoryDto;
   categoryId: number;
-  measure?: { id: number; name: string };
+  measure?: string;
   tags?: (TagDto | { id: number })[];
   variants: ProductVariantDto[] = [];
 
@@ -22,7 +22,7 @@ export class ProductDto {
     categoryId: number,
     variants: ProductVariantDto[],
     finalPrice?: number,
-    measure?: { id: number; name: string },
+    measure?: string,
     category?: CategoryDto,
     tags?: (TagDto | { id: number })[]
   ) {

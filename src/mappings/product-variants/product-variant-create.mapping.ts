@@ -2,7 +2,6 @@
 
 export const productVariantCreateMapping = {
   // Integers
-  measureTypeId: { parseInt: true },
   contentAmount: { parseInt: true },
   currentStock: { parseInt: true },
   

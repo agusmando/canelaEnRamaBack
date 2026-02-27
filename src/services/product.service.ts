@@ -46,8 +46,8 @@ export class ProductService extends GenericServiceImpl<
       if (
         createData.variants.length == 0 ||
         !createData.variants ||
-        createData.measureTypeId == 0 ||
-        !createData.measureTypeId ||
+        createData.measure == "" ||
+        !createData.measure ||
         createData.categoryId == 0 ||
         !createData.categoryId ||
         !createData.name ||
@@ -58,7 +58,7 @@ export class ProductService extends GenericServiceImpl<
         if (createData.variants.length == 0 || !createData.variants) {
           throw new ProductHasNoVariantsError();
         }
-        if (createData.measureTypeId == 0 || !createData.measureTypeId) {
+        if (createData.measure == "" || !createData.measure) {
           throw new InvalidMeasureError();
         }
         if (createData.categoryId == 0 || !createData.categoryId) {

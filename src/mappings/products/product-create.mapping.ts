@@ -6,7 +6,6 @@ export const productCreateMapping = {
   // Campos simples del producto
   categoryId: { parseInt: true }, // Si envías el ID directamente en el body
   brandId: { parseInt: true },
-  measureTypeId: { parseInt: true },
   active: { parseBoolean: true },
 
   // Relaciones simples (Conectar)

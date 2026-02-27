@@ -18,14 +18,14 @@ BEGIN
     FROM (
         SELECT
             d."mixVariantId",
-            -- Cálculo de la suma de (Precio del Componente * Cantidad Requerida)
-            ROUND(SUM(((pv.price * pv."profitMargin" + pv.price)* d.quantity)) )AS new_price
+            ROUND(SUM(
+                ((pv.price * pv."profitMargin" + pv.price) * (CASE WHEN pv.measure = 'KG' THEN d.quantity / 1000.0 ELSE d.quantity END))
+            )) AS new_price
         FROM
             "Dependency" AS d
         JOIN
-            "ProductVariant" AS pv ON d."productVariantId" = pv.id -- Component Product
+            "ProductVariant" AS pv ON d."productVariantId" = pv.id
         WHERE
-            -- Filtrar solo los Mixes que contienen el componente modificado
             d."mixVariantId" IN (
                 SELECT DISTINCT "mixVariantId" FROM "Dependency" WHERE "productVariantId" = p_variant_component_id
             )
@@ -42,8 +42,10 @@ BEGIN
     SET "price" = subquery.new_price, "profitMargin" = 0
     FROM (
         SELECT
-            mix_variant_id,
-            ROUND(SUM(((p.price * p."profitMargin" + p.price)* d.quantity))) AS new_price
+            d."mixVariantId", -- Usamos d.mixVariantId para mayor claridad
+            ROUND(SUM(
+                ((p.price * p."profitMargin" + p.price) * (CASE WHEN p.measure = 'KG' THEN d.quantity / 1000.0 ELSE d.quantity END))
+            )) AS new_price
         FROM
             "Dependency" AS d
         JOIN
@@ -51,7 +53,6 @@ BEGIN
         WHERE d."mixVariantId" = mix_variant_id
         GROUP BY
             d."mixVariantId"
-
     ) AS subquery
     WHERE mix_variant.id = subquery.mix_variant_id;
 END;
@@ -93,60 +94,73 @@ END;
 //process_mix_production
 // * p_mix_variant_id INT
 // * p_production_amount DOUBLE
+-- process_mix_production
 DECLARE
     v_total_recipe_weight FLOAT;
+    v_insufficient_component TEXT;
 BEGIN
-    -- 1. Calcular el peso total de la receta base
-    SELECT SUM(quantity) 
+    -- 1. Calcular el peso total de la receta base (considerando KG)
+    SELECT SUM(CASE WHEN pv.measure = 'KG' THEN d.quantity / 1000.0 ELSE d.quantity END) 
     INTO v_total_recipe_weight
-    FROM "Dependency"
-    WHERE "mixVariantId" = p_mix_variant_id -- Ajustado a tu schema: mixId
-      AND active = true;
+    FROM "Dependency" d
+    JOIN "ProductVariant" pv ON d."productVariantId" = pv.id
+    WHERE d."mixVariantId" = p_mix_variant_id 
+      AND d.active = true;
 
-    -- Validación
     IF v_total_recipe_weight IS NULL OR v_total_recipe_weight = 0 THEN
         RAISE EXCEPTION 'Error: La receta para el Mix ID % no existe o suma 0.', p_mix_variant_id;
     END IF;
 
-    -- 2. Insertar historial en StockMovement para cada insumo
-    -- Aquí traemos el "price" actual de ProductVariant para congelarlo en el historial
+    -- 2. VALIDACIÓN: Verificar stock insuficiente
+    SELECT pv.name
+    INTO v_insufficient_component
+    FROM "Dependency" d
+    JOIN "ProductVariant" pv ON d."productVariantId" = pv.id
+    WHERE d."mixVariantId" = p_mix_variant_id
+      AND d.active = true
+      AND pv."currentStock" < ROUND(((CASE WHEN pv.measure = 'KG' THEN d.quantity / 1000.0 ELSE d.quantity END) / v_total_recipe_weight) * p_production_amount)
+    LIMIT 1;
+
+    IF v_insufficient_component IS NOT NULL THEN
+        RAISE EXCEPTION 'Stock insuficiente para el componente: %. No se puede producir el Mix.', v_insufficient_component;
+    END IF;
+
+    -- 3. Insertar historial en StockMovement
     INSERT INTO "StockMovement" ("productVariantId", quantity, type, "createdAt", "priceAtTime")
     SELECT 
-        d."productVariantId", -- En tu schema de Dependency usas productId
-        -1 * ROUND((d.quantity / v_total_recipe_weight) * p_production_amount),
+        d."productVariantId", 
+        -1 * ROUND(((CASE WHEN pv.measure = 'KG' THEN d.quantity / 1000.0 ELSE d.quantity END) / v_total_recipe_weight) * p_production_amount),
         'PRODUCTION'::"MovementType",
         NOW(),
-        pv.price -- <--- Capturamos el precio/costo actual de la variante
+        pv.price 
     FROM "Dependency" d
     JOIN "ProductVariant" pv ON d."productVariantId" = pv.id
     WHERE d."mixVariantId" = p_mix_variant_id
       AND d.active = true;
 
-    -- 3. Restar del Stock Actual de los insumos
+    -- 4. Restar del Stock Actual
     UPDATE "ProductVariant" pv
     SET "currentStock" = "currentStock" - subquery.calculated_deduction
     FROM (
         SELECT 
             d."productVariantId",
-            ROUND((d.quantity / v_total_recipe_weight) * p_production_amount) as calculated_deduction
+            ROUND(((CASE WHEN pv2.measure = 'KG' THEN d.quantity / 1000.0 ELSE d.quantity END) / v_total_recipe_weight) * p_production_amount) as calculated_deduction
         FROM "Dependency" d
+        JOIN "ProductVariant" pv2 ON d."productVariantId" = pv2.id
         WHERE d."mixVariantId" = p_mix_variant_id
           AND d.active = true
     ) AS subquery
     WHERE pv.id = subquery."productVariantId";
 
-    -- 4. OPCIONAL: Aumentar el stock del Mix terminado
-    -- Si también quieres que el SP maneje la entrada del producto final:
-    -- UPDATE "ProductVariant"
-    --SET "currentStock" = "currentStock" + p_production_amount
-    --WHERE id = p_mix_variant_id;
-
-    -- Insertar el movimiento de entrada del Mix (su costo es la suma proporcional o su precio actual)
+    -- 5 y 6 (Se mantienen igual ya que actúan sobre el producto Mix terminado)
     INSERT INTO "StockMovement" ("productVariantId", quantity, type, "createdAt", "priceAtTime")
     SELECT id, p_production_amount, 'PRODUCTION'::"MovementType", NOW(), price
     FROM "ProductVariant"
     WHERE id = p_mix_variant_id;
 
+    UPDATE "ProductVariant"
+    SET "currentStock" = "currentStock" + p_production_amount
+    WHERE id = p_mix_variant_id;
 END;
 
 //add_item_to_cart

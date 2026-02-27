@@ -5,7 +5,7 @@ export class CreateProductDto {
   brandId: number;
   categoryId: number;
   Tags?: { id: number }[];
-  measureTypeId: number;
+  measure: string;
   variants: CreateProductVariantDto[] = [];
 
   constructor(
@@ -13,7 +13,7 @@ export class CreateProductDto {
     description: string,
     categoryId: number,
     brandId: number,
-    measureTypeId: number,
+    measure: string,
     variants: CreateProductVariantDto[],
     Tags?: { id: number }[]
   ) {
@@ -22,7 +22,7 @@ export class CreateProductDto {
     this.categoryId = categoryId;
     this.brandId = brandId;
     this.Tags = Tags;
-    this.measureTypeId = measureTypeId;
+    this.measure = measure;
     this.variants = variants;
   }
 }

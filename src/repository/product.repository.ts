@@ -102,7 +102,6 @@ export class ProductRepository extends GenericRepositoryImpl<
         variants: true,
         Category: true,
         Brand: true,
-        measure: true,
       },
     });
   }

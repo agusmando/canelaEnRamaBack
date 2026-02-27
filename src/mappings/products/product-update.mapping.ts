@@ -6,7 +6,7 @@ export const productUpdateMapping = {
   // profitMargin: { field: "profitMargin" },
 
   // Relaciones simples
-  measureTypeId: { relation: true, connectField: "id" },
+  measure: { field: "measure" },
   categoryId: { relation: true, connectField: "id" },
   Tags: { relation: true, connectField: "id" },
   brandId: { relation: true, connectField: "id" },

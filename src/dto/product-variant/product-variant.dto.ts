@@ -14,11 +14,10 @@ export class ProductVariantDto {
   availableWeb: boolean;
   stockThreshold: number;
   availablePedidosYa: boolean;
-  contentMeasure?: { id: number; name: string };
+  contentMeasure?: string;
   packagingOptions: number[];
   requestTime: string;
   product?: ProductDto;
-  measureTypeId: number;
   isComponentOf?: DependencyDto[];
   hasComponents?: DependencyDto[];
   movements?: MovementDto[] = [];
@@ -32,11 +31,10 @@ export class ProductVariantDto {
     currentStock: number,
     packagingOptions: number[],
     requestTime: string,
-    measureTypeId: number,
     availableWeb: boolean,
     stockThreshold: number,
     availablePedidosYa: boolean,
-    contentMeasure?: { id: number; name: string },
+    contentMeasure?: string,
     profitMargin?: number,
     price?: number,
     product?: ProductDto,
@@ -57,7 +55,6 @@ export class ProductVariantDto {
     this.packagingOptions = packagingOptions;
     this.requestTime = requestTime;
     this.product = product;
-    this.measureTypeId = measureTypeId;
     this.isComponentOf = isComponentOf;
     this.hasComponents = hasComponents;
     this.movements = movements;

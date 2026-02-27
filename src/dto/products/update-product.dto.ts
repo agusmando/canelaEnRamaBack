@@ -8,6 +8,7 @@ export class UpdateProductDto {
   category: string;
   tags: TagDto[];
   brand?: string;
+  measure?: string
   addVariants?: CreateProductVariantDto[];
   removeVariants?: number[];
   activateVariants?: number[];
@@ -22,6 +23,7 @@ export class UpdateProductDto {
     category: string,
     tags: TagDto[],
     brand?: string,
+    measure?: string,
     addVariants?: CreateProductVariantDto[],
     removeVariants?: number[],
     activateVariants?: number[],
@@ -35,6 +37,7 @@ export class UpdateProductDto {
     this.category = category;
     this.tags = tags;
     this.brand = brand;
+    this.measure = measure;
     this.addVariants = addVariants;
     this.removeVariants = removeVariants;
     this.activateVariants = activateVariants;

@@ -7,7 +7,7 @@ export class CreateProductVariantDto {
   active: boolean;
   availableWeb: boolean;
   availablePedidosYa: boolean;
-  measureTypeId: number;
+  contentMeasure: string;
   packagingOptions?: number[];
   requestTime?: string;
   hasComponents?: { productId: number; quantity: number }[];
@@ -19,7 +19,7 @@ export class CreateProductVariantDto {
     profitMargin: number,
     currentStock: number,
     active: boolean,
-    measureTypeId: number,
+    contentMeasure: string,
     availableWeb: boolean,
     availablePedidosYa: boolean,
     stockThreshold: number,
@@ -33,7 +33,7 @@ export class CreateProductVariantDto {
     this.profitMargin = profitMargin;
     this.currentStock = currentStock;
     this.active = active;
-    this.measureTypeId = measureTypeId;
+    this.contentMeasure = contentMeasure;
     this.packagingOptions = packagingOptions;
     this.requestTime = requestTime;
     this.hasComponents = hasComponents;

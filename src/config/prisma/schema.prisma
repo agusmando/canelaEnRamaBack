@@ -26,8 +26,7 @@ model Product {
   variants ProductVariant[]
 
   // Medidas (Esto define qué es físicamente)
-  measure       MeasureType @relation(fields: [measureTypeId], references: [id])
-  measureTypeId Int
+  measure       Measure @default(KG)
   offers        Offer[]
   // Review      Review[]
   // offers      Offer[]
@@ -43,7 +42,8 @@ model ProductVariant {
   profitMargin     Float       @default(0)
   currentStock     Int         @default(0)
   active           Boolean     @default(true) // Apaga solo esta presentación
-  contentMeasure   MeasureType @relation(fields: [measureTypeId], references: [id]) // Por ejemplo un frasco de 60cc, 150ml, 360g, etc
+  contentMeasure   Measure @default(KG) 
+  contentAmount    Int        // Por ejemplo un frasco de 60cc, 150ml, 360g, etc
   packagingOptions Float[]
   requestTime      String      @default("")
   stockThreshold   Int         @default(0)
@@ -57,8 +57,7 @@ model ProductVariant {
   hasComponents Dependency[] @relation("MixVariant")
 
   movements     StockMovement[]
-  // OrderDetail  OrderDetail[]
-  measureTypeId Int
+  
   offers        Offer[]
   images        Image[]
 
@@ -69,11 +68,12 @@ model ProductVariant {
   availablePedidosYa Boolean @default(true)
 }
 
-model MeasureType {
-  id              Int              @id @default(autoincrement())
-  name            String
-  products        Product[]
-  productVariants ProductVariant[]
+enum Measure {
+  KG
+  U
+  L
+  ML
+  G
 }
 
 model Dependency {

@@ -133,7 +133,7 @@ export class ProductVariantRepository extends GenericRepositoryImpl<
       const model = tx ?? this.prisma;
       await model.$executeRaw`SELECT public.recalculate_mix_price(${mixVariantId}::INT)`;
     } catch (error) {
-      throw new StoreProcedureError("recalculate_mix_price");
+      throw new StoreProcedureError("recalculate_mix_price", error);
     }
   }
 
@@ -142,7 +142,7 @@ export class ProductVariantRepository extends GenericRepositoryImpl<
       const model = tx ?? this.prisma;
       await model.$executeRaw`SELECT public.recalculate_all_mixes_from_product(${productId}::INT)`;
     } catch (error) {
-      throw new StoreProcedureError("recalculate_all_mixes_from_product");
+      throw new StoreProcedureError("recalculate_all_mixes_from_product", error);
     }
   }
 
@@ -151,12 +151,8 @@ export class ProductVariantRepository extends GenericRepositoryImpl<
     newStock: number,
     tx?: PrismaClient,
   ) {
-    try {
       const model = tx ?? this.prisma;
-      await model.$executeRaw`SELECT public.create_stock_movement(${mixVariantId}::INT, ${newStock}::INT, ${"ADJUSTMENT"}::TEXT)`;
-    } catch (error) {
-      throw new StoreProcedureError("create_stock_movement");
-    }
+      await model.$executeRaw`SELECT public.process_mix_production(${mixVariantId}::INT, ${newStock}::INT)`;
   }
 
   async createStockMovement(
@@ -165,12 +161,8 @@ export class ProductVariantRepository extends GenericRepositoryImpl<
     type: string,
     tx?: PrismaClient,
   ) {
-    try {
       const model = tx ?? this.prisma;
       await model.$executeRaw`SELECT public.create_stock_movement(${mixVariantId}::INT, ${newStock}::INT, ${type}::TEXT)`;
-    } catch (error) {
-      throw new StoreProcedureError("create_stock_movement");
-    }
   }
 
   async removeVariant(
@@ -216,11 +208,7 @@ export class ProductVariantRepository extends GenericRepositoryImpl<
     quantity: number,
     tx?: PrismaClient,
   ) {
-    try {
       const model = tx ?? this.prisma;
       return await model.$executeRaw`SELECT public.add_component_to_variant(${productVariantId}::INT, ${mixVariantId}::INT, ${quantity}::INT)`;
-    } catch (error) {
-      throw new StoreProcedureError("add_component_to_variant");
-    }
   }
 }

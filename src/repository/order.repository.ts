@@ -86,8 +86,8 @@ export class OrderRepository extends GenericRepositoryImpl<
           },
         },
       });
-    } catch (error) {
-      throw new StoreProcedureError("update_time_on_order");
+    } catch (error: any) {
+      throw new StoreProcedureError("update_time_on_order", error);
     }
   }
 

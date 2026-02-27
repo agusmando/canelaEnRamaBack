@@ -7,6 +7,7 @@ import { ProductVariantRepository } from "../repository/product-variant.reposito
 import { NotFoundError } from "../errors/application/NotFoundError.ts";
 import { BadRequestError } from "../errors/application/BadRequestError.ts";
 import { ImageService } from "./image.service.ts";
+import { ServerError } from "../errors/application/ServerError.ts";
 
 export class ProductVariantService extends GenericServiceImpl<
   ProductVariantDto,
@@ -56,7 +57,7 @@ export class ProductVariantService extends GenericServiceImpl<
       }
 
       // Actualiza situaciones de stock y precio relacionadas con el stock de un mix, y el precio de sus componentes.
-      this.mixRelatedStockQueries(data, id, updatedVariant as any);
+      await this.mixRelatedStockQueries(data, id, updatedVariant as any);
 
       if (
         (data.addComponents && data.addComponents.length > 0) ||
@@ -88,8 +89,9 @@ export class ProductVariantService extends GenericServiceImpl<
     addComponents?: { productVariantId: number; quantity: number }[],
     tx?: any
   ) {
-    if (removeComponents) {
-      const componentPromises = removeComponents.map(async (component: any) => {
+    try {
+      if (removeComponents) {
+        const componentPromises = removeComponents.map(async (component: any) => {
         return await this.productVariantRepository.removeVariant(
           mixVariantId,
           component.productVariantId,
@@ -133,6 +135,9 @@ export class ProductVariantService extends GenericServiceImpl<
         mixVariantId,
         tx
       );
+      }
+    } catch (error: any) {
+      throw new ServerError("handleVariantsUpdate", error);
     }
   }
 
@@ -143,43 +148,48 @@ export class ProductVariantService extends GenericServiceImpl<
     updatedVariant: any,
     tx?: any
   ) {
-    if (
-      (requestData.price || requestData.profitMargin) &&
-      updatedVariant.isComponentOf &&
-      updatedVariant.isComponentOf.length > 0
-    ) {
-      await this.productVariantRepository.recalculateAllMixesFromProduct(
-        Number(id),
-        tx
-      );
-    }
-    if (requestData.stockIncrement) {
+    try {
+
       if (
-        requestData.stockIncrement > 0 &&
-        updatedVariant.hasComponents &&
-        updatedVariant.hasComponents.length > 0
+        (requestData.price || requestData.profitMargin) &&
+        updatedVariant.isComponentOf &&
+        updatedVariant.isComponentOf.length > 0
       ) {
-        await this.productVariantRepository.processMixProduction(
+        await this.productVariantRepository.recalculateAllMixesFromProduct(
           Number(id),
-          requestData.stockIncrement,
-          tx
-        );
-      } else {
-        await this.productVariantRepository.createStockMovement(
-          Number(id),
-          requestData.stockIncrement,
-          requestData.stockIncrement < 0 ? "OUT" : "IN",
           tx
         );
       }
-    }
+      if (requestData.stockIncrement) {
+        if (
+          requestData.stockIncrement > 0 &&
+          updatedVariant.hasComponents &&
+          updatedVariant.hasComponents.length > 0
+        ) {
+          await this.productVariantRepository.processMixProduction(
+            Number(id),
+            requestData.stockIncrement,
+            tx
+          );
+        } else {
+          await this.productVariantRepository.createStockMovement(
+            Number(id),
+            requestData.stockIncrement,
+            requestData.stockIncrement < 0 ? "OUT" : "IN",
+            tx
+          );
+        }
+      }
 
-    if (requestData.currentStock) {
-      await this.productVariantRepository.processMixProduction(
-        Number(id),
-        requestData.currentStock,
-        tx
-      );
+      if (requestData.currentStock) {
+        await this.productVariantRepository.processMixProduction(
+          Number(id),
+          requestData.currentStock,
+          tx
+        );
+      }
+    } catch (error: any) {
+      throw new ServerError("mixRelatedStockQueries", error);
     }
   }
 }

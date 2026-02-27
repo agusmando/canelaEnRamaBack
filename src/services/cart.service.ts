@@ -6,6 +6,7 @@ import { NotFoundError } from "../errors/application/NotFoundError.ts";
 import { ValidationError } from "../errors/application/ValidationError.ts";
 import { CartRepository } from "../repository/cart.repository.ts";
 import { v4 as uuidv4 } from "uuid";
+import { ServerError } from "../errors/application/ServerError.ts";
 
 export class CartService extends GenericServiceImpl<
   CartDto,
@@ -45,8 +46,10 @@ export class CartService extends GenericServiceImpl<
     }
     console.log("data", data);
     return this.cartRepository.withTransaction(async (tx) => {
-      if (data.userSuperTokensId) {
-        return await this.cartRepository.mergeSessionCartToUserCart(
+      try {
+
+        if (data.userSuperTokensId) {
+          return await this.cartRepository.mergeSessionCartToUserCart(
           sessionId,
           data.userSuperTokensId,
           tx
@@ -78,6 +81,10 @@ export class CartService extends GenericServiceImpl<
         return response;
       }
       return await this.cartRepository.updateTimeOnCart(sessionId, tx);
+    }
+      catch (error: any) {
+        throw new ServerError("Update cart error", error);
+    }
     });
   }
   //   async addRemoveProducts(

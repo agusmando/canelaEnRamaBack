@@ -8,7 +8,6 @@ import { ProductVariantService } from "./product-variant.service.ts";
 import { CreateOrderItemDto } from "../dto/order-item/create-order-item.dto.ts";
 import { NotFoundError } from "../errors/application/NotFoundError.ts";
 import { UpdateOrderItemDto } from "../dto/order-item/update-order-item.dto.ts";
-import { OrderItemDto } from "../dto/order-item/order-item.dto.ts";
 import { StockMovementService } from "./stockMovement.service.ts";
 import { OfferService } from "./offer.service.ts";
 

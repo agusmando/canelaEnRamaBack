@@ -18,6 +18,7 @@ import { ProductRepository } from "../repository/product.repository.ts";
 import { ProductVariantRepository } from "../repository/product-variant.repository.ts";
 import { ImageService } from "./image.service.ts";
 import { StockMovementService } from "./stockMovement.service.ts";
+import { StoreProcedureError } from "../errors/infra/StoreProcedureError.ts";
 
 export class ProductService extends GenericServiceImpl<
   ProductDto,
@@ -90,15 +91,19 @@ export class ProductService extends GenericServiceImpl<
       if (createData?.variants && createData.variants.length > 0) {
         for (const component of product.variants) {
           if (component.hasComponents && component.hasComponents.length > 0) {
-            await this.productVariantRepository.recalculateSingleMixPrice(
-              component.id,
-              tx,
-            );
-            await this.stockMovementRepository.processMixProduction(
-              component.id,
-              component.currentStock,
-              tx,
-            );
+            try {
+              await this.productVariantRepository.recalculateSingleMixPrice(
+                component.id,
+                tx,
+              );
+              await this.stockMovementRepository.processMixProduction(
+                component.id,
+                component.currentStock,
+                tx,
+              );
+            } catch (error) {
+              throw new StoreProcedureError("recalculate_mix_price/process_mix_production", error);
+            }
           }
         }
         // await this.productVariantRepository.recalculateSingleMixPrice(

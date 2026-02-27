@@ -69,7 +69,7 @@ export class GenericServiceImpl<T, U, V>
   async create(data: U): Promise<any> {
     const newEntity = await this.genericRepositoryImpl.create(data);
     if (!newEntity) {
-      throw new ServerError()
+      throw new ServerError("Generic service error", "Error creating entity")
     } else {
       return;
     }
@@ -77,7 +77,7 @@ export class GenericServiceImpl<T, U, V>
   async update(id: number, data: V): Promise<any> {
     const newEntity = await this.genericRepositoryImpl.update(id, data);
     if (!newEntity) {
-      throw new ServerError()
+      throw new ServerError("Generic service error", "Error updating entity")
     } else {
       return;
     }

@@ -99,8 +99,8 @@ export class CartRepository extends GenericRepositoryImpl<
       await model
         .$executeRaw`SELECT public.merge_session_cart_to_user_cart(${sessionId}::VARCHAR, ${userSuperTokensId}::VARCHAR)`;
       return this.updateTimeOnCart(userSuperTokensId);
-    } catch (error) {
-      throw new StoreProcedureError("merge_session_cart_to_user_cart");
+    } catch (error: any) {
+      throw new StoreProcedureError("merge_session_cart_to_user_cart", error);
     }
   }
 
@@ -115,8 +115,8 @@ export class CartRepository extends GenericRepositoryImpl<
         );
         return Promise.all(promises);
       });
-    } catch (error) {
-      throw new StoreProcedureError("add_item_to_cart");
+    } catch (error: any) {
+      throw new StoreProcedureError("add_item_to_cart", error);
     }
   }
 
@@ -201,8 +201,8 @@ export class CartRepository extends GenericRepositoryImpl<
           },
         },
       });
-    } catch (error) {
-      throw new StoreProcedureError("update_time_on_cart");
+    } catch (error: any) {
+      throw new StoreProcedureError("update_time_on_cart", error);
     }
   }
 }

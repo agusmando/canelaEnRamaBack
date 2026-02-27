@@ -13,12 +13,16 @@ export class StockMovementService {
     type: string,
     tx?: PrismaClient
   ) {
-    return await this.stockMovementRepository.createStockMovement(
-      mixVariantId,
-      newStock,
-      type,
-      tx
-    );
+    try {
+      return await this.stockMovementRepository.createStockMovement(
+        mixVariantId,
+        newStock,
+        type,
+        tx
+      );
+    } catch (error) {
+      throw new StoreProcedureError("create_stock_movement", error);
+    }
   }
 
   async processMixProduction(
@@ -26,10 +30,14 @@ export class StockMovementService {
     amount: number,
     tx?: PrismaClient,
   ) {
-    return await this.stockMovementRepository.processMixProduction(
-      mixVariantId,
-      amount,
-      tx
-    );
+    try {
+      return await this.stockMovementRepository.processMixProduction(
+        mixVariantId,
+        amount,
+        tx
+      );
+    } catch (error) {
+      throw new StoreProcedureError("process_mix_production", error);
+    }
   } 
 }

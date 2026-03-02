@@ -119,16 +119,16 @@ export class OrderService extends GenericServiceImpl<
       const response = await this.orderRepository.create(createOrderDto);
       if (response) {
         let promises: Promise<any>[] = [];
-        orderItems.forEach(async (item: any) => {
-          if (item.status !== "CANCELLED") {
-            let quantity = item.selectedBulkOption
+        for (const item of orderItems) {
+            if (item.status !== "CANCELLED") {
+              let quantity = item.selectedBulkOption
               ? item.quantity * item.selectedBulkOption
               : item.quantity;
-            promises.push(
-              this.updateItemStock(item.productVariantId, quantity, 0, tx),
-            );
-          }
-        });
+              promises.push(
+                this.updateItemStock(item.productVariantId, quantity, 0, tx),
+              );
+            }
+        }
         await Promise.all(promises);
       }
       return response;

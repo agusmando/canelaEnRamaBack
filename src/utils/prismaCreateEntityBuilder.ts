@@ -27,6 +27,12 @@ export const prismaCreateEntityBuilder = (data: any, mapping?: any) => {
       result[key] = val === "true" || val === true || val === "1" || val === 1;
       continue;
     }
+    if (map.parseFloatArray) {
+      if (Array.isArray(val)) {
+        result[key] = val.map((item: any) => parseFloat(item));
+        continue;
+      }
+    }
 
     // 3. Manejo de Relaciones
     if (map.relation) {

@@ -71,12 +71,37 @@ export class ProductService extends GenericServiceImpl<
         }
       }
 
+      let stockManagement: {name: string, currentStock: number}[] = []
+      createData.variants.forEach((variant) => {
+        stockManagement.push({
+          name: variant.name,
+          currentStock: variant.currentStock
+        })
+        variant.currentStock = 0
+      });
       // Creating the product
       const product = await this.productRepository.createProduct(
         createData,
         uploadedFilesByField,
         tx,
       );
+
+      for (const stagedV of stockManagement) {
+        for (const createdV of product.variants) {
+          if (createdV.name == stagedV.name) {
+            console.log("ingreso " + createdV.name + " " + createdV.currentStock)
+            await this.stockMovementRepository.createStockMovement(
+              createdV.id,
+              stagedV.currentStock,
+              "IN",
+              tx,
+            );  
+          } 
+        }
+      }
+
+      // Manage stock
+
 
       console.log("product", product);
       // Post-creation processing

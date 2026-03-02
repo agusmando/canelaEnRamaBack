@@ -57,7 +57,7 @@ export class ProductVariantService extends GenericServiceImpl<
       }
 
       // Actualiza situaciones de stock y precio relacionadas con el stock de un mix, y el precio de sus componentes.
-      await this.mixRelatedStockQueries(data, id, updatedVariant as any);
+      await this.mixRelatedStockQueries(data, id, updatedVariant as any, tx);
 
       if (
         (data.addComponents && data.addComponents.length > 0) ||
@@ -149,6 +149,7 @@ export class ProductVariantService extends GenericServiceImpl<
     tx?: any
   ) {
     try {
+      console.log('mixRelatedStockQueries', requestData, id, 'is ', updatedVariant.currentStock ? 'with currentStock' : 'with stockIncrement')
 
       if (
         (requestData.price || requestData.profitMargin) &&
@@ -160,7 +161,28 @@ export class ProductVariantService extends GenericServiceImpl<
           tx
         );
       }
-      if (requestData.stockIncrement) {
+      if (requestData.currentStock) {
+        if (
+          requestData.stockIncrement > 0 &&
+          updatedVariant.hasComponents &&
+          updatedVariant.hasComponents.length > 0
+        ) {
+          await this.productVariantRepository.processMixProduction(
+            Number(id),
+            requestData.currentStock,
+            tx
+          );
+        } else {
+          console.log("requestData.currentStock", requestData.currentStock)
+          await this.productVariantRepository.createStockMovement(
+            Number(id),
+            requestData.currentStock,
+            "ADJUSTMENT",
+            tx  
+          )
+        }
+      }
+      if (requestData.stockIncrement && !requestData.currentStock) {
         if (
           requestData.stockIncrement > 0 &&
           updatedVariant.hasComponents &&
@@ -181,13 +203,6 @@ export class ProductVariantService extends GenericServiceImpl<
         }
       }
 
-      if (requestData.currentStock) {
-        await this.productVariantRepository.processMixProduction(
-          Number(id),
-          requestData.currentStock,
-          tx
-        );
-      }
     } catch (error: any) {
       throw new ServerError("mixRelatedStockQueries", error);
     }

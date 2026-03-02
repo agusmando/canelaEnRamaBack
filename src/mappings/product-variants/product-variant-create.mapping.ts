@@ -9,6 +9,9 @@ export const productVariantCreateMapping = {
   price: { parseFloat: true },
   profitMargin: { parseFloat: true },
 
+  // array de float
+  packagingOptions: { parseFloatArray: true },
+
   // Booleans
   active: { parseBoolean: true },
   availableWeb: { parseBoolean: true },
@@ -27,7 +30,6 @@ export const productVariantCreateMapping = {
   },
   
   stockThreshold: { parseInt: true },
-  packagingOptions: { parseInt: true },
 
   // Relaciones Mix/Componentes (según tu JSON comentado)
   hasComponents: {

@@ -162,8 +162,8 @@ export class ProductVariantService extends GenericServiceImpl<
         );
       }
       if (requestData.currentStock) {
-        if (
-          requestData.stockIncrement > 0 &&
+        if ( 
+          requestData.currentStock > 0 && 
           updatedVariant.hasComponents &&
           updatedVariant.hasComponents.length > 0
         ) {

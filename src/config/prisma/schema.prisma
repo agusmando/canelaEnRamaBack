@@ -43,7 +43,7 @@ model ProductVariant {
   currentStock     Int         @default(0)
   active           Boolean     @default(true) // Apaga solo esta presentación
   contentMeasure   Measure @default(KG) 
-  contentAmount    Int        // Por ejemplo un frasco de 60cc, 150ml, 360g, etc
+  contentAmount    Int?        // Por ejemplo un frasco de 60cc, 150ml, 360g, etc
   packagingOptions Float[]
   requestTime      String      @default("")
   stockThreshold   Int         @default(0)
@@ -303,23 +303,3 @@ enum OrderItemStatus {
 
 //   order Order @relation(fields: [orderId], references: [id])
 // }
-
-/**
- * Vamos muy bien. Voy a necesitar seguir retocando Algunos de los elementos como la barra de scroll se ven de color oscuro cuando
- * estoy en modo claro (en modo dark está perfecto)
- * Al seleccionar un elemento del sidebar, este debe quedar destacado para saber en qué sección estoy.
- * Todos los botones de eliminación en todas las tablas tienen que decir algún mensaje indicando que es una acción irreversible.
- * En la parte de crear un producto, hace falta aclarar que las etiquetas se deben buscar mediante un input autocomplete y a medida se vayan seleccionando, mostrarse como badges debajo (porque van a haber demasiadas etiquetas). Puedo quitar los badges.
- * Al hacer click en la parte de la imagen de la variante, se debe poder seleccionar una imagen y mostrarla sin que esta se estire. Si el producto es un mix, debería permitir la búsqueda de variantes mediante un autocomplete (van a haber demasiados productos y variantes)
- * Cuando quiero crear una oferta, el ícono para permitir la selección de fecha desde y fecha hasta no se ve en modo claro (se ve blanco), pero si en modo oscuro.
- * En esa sección también me gustaría que el botón de editar permita abrir el mismo modal que se utilizó para la creación de la oferta, pero cargando los datos que tiene la oferta en cuestión.
- * En la modificación debe permitir agregar un botón para decir si está activa o inactiva. Se deben poder deseleccionar variantes o productos seleccionados.
- * La tabla de ofertas debe estar preparada para mostrar datos de ofertas que se realicen por ejempo con el tipo de oferta "Compra X y obten % de descuento". Si la oferta no tiene dichos
- * campos, simplemente mostrarlos como "-". Los atributos de las ofertas más raras no se muestran actualmente en la tabla y deben estar.
- * El estado de las órdenes debe mostrarse en español. Se necesita agregar un botón de "+ agregar" que abra un modal de creación de órden.
- * Debe permitir elegir múltiples variantes mediante autocomplete y ponerles la cantidad que fué comprada. Debe permitir elegir la forma de pago "Mercado Pago", "Pedidos ya", "Débito", "Crédito", "Efectivo".
- * También tiene que haber un botón al lado que diga "Carga Masiva". En este se abre un modal que será similar al anterior. En este se debe poder elegir un tipo de pago a la vez y para cada tipo de pago se agregarán la cantidad de variantes que se necesiten (mediante autocomplete) y poniendo la cantidad comprada. Deben poderse agregar la cantidad de variantes que se quieran dentro de cada tipo de pago.
- * Se deben poder ver los detalles de un proveedor, viendo todas las marcas que contienen y puediendo agregar nuevas marcas que se asocien a este.
- * Se deben poder editar etiquetas (solo el nombre)
- * En la sección de estadísticas me gustaría ver el porcentaje de ventas (órdenes) que se realizaron con cada medio de pago
- */

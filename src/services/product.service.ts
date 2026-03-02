@@ -71,13 +71,13 @@ export class ProductService extends GenericServiceImpl<
         }
       }
 
-      let stockManagement: {name: string, currentStock: number}[] = []
+      let stockManagement: { name: string; currentStock: number }[] = [];
       createData.variants.forEach((variant) => {
         stockManagement.push({
           name: variant.name,
-          currentStock: variant.currentStock
-        })
-        variant.currentStock = 0
+          currentStock: variant.currentStock,
+        });
+        variant.currentStock = 0;
       });
       // Creating the product
       const product = await this.productRepository.createProduct(
@@ -86,22 +86,7 @@ export class ProductService extends GenericServiceImpl<
         tx,
       );
 
-      for (const stagedV of stockManagement) {
-        for (const createdV of product.variants) {
-          if (createdV.name == stagedV.name) {
-            console.log("ingreso " + createdV.name + " " + createdV.currentStock)
-            await this.stockMovementRepository.createStockMovement(
-              createdV.id,
-              stagedV.currentStock,
-              "IN",
-              tx,
-            );  
-          } 
-        }
-      }
-
       // Manage stock
-
 
       console.log("product", product);
       // Post-creation processing
@@ -114,20 +99,37 @@ export class ProductService extends GenericServiceImpl<
 
       // Recalculate mix price
       if (createData?.variants && createData.variants.length > 0) {
-        for (const component of product.variants) {
-          if (component.hasComponents && component.hasComponents.length > 0) {
-            try {
-              await this.productVariantRepository.recalculateSingleMixPrice(
-                component.id,
-                tx,
-              );
-              await this.stockMovementRepository.processMixProduction(
-                component.id,
-                component.currentStock,
-                tx,
-              );
-            } catch (error) {
-              throw new StoreProcedureError("recalculate_mix_price/process_mix_production", error);
+        for (const createdV of product.variants) {
+          for (const stagedV of stockManagement) {
+            if (createdV.hasComponents && createdV.hasComponents.length > 0) {
+              try {
+                await this.productVariantRepository.recalculateSingleMixPrice(
+                  createdV.id,
+                  tx,
+                );
+                await this.stockMovementRepository.processMixProduction(
+                  createdV.id,
+                  stagedV.currentStock,
+                  tx,
+                );
+              } catch (error) {
+                throw new StoreProcedureError(
+                  "recalculate_mix_price/process_mix_production",
+                  error,
+                );
+              }
+            } else {
+              if (createdV.name == stagedV.name) {
+                console.log(
+                  "ingreso " + createdV.name + " " + createdV.currentStock,
+                );
+                await this.stockMovementRepository.createStockMovement(
+                  createdV.id,
+                  stagedV.currentStock,
+                  "IN",
+                  tx,
+                );
+              }
             }
           }
         }

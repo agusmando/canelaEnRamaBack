@@ -10,6 +10,7 @@ import { NotFoundError } from "../errors/application/NotFoundError.ts";
 import { UpdateOrderItemDto } from "../dto/order-item/update-order-item.dto.ts";
 import { StockMovementService } from "./stockMovement.service.ts";
 import { OfferService } from "./offer.service.ts";
+import { PricingService } from "./pricing.service.ts";
 
 export class OrderService extends GenericServiceImpl<
   OrderDto,
@@ -20,12 +21,14 @@ export class OrderService extends GenericServiceImpl<
   private productVariantService: ProductVariantService;
   private stockMovementService: StockMovementService;
   private offerService: OfferService;
+  private pricingService: PricingService;
   constructor() {
     super("order");
     this.orderRepository = new OrderRepository();
     this.productVariantService = new ProductVariantService();
     this.stockMovementService = new StockMovementService();
     this.offerService = new OfferService();
+    this.pricingService = new PricingService();
   }
 
   async createOrder(data: CreateOrderDto, sessionId: string): Promise<any> {
@@ -39,6 +42,7 @@ export class OrderService extends GenericServiceImpl<
     return this.orderRepository.withTransaction(async (tx) => {
       let awaitingStockAt: Date = new Date();
       let currentDate: Date = new Date(awaitingStockAt);
+      let totalPrice: number = 0;
       const itemsForCreation: Promise<CreateOrderItemDto>[] =
         data.orderItems.map(async (item) => {
           const productVariant = await this.productVariantService.findOne(
@@ -52,18 +56,29 @@ export class OrderService extends GenericServiceImpl<
 
           // compute fulfillment for bulk/unit
           const requestedPackages = Number(item.quantity || 0);
-          const selectedBulk = item.selectedBulkOption ? Number(item.selectedBulkOption) : undefined;
-          const fulfillment = this.computeFulfillment(productVariant, requestedPackages, selectedBulk);
+          const selectedBulk = item.selectedBulkOption
+            ? Number(item.selectedBulkOption)
+            : undefined;
+          const fulfillment = this.computeFulfillment(
+            productVariant,
+            requestedPackages,
+            selectedBulk,
+          );
 
           // apply results
           if (fulfillment.status === "CANCELLED") {
             item.status = "CANCELLED";
             item.quantity = 0;
-            item.selectedBulkOption = fulfillment.finalSize ?? item.selectedBulkOption;
+            item.selectedBulkOption =
+              fulfillment.finalSize ?? item.selectedBulkOption;
           } else {
-            item.status = fulfillment.status === "FULFILLED" ? (item.status || "FULFILLED") : "PARTIALLY_RETURNED";
+            item.status =
+              fulfillment.status === "FULFILLED"
+                ? item.status || "FULFILLED"
+                : "PARTIALLY_RETURNED";
             item.quantity = fulfillment.finalQty;
-            if (fulfillment.finalSize != null) item.selectedBulkOption = fulfillment.finalSize;
+            if (fulfillment.finalSize != null)
+              item.selectedBulkOption = fulfillment.finalSize;
           }
 
           // Si hay tiempo de pedido
@@ -75,18 +90,18 @@ export class OrderService extends GenericServiceImpl<
           }
 
           // Aplicar ofertas sobre el precio por paquete (finalPrice representa precio por paquete según tamaño)
-          if (productVariant.offers && productVariant.offers.length > 0) {
-            item.unitPriceSnapshot = await this.offerService.applyOffer(
-              productVariant.finalPrice || 0,
-              item.quantity,
-              productVariant.currentStock,
-              productVariant.offers,
-            );
-          }
+          const priceInfo = await this.pricingService.priceForOrderItem({
+            productVariant,
+            requestedQuantity: item.quantity,
+            selectedBulkOption: item.selectedBulkOption,
+          });
 
           if (item.awaitingStockAt && item.awaitingStockAt > awaitingStockAt) {
             awaitingStockAt = item.awaitingStockAt;
           }
+
+
+          totalPrice += priceInfo.totalPriceSnapshot;
 
           return {
             quantity: item.quantity,
@@ -94,15 +109,15 @@ export class OrderService extends GenericServiceImpl<
             productNameSnapshot: productVariant.product?.name || "",
             variantNameSnapshot: productVariant.name,
             selectedBulkOption: item.selectedBulkOption,
-            unitPriceSnapshot:
-              item.unitPriceSnapshot || productVariant.finalPrice || 0,
+            unitPriceSnapshot: priceInfo.unitPriceSnapshot,
+            discountAppliedSnapshot: priceInfo.discountAppliedSnapshot,
+            offerTypeSnapshot: priceInfo.offerTypeSnapshot,
             status: item.status || "FULFILLED",
             awaitingStockAt: item.awaitingStockAt,
           };
         });
 
       const orderItems = await Promise.all(itemsForCreation);
-      const totalPrice = await this.calculateTotalPrice(orderItems);
       await this.recalculateOrderStatus(data);
 
       let createOrderDto: CreateOrderDto = {
@@ -116,19 +131,19 @@ export class OrderService extends GenericServiceImpl<
           awaitingStockAt > currentDate ? awaitingStockAt : undefined,
       };
 
-      console.log("createOrderDto", createOrderDto)
+      console.log("createOrderDto", createOrderDto);
       const response = await this.orderRepository.create(createOrderDto);
       if (response) {
         let promises: Promise<any>[] = [];
         for (const item of orderItems) {
-            if (item.status !== "CANCELLED") {
-              let quantity = item.selectedBulkOption
+          if (item.status !== "CANCELLED") {
+            let quantity = item.selectedBulkOption
               ? item.quantity * item.selectedBulkOption
               : item.quantity;
-              promises.push(
-                this.updateItemStock(item.productVariantId, quantity, 0, tx),
-              );
-            }
+            promises.push(
+              this.updateItemStock(item.productVariantId, quantity, 0, tx),
+            );
+          }
         }
         await Promise.all(promises);
       }
@@ -215,11 +230,20 @@ export class OrderService extends GenericServiceImpl<
       }
 
       // obtener variant para calcular tamaños si cambia presentación
-      const productVariant = await this.productVariantService.findOne(currentItem.productVariantId);
-      const packaging = (productVariant?.packagingOptions || []).map((p: any) => Number(p)).filter((n: number)=>!isNaN(n)).sort((a:number,b:number)=>a-b);
+      const productVariant = await this.productVariantService.findOne(
+        currentItem.productVariantId,
+      );
+      const packaging = (productVariant?.packagingOptions || [])
+        .map((p: any) => Number(p))
+        .filter((n: number) => !isNaN(n))
+        .sort((a: number, b: number) => a - b);
 
-      const currentSize = Number(currentItem.selectedBulkOption) || (packaging[0] || 1);
-      const newSize = item.selectedBulkOption != null ? Number(item.selectedBulkOption) : currentSize;
+      const currentSize =
+        Number(currentItem.selectedBulkOption) || packaging[0] || 1;
+      const newSize =
+        item.selectedBulkOption != null
+          ? Number(item.selectedBulkOption)
+          : currentSize;
 
       const currentUnits = currentItem.quantity * currentSize;
       const newUnits = Number(item.quantity) * newSize;
@@ -317,7 +341,7 @@ export class OrderService extends GenericServiceImpl<
   private calculateTotalPrice(orderItems: any[]) {
     return orderItems.reduce((total, item) => {
       let quantity = item.selectedBulkOption
-        ? item.quantity / 1000 * item.selectedBulkOption
+        ? (item.quantity / 1000) * item.selectedBulkOption
         : item.quantity;
       return total + item.unitPriceSnapshot * quantity;
     }, 0);
@@ -351,9 +375,10 @@ export class OrderService extends GenericServiceImpl<
     selectedBulkOption?: number,
   ) {
     const currentStock = Number(productVariant.currentStock || 0); // unidades (g o unidades)
-    const packaging = (productVariant.packagingOptions || []).map((p: any) =>
-      Number(p),
-    ).filter((n: number) => !isNaN(n)).sort((a: number, b: number) => a - b);
+    const packaging = (productVariant.packagingOptions || [])
+      .map((p: any) => Number(p))
+      .filter((n: number) => !isNaN(n))
+      .sort((a: number, b: number) => a - b);
 
     // Unidad/simple (no packaging)
     if (!packaging || packaging.length === 0) {
@@ -361,9 +386,19 @@ export class OrderService extends GenericServiceImpl<
         return { finalSize: null, finalQty: 0, status: "CANCELLED", units: 0 };
       }
       if (currentStock >= requestedPackages) {
-        return { finalSize: null, finalQty: requestedPackages, status: "FULFILLED", units: requestedPackages };
+        return {
+          finalSize: null,
+          finalQty: requestedPackages,
+          status: "FULFILLED",
+          units: requestedPackages,
+        };
       }
-      return { finalSize: null, finalQty: currentStock, status: "PARTIALLY_RETURNED", units: currentStock };
+      return {
+        finalSize: null,
+        finalQty: currentStock,
+        status: "PARTIALLY_RETURNED",
+        units: currentStock,
+      };
     }
 
     // Producto a granel
@@ -375,13 +410,23 @@ export class OrderService extends GenericServiceImpl<
     const requestedUnits = selectedSize * requestedPackages;
 
     if (currentStock >= requestedUnits) {
-      return { finalSize: selectedSize, finalQty: requestedPackages, status: "FULFILLED", units: requestedUnits };
+      return {
+        finalSize: selectedSize,
+        finalQty: requestedPackages,
+        status: "FULFILLED",
+        units: requestedUnits,
+      };
     }
 
     // Intenta con la misma presentación pero menos paquetes
     const maxSame = Math.floor(currentStock / selectedSize);
     if (maxSame >= 1) {
-      return { finalSize: selectedSize, finalQty: maxSame, status: "PARTIALLY_RETURNED", units: maxSame * selectedSize };
+      return {
+        finalSize: selectedSize,
+        finalQty: maxSame,
+        status: "PARTIALLY_RETURNED",
+        units: maxSame * selectedSize,
+      };
     }
 
     // Si no cabe ni una de la presentación seleccionada, buscar presentaciones más pequeñas
@@ -392,6 +437,13 @@ export class OrderService extends GenericServiceImpl<
     }
     const fallbackSize = possible[0]; // más pequeña que cabe
     const fallbackQty = Math.floor(currentStock / fallbackSize);
-    return { finalSize: fallbackSize, finalQty: fallbackQty, status: "PARTIALLY_RETURNED", units: fallbackQty * fallbackSize };
+    return {
+      finalSize: fallbackSize,
+      finalQty: fallbackQty,
+      status: "PARTIALLY_RETURNED",
+      units: fallbackQty * fallbackSize,
+    };
   }
+
+  
 }

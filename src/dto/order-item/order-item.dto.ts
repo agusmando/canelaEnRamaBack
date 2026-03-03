@@ -11,6 +11,8 @@ export class OrderItemDto {
   productNameSnapshot: string;
   variantNameSnapshot: string;
   unitPriceSnapshot: number;
+  discountAppliedSnapshot: number;
+  offerTypeSnapshot: string;
   quantity: number;
 
   status: string;
@@ -26,6 +28,8 @@ export class OrderItemDto {
     unitPriceSnapshot: number,
     quantity: number,
     status: string,
+    discountAppliedSnapshot: number,
+    offerTypeSnapshot: string,
     productVariant?: ProductVariantDto,
     order?: OrderDto,
     awaitingStockAt?: Date,
@@ -41,6 +45,8 @@ export class OrderItemDto {
     this.productVariant = productVariant;
     this.order = order;
     this.status = status;
+    this.discountAppliedSnapshot = discountAppliedSnapshot;
+    this.offerTypeSnapshot = offerTypeSnapshot;
     this.awaitingStockAt = awaitingStockAt;
     this.selectedBulkOption = selectedBulkOption;
   }

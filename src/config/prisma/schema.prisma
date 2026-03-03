@@ -275,6 +275,8 @@ model OrderItem {
   productNameSnapshot String // Ej: "Yogurt"
   variantNameSnapshot String // Ej: "Vainilla"
   unitPriceSnapshot   Float // El precio al que se vendió EXACTAMENTE ese día
+  discountAppliedSnapshot Float @default(0) // El descuento que se aplicó EXACTAMENTE ese dia
+  offerTypeSnapshot String @default("") // Ej: "BUY_ONE_GET_MORE"
 
   quantity        Int
   status          OrderItemStatus @default(FULFILLED)

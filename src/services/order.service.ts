@@ -116,6 +116,7 @@ export class OrderService extends GenericServiceImpl<
           awaitingStockAt > currentDate ? awaitingStockAt : undefined,
       };
 
+      console.log("createOrderDto", createOrderDto)
       const response = await this.orderRepository.create(createOrderDto);
       if (response) {
         let promises: Promise<any>[] = [];
@@ -316,7 +317,7 @@ export class OrderService extends GenericServiceImpl<
   private calculateTotalPrice(orderItems: any[]) {
     return orderItems.reduce((total, item) => {
       let quantity = item.selectedBulkOption
-        ? item.quantity * item.selectedBulkOption
+        ? item.quantity / 1000 * item.selectedBulkOption
         : item.quantity;
       return total + item.unitPriceSnapshot * quantity;
     }, 0);

@@ -87,7 +87,11 @@ export const prismaCreateEntityBuilder = (data: any, mapping?: any) => {
       // CASO C: Primitivos que son FK directas (a veces pasa)
       else {
         // Normalmente esto no se mapea como 'relation', pero por si acaso
-        result[key] = { connect: { [map.connectField || "id"]: Number(val) } };
+        if (!Number.isNaN(val[0].id)) {
+          result[key] = { connect: { [map.connectField || "id"]: Number(val) } };
+        } else {
+            result[key] = { connect: { [map.connectField || "id"]: val } };
+          }
       }
     }
   }

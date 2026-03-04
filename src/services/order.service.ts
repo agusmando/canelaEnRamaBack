@@ -151,7 +151,7 @@ export class OrderService extends GenericServiceImpl<
     });
   }
 
-  async getOrder(id: number, tx: any) {
+  async getOrder(id: number, tx?: any) {
     return await this.orderRepository.getOrder(id, tx);
   }
 

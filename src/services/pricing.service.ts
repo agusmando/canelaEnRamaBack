@@ -1,3 +1,4 @@
+import { OfferDto } from "../dto/offer/offer.dto.ts";
 import { OfferService } from "./offer.service.ts";
 
 export type RoundingStrategy =
@@ -26,9 +27,23 @@ export class PricingService {
     baseUnitPrice: number,
     quantityPackages: number,
     currentStock: number,
-    offers: any[],
+    offers: OfferDto[],
+    productOriginalStockThreshold: number,
   ) {
-    if (!offers || offers.length === 0) {
+    const lastOffer = offers?.[offers.length - 1];
+    const threshold =
+      lastOffer?.stockThreshold && productOriginalStockThreshold
+        ? Math.max(lastOffer.stockThreshold, productOriginalStockThreshold)
+        : productOriginalStockThreshold || lastOffer?.stockThreshold;
+    if (
+      !offers ||
+      offers.length === 0 ||
+      !lastOffer ||
+      lastOffer.active === false ||
+      (threshold && currentStock < threshold) ||
+      (lastOffer.finishTime && lastOffer.finishTime < new Date()) ||
+      (lastOffer.startTime && lastOffer.startTime >= new Date())
+    ) {
       const total = baseUnitPrice * quantityPackages;
       return {
         unitPriceAfterOffer: baseUnitPrice,
@@ -39,19 +54,28 @@ export class PricingService {
     }
 
     // OfferService.applyOffer actualmente devuelve unit price (o promedio). Ajustar si necesario.
-    const unitAfter = this.offerService.applyOffer(
+    const { unitAfter, offerType } = this.offerService.applyOffer(
       baseUnitPrice,
       quantityPackages,
       currentStock,
       offers,
     );
     const total = unitAfter * quantityPackages;
-    const discountApplied = Math.max(0, baseUnitPrice * quantityPackages - total);
-
-    return {
+    const discountApplied = Math.max(
+      0,
+      baseUnitPrice * quantityPackages - total,
+    );
+    console.log("discountApplied", {
       unitPriceAfterOffer: baseUnitPrice,
       totalAfterOffer: total,
-      discountApplied
+      discountApplied,
+      offerType,
+    });
+    return {
+      unitPriceAfterOffer: baseUnitPrice,
+      totalAfterOffer: total ? total : baseUnitPrice * quantityPackages,
+      discountApplied: discountApplied ? discountApplied : 0,
+      offerType: offerType ? offerType : "",
     };
   }
 
@@ -81,22 +105,33 @@ export class PricingService {
     const baseUnitPrice = productVariant.finalPrice || 0;
 
     // 2) Normalizar cantidad según packaging si es necesario (mantener la misma semántica que computeFulfillment)
-    const measureContent = productVariant.measureContent;
+    const contentMeasure = productVariant.contentMeasure;
     const processedQuantity =
-      measureContent == "KG" ? requestedQuantity / 1000 : requestedQuantity; // Si es kilogramos, dividir gramos por mil
+      contentMeasure == "KG" ? requestedQuantity / 1000 : requestedQuantity; // Si es kilogramos, dividir gramos por mil
     let finalQuantity = selectedBulkOption // Si viene empaquetado, multiplicamos por la cantidad requerida
       ? processedQuantity * selectedBulkOption
       : processedQuantity;
 
+    console.log(
+      "productVariant",
+      productVariant.offers,
+      productVariant.product.offers,
+    );
+
     // 3) aplicar ofertas
+
+    const offers =
+      productVariant.offers.length > 0
+        ? productVariant.offers
+        : productVariant.product.offers || [];
+
     const offerResult = this.applyOffers(
       baseUnitPrice,
       Number(finalQuantity || 0),
       Number(productVariant.currentStock || 0),
-      productVariant.offers || [],
+      offers,
+      Number(productVariant.stockThreshold),
     );
-
-    const offerTypeSnapshot = this.offerEvaluationAndProcessing(productVariant);
 
     // 4) aplicar redondeo al precio unitario final (o al precio por kilo/unidad, según decidas)
     // const roundedUnit = this.applyRounding(
@@ -111,61 +146,12 @@ export class PricingService {
     // );
 
     return {
-      unitPriceSnapshot: offerResult.unitPriceAfterOffer, //roundedUnit,
-      totalPriceSnapshot: offerResult.totalAfterOffer, // roundedTotal,  CAMBIAR CUANDO ESTÉ EL ROUNDING LISTO
-      discountAppliedSnapshot: offerResult.discountApplied,
-      offerTypeSnapshot: offerTypeSnapshot,
-      rawUnitPriceBeforeRounding: offerResult.unitPriceAfterOffer,
-      rawTotalBeforeRounding: offerResult.totalAfterOffer,
+      unitPriceSnapshot: offerResult.unitPriceAfterOffer ?? 0, //roundedUnit,
+      totalPriceSnapshot: offerResult.totalAfterOffer ?? 0, // roundedTotal,  CAMBIAR CUANDO ESTÉ EL ROUNDING LISTO
+      discountAppliedSnapshot: Math.ceil(offerResult.discountApplied) ?? 0,
+      offerTypeSnapshot: offerResult.offerType ?? "",
+      rawUnitPriceBeforeRounding: offerResult.unitPriceAfterOffer ?? 0,
+      rawTotalBeforeRounding: offerResult.totalAfterOffer ?? 0,
     };
-  }
-
-  offerEvaluationAndProcessing(productVariant: any) {
-    let offerTypeSnapshot = null;
-
-    if (!productVariant.offers || productVariant.offers.length === 0) {
-      return;
-    }
-
-    const knowkDiscountValue = [
-      "FIXED",
-      "PERCENTAGE",
-      "BUY_MORE_GET_DISCOUNT",
-      "BUY_MORE_GET_FIXED_DISCOUNT",
-    ]; //con discountValue
-    const knownQuantityToGet = ["BUY_ONE_GET_MORE", "BUY_MORE_GET_MORE"]; //Con quantityToGet y unitPriceSnapshot
-
-    const selectedOffer =
-      productVariant.offers[productVariant.offers.length - 1];
-    const minimumQuantity = Number(selectedOffer.discountQuantity ?? 0);
-
-    if (productVariant.currentStock < selectedOffer.stockThreshold) {
-      return;
-    }
-
-    if (knownQuantityToGet.includes(selectedOffer.discountType)) {
-      // if ()
-
-      const giftedQuantity = Number(selectedOffer.quantityToGet ?? 0);
-      offerTypeSnapshot =
-        giftedQuantity + minimumQuantity + "x" + minimumQuantity; //2x1, 3x2, etc
-    }
-    if (knowkDiscountValue.includes(selectedOffer.discountType)) {
-      const discountValue = Number(selectedOffer.discountValue ?? 0);
-      if (selectedOffer.discountType === "PERCENTAGE") {
-        offerTypeSnapshot = discountValue + "%";
-      }
-      if (selectedOffer.discountType === "FIXED") {
-        offerTypeSnapshot = "$" + discountValue;
-      }
-      if (selectedOffer.discountType === "BUY_MORE_GET_DISCOUNT") {
-        offerTypeSnapshot = minimumQuantity + "x" + discountValue + "%";
-      }
-      if (selectedOffer.discountType === "BUY_MORE_GET_FIXED_DISCOUNT") {
-        offerTypeSnapshot = minimumQuantity + "x-$" + discountValue;
-      }
-    }
-
-    return offerTypeSnapshot
   }
 }

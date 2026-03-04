@@ -1,8 +1,37 @@
+import { CreateOfferDto } from "../dto/offer/create-offer.dto.ts";
 import { OfferDto } from "../dto/offer/offer.dto.ts";
+import { UpdateOfferDto } from "../dto/offer/update-offer.dto.ts";
 import { ValidationError } from "../errors/application/ValidationError.ts";
+import { GenericServiceImpl } from "./generic-impl.service.ts";
+import { ProductVariantService } from "./product-variant.service.ts";
 
-export class OfferService {
-  constructor() {}
+export class OfferService extends GenericServiceImpl<
+  OfferDto,
+  CreateOfferDto,
+  UpdateOfferDto
+> {
+  private productVariantService: ProductVariantService
+  constructor() {
+    super("offer");
+    this.productVariantService = new ProductVariantService();
+  }
+
+  async create(data: CreateOfferDto) {
+    try {
+      if (data.productVariantId) {
+        const productVariant = await this.productVariantService.findOne(
+          data.productVariantId,
+        );
+        if (data.stockThreshold && productVariant.stockThreshold > data.stockThreshold) {
+          data.stockThreshold = productVariant.stockThreshold;
+        }
+      }
+      return await super.create(data);
+    } catch (error) {
+      throw error;
+    }
+  }
+
 
   args: { currentPrice: number; offer: OfferDto; quantity?: number } | null =
     null;
@@ -73,13 +102,19 @@ export class OfferService {
         "Discount percentage must be between 0 and 100",
       );
     }
-    return currentPrice * (1 - offer.discountValue / 100);
+    return { 
+      unitAfter: currentPrice * (1 - offer.discountValue / 100),
+      offerType: offer.discountValue + "%" 
+    };
   }
 
   // 2. Descuento fijo simple (ej. $100 off)
   fixedDiscount(currentPrice: number, offer: OfferDto) {
     const discount = offer.discountValue || 0;
-    return Math.max(0, currentPrice - discount);
+    return {
+      unitAfter: Math.max(0, currentPrice - discount),
+      offerType: "$" + discount,
+    };
   }
 
   // 3. Lógica para "Lleva X y paga Y" (BUY_ONE_GET_MORE / BUY_MORE_GET_MORE)
@@ -91,25 +126,38 @@ export class OfferService {
 
     if (quantity < reqQty) return currentPrice;
 
-    const setsOfOffer = Math.floor(quantity / reqQty);
-    const remainder = quantity % reqQty;
+    const setsOfOffer = Math.floor(quantity / reqQty); //2
+    const remainder = quantity % reqQty; //0
 
     const totalPrice =
       setsOfOffer * payQty * currentPrice + remainder * currentPrice;
-    return totalPrice / quantity; // Retornamos el precio unitario promedio
+    return {
+      unitAfter: totalPrice / quantity,
+      offerType: reqQty + "x" + payQty,
+    }; // Retornamos el precio unitario promedio
   }
 
   // 4. Lógica para "A partir de X cantidad, aplica descuento"
   // Ejemplo: Llevando 5 o más, 20% de descuento en cada uno.
-  buyXGetDiscount(currentPrice: number, offer: OfferDto, quantity: number, mode: "PERCENTAGE" | "FIXED") {
+  buyXGetDiscount(
+    currentPrice: number,
+    offer: OfferDto,
+    quantity: number,
+    mode: "PERCENTAGE" | "FIXED",
+  ) {
     const requiredQty = offer.discountQuantity || 0;
-    
+
     if (quantity >= requiredQty) {
-      return mode === "PERCENTAGE" 
-        ? this.percentageDiscount(currentPrice, offer) 
+      const { unitAfter } = mode === "PERCENTAGE"
+        ? this.percentageDiscount(currentPrice, offer)
         : this.fixedDiscount(currentPrice, offer);
+      const offerType = mode === "PERCENTAGE" 
+        ? requiredQty + "x" + offer.discountValue + "%" 
+        : requiredQty + "x-$" + offer.discountValue;
+      return { unitAfter, offerType };
     }
     
-    return currentPrice;
+
+    return { unitPrice: currentPrice, offerType: "" };
   }
 }

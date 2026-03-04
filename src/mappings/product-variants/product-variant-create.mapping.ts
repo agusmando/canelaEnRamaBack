@@ -4,6 +4,7 @@ export const productVariantCreateMapping = {
   // Integers
   contentAmount: { parseInt: true },
   currentStock: { parseInt: true },
+  roundingOption: { parseInt: true },
   
   // Floats (IMPORTANTE: FormData envía strings, Prisma requiere Float)
   price: { parseFloat: true },

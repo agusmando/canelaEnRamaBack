@@ -2,6 +2,7 @@
 
 export const orderSearchQueryMapping = {
   ofuscatedId: { field: "id", type: "number" },
+  ofuscatedUser: { field: "user", type: "object"},
   userSuperTokensId: { field: "userSuperTokensId", type: "string" },
   ofuscatedItems: { field: "orderItems", type: "relationArray", childField: "id", expand: ["productVariant"] },
   createdAt: { field: "createdAt", type: "date", operation: "gte" },

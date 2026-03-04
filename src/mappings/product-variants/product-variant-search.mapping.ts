@@ -9,6 +9,7 @@ export const productVariantSearchQueryMapping = {
   minPrice: { field: "price", operation: "gte", type: "numberRange" },
   maxPrice: { field: "price", operation: "lte", type: "numberRange" },
   active: { field: "active", type: "boolean" },
+  roundingOption: { field: "roundingOption", type: "number" },
   currentStock: { field: "currentStock", type: "number" },
   stockThreshold: { field: "currentStock", operation: "gte", type: "numberRange" },
   maxStock: { field: "currentStock", operation: "lte", type: "numberRange" },

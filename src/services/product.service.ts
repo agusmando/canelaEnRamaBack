@@ -19,6 +19,7 @@ import { ProductVariantRepository } from "../repository/product-variant.reposito
 import { ImageService } from "./image.service.ts";
 import { StockMovementService } from "./stockMovement.service.ts";
 import { StoreProcedureError } from "../errors/infra/StoreProcedureError.ts";
+import { productVariantPostProcessingMapping } from "../mappings/product-variants/product-variant-post-procesing.mapping.ts";
 
 export class ProductService extends GenericServiceImpl<
   ProductDto,
@@ -90,7 +91,7 @@ export class ProductService extends GenericServiceImpl<
 
       console.log("product", product);
       // Post-creation processing
-      const postMapping = productPostProcessingMapping;
+      const postMapping = productVariantPostProcessingMapping;
       const postVariants = product.variants.map((variant: any) => {
         if (!variant.profitMargin || !variant.price) return variant;
         return postMapping(variant);

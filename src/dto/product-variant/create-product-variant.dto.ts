@@ -8,6 +8,7 @@ export class CreateProductVariantDto {
   availableWeb: boolean;
   availablePedidosYa: boolean;
   contentMeasure: string;
+  roundingOption: number;
   packagingOptions?: number[];
   requestTime?: string;
   hasComponents?: { productId: number; quantity: number }[];
@@ -23,6 +24,7 @@ export class CreateProductVariantDto {
     availableWeb: boolean,
     availablePedidosYa: boolean,
     stockThreshold: number,
+    roundingOption: number,
     packagingOptions?: number[],
     requestTime?: string,
     hasComponents?: { productId: number; quantity: number }[]
@@ -37,6 +39,7 @@ export class CreateProductVariantDto {
     this.packagingOptions = packagingOptions;
     this.requestTime = requestTime;
     this.hasComponents = hasComponents;
+    this.roundingOption = roundingOption;
     this.stockThreshold = stockThreshold;
     this.availableWeb = availableWeb;
     this.availablePedidosYa = availablePedidosYa;

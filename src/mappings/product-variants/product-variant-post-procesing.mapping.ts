@@ -1,12 +1,18 @@
 import { ProductVariantDto } from "../../dto/product-variant/product-variant.dto.ts";
 
 export const productVariantPostProcessingMapping = (
-  product: ProductVariantDto
+  product: ProductVariantDto,
 ): ProductVariantDto => {
   let finalVariant = { ...product };
+  if (!finalVariant.price || !finalVariant.profitMargin) {
+    return finalVariant;
+  }
+  const rawPrice =
+    finalVariant.price * finalVariant.profitMargin + finalVariant.price;
+  const roundingOption = finalVariant.roundingOption;
+  console.log("AAAAAAA VEEEEEEER",rawPrice, roundingOption);
   finalVariant.finalPrice =
-    Number(finalVariant.price) * Number(finalVariant.profitMargin) +
-    Number(finalVariant.price);
+    Math.ceil(rawPrice / roundingOption) * roundingOption;
   const { profitMargin, price, ...rest } = finalVariant;
   return rest;
 };

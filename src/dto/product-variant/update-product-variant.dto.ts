@@ -16,11 +16,13 @@ export class UpdateProductVariantDto {
   removeImages?: { id: number }[];
   images?: any[];
   stockThreshold?: number;
+  roundingOption?: number;
 
   constructor(
     availableWeb?: boolean,
     availablePedidosYa?: boolean,
     stockThreshold?: number,
+    roundingOption?: number,
     name?: string,
     active?: boolean,
     contentMeasure?: string,
@@ -53,5 +55,6 @@ export class UpdateProductVariantDto {
     this.availableWeb = availableWeb;
     this.availablePedidosYa = availablePedidosYa;
     this.stockThreshold = stockThreshold;
+    this.roundingOption = roundingOption;
   }
 }

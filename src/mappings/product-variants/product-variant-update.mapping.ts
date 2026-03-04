@@ -13,6 +13,7 @@ export const productVariantUpdateMapping = {
   availablePedidosYa: { field: "availablePedidosYa" },
   stockThreshold: { field: "stockThreshold" },
   currentStock: { field: "currentStock" },
+  roundingOption: { field: "roundingOption" },
   // Obtiene un array de public_id
   // removeImages: {
   //   transform: (images: any[], fullData: any) => ({

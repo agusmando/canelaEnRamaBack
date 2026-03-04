@@ -32,6 +32,7 @@ export class OrderRepository extends GenericRepositoryImpl<
       return await model.order.findFirst({
         where: { id },
         include: {
+          user: true,
           orderItems: {
             include: {
               productVariant: {

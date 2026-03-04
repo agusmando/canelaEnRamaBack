@@ -7,14 +7,17 @@ export const productPostProcessingMapping = (product: ProductDto) => {
     return finalProduct;
   const variants: ProductVariantDto[] = finalProduct?.variants.map(
     (variant) => {
-      if (!variant.price || !variant.profitMargin) return variant;
-      variant.finalPrice = Math.round(
-        Number(variant.price) * Number(variant.profitMargin) +
-          Number(variant.price)
-      );
-      variant.profitMargin = 0;
-      variant.price = 0;
-      return variant;
+  if (!variant.price || !variant.profitMargin) {
+    return variant;
+  }
+  const rawPrice =
+    variant.price * variant.profitMargin + variant.price;
+  const roundingOption = variant.roundingOption;
+  console.log("AAAAAAA VEEEEEEER",rawPrice, roundingOption);
+  variant.finalPrice =
+    Math.ceil(rawPrice / roundingOption) * roundingOption;
+  const { profitMargin, price, ...rest } = variant;
+  return rest;
     }
   );
   // .filter(Boolean);

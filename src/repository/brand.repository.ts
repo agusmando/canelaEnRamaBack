@@ -36,14 +36,16 @@ export class BrandRepository extends GenericRepositoryImpl<
         ),
       },
     };
+
+    const model = tx ?? this.prisma;
     console.log(JSON.stringify(data));
-    return await this.prisma.brand.update({
+    return await model.brand.update({
       where: { id: brandId },
       data,
       include: {
         products: true,
         suppliers: true,
       },
-    }, tx);
+    });
   }
 }

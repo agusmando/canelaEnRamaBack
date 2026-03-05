@@ -1,9 +1,9 @@
-import { CartDto } from "../dto/cart/cart.dto.ts";
-import { CreateCartDto } from "../dto/cart/create-cart.dto.ts";
-import { UpdateCartDto } from "../dto/cart/update-cart.dto.ts";
-import { CartService } from "../services/cart.service.ts";
-import { BaseResponse } from "../utils/responseFormat.ts";
-import { GenericControllerImpl } from "./generic-impl.controller.ts";
+import { CartDto } from "../dto/cart/cart.dto.js";
+import { CreateCartDto } from "../dto/cart/create-cart.dto.js";
+import { UpdateCartDto } from "../dto/cart/update-cart.dto.js";
+import { CartService } from "../services/cart.service.js";
+import { BaseResponse } from "../utils/responseFormat.js";
+import { GenericControllerImpl } from "./generic-impl.controller.js";
 
 export class CartController extends GenericControllerImpl<
   CartDto,

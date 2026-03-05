@@ -1,6 +1,6 @@
-import { CreateMovementDto } from "../dto/movement/create-movement.dto.ts";
-import { MovementDto } from "../dto/movement/movement.dto.ts";
-import { GenericControllerImpl } from "./generic-impl.controller.ts";
+import { CreateMovementDto } from "../dto/movement/create-movement.dto.js";
+import { MovementDto } from "../dto/movement/movement.dto.js";
+import { GenericControllerImpl } from "./generic-impl.controller.js";
 
 // const tagService = new TagService();
 

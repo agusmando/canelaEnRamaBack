@@ -1,14 +1,14 @@
-import { OrderItemRepository } from "./order-item.repository.ts";
+import { OrderItemRepository } from "./order-item.repository.js";
 import { PrismaClient } from "@prisma/client";
-import { OrderDto } from "../dto/order/order.dto.ts";
-import { CreateOrderDto } from "../dto/order/create-order.dto.ts";
-import { UpdateOrderDto } from "../dto/order/update-order.dto.ts";
-import { GenericRepositoryImpl } from "./generic.repository.ts";
-import { StoreProcedureError } from "../errors/infra/StoreProcedureError.ts";
-import { UpdateOrderItemDto } from "../dto/order-item/update-order-item.dto.ts";
-import { DatabaseError } from "../errors/infra/DatabaseError.ts";
-import { ValidationError } from "../errors/application/ValidationError.ts";
-import { NotFoundError } from "../errors/application/NotFoundError.ts";
+import { OrderDto } from "../dto/order/order.dto.js";
+import { CreateOrderDto } from "../dto/order/create-order.dto.js";
+import { UpdateOrderDto } from "../dto/order/update-order.dto.js";
+import { GenericRepositoryImpl } from "./generic.repository.js";
+import { StoreProcedureError } from "../errors/infra/StoreProcedureError.js";
+import { UpdateOrderItemDto } from "../dto/order-item/update-order-item.dto.js";
+import { DatabaseError } from "../errors/infra/DatabaseError.js";
+import { ValidationError } from "../errors/application/ValidationError.js";
+import { NotFoundError } from "../errors/application/NotFoundError.js";
 
 export class OrderRepository extends GenericRepositoryImpl<
   OrderDto,

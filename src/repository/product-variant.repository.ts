@@ -1,12 +1,12 @@
 import { PrismaClient } from "@prisma/client";
-import { GenericRepositoryImpl } from "./generic.repository.ts";
-import { prismaCreateEntityBuilder } from "../utils/prismaCreateEntityBuilder.ts";
-import { productVariantCreateMapping } from "../mappings/product-variants/product-variant-create.mapping.ts";
-import { CreateProductVariantDto } from "../dto/product-variant/create-product-variant.dto.ts";
-import { ProductVariantDto } from "../dto/product-variant/product-variant.dto.ts";
-import { UpdateProductVariantDto } from "../dto/product-variant/update-product-variant.dto.ts";
-import { ImageService } from "../services/image.service.ts";
-import { StoreProcedureError } from "../errors/infra/StoreProcedureError.ts";
+import { GenericRepositoryImpl } from "./generic.repository.js";
+import { prismaCreateEntityBuilder } from "../utils/prismaCreateEntityBuilder.js";
+import { productVariantCreateMapping } from "../mappings/product-variants/product-variant-create.mapping.js";
+import { CreateProductVariantDto } from "../dto/product-variant/create-product-variant.dto.js";
+import { ProductVariantDto } from "../dto/product-variant/product-variant.dto.js";
+import { UpdateProductVariantDto } from "../dto/product-variant/update-product-variant.dto.js";
+import { ImageService } from "../services/image.service.js";
+import { StoreProcedureError } from "../errors/infra/StoreProcedureError.js";
 
 export class ProductVariantRepository extends GenericRepositoryImpl<
   ProductVariantDto,

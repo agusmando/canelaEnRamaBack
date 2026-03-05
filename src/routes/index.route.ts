@@ -1,18 +1,18 @@
 import express from "express";
 const router = express.Router();
 
-import productRoutes from "./product.route.ts";
-import productVariantRoutes from "./product-variant.route.ts";
-import tagRoutes from "./tag.route.ts";
-import categoryRoutes from "./category.route.ts";
-import supplierRoutes from "./supplier.route.ts";
-import movementRoutes from "./movement.route.ts";
-import brandRoutes from "./brand.route.ts";
-import offerRoutes from "./offer.route.ts";
-import cartRoutes from "./cart.route.ts";
-import cartItemRoutes from "./cart-item.route.ts";
-import orderRoutes from "./order.route.ts";
-import orderItemRoutes from "./order-item.route.ts";
+import productRoutes from "./product.route.js";
+import productVariantRoutes from "./product-variant.route.js";
+import tagRoutes from "./tag.route.js";
+import categoryRoutes from "./category.route.js";
+import supplierRoutes from "./supplier.route.js";
+import movementRoutes from "./movement.route.js";
+import brandRoutes from "./brand.route.js";
+import offerRoutes from "./offer.route.js";
+import cartRoutes from "./cart.route.js";
+import cartItemRoutes from "./cart-item.route.js";
+import orderRoutes from "./order.route.js";
+import orderItemRoutes from "./order-item.route.js";
 
 router.use("/product", productRoutes);
 router.use("/product/variant", productVariantRoutes);

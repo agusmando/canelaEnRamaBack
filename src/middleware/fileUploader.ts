@@ -1,5 +1,5 @@
 import Multer from "multer";
-import { ImageService } from "../services/image.service.ts";
+import { ImageService } from "../services/image.service.js";
 
 const storage = Multer.memoryStorage();
 export const upload = Multer({ storage }); // usar upload.single('file'), upload.array('files'), upload.fields([...]) según necesidad

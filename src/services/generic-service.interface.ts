@@ -1,4 +1,4 @@
-import { BaseResponse } from "../utils/responseFormat.ts";
+import { BaseResponse } from "../utils/responseFormat.js";
 
 export default interface GenericServiceInterface<T, U, V> {
   getListedElements(

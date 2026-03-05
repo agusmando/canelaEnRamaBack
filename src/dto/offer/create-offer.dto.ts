@@ -1,4 +1,4 @@
-import { CreateProductVariantDto } from "../product-variant/create-product-variant.dto.ts";
+import { CreateProductVariantDto } from "../product-variant/create-product-variant.dto.js";
 export class CreateOfferDto {
   productId?: number;
   productVariantId?: number;

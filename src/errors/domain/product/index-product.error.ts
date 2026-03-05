@@ -1,6 +1,6 @@
-import { InvalidMeasureError } from "./InvalidMeasureError.ts";
-import { ProductHasNoVariantsError } from "./ProductHasNoVariantsError.ts";
-import { ProductHasNoCategoryError } from "./ProductHasNoCategoryError.ts";
+import { InvalidMeasureError } from "./InvalidMeasureError.js";
+import { ProductHasNoVariantsError } from "./ProductHasNoVariantsError.js";
+import { ProductHasNoCategoryError } from "./ProductHasNoCategoryError.js";
 export {
   InvalidMeasureError,
   ProductHasNoVariantsError,

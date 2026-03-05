@@ -1,6 +1,6 @@
 import express from "express";
-import { MovementController } from "../controllers/movement.controller.ts";
-import { isAuthenticated, requireRole } from "../middleware/auth.middleware.ts";
+import { MovementController } from "../controllers/movement.controller.js";
+import { isAuthenticated, requireRole } from "../middleware/auth.middleware.js";
 const router = express.Router();
 
 const movementController = new MovementController();

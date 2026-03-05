@@ -1,9 +1,9 @@
-import { BrandDto } from "../dto/brand/brand.dto.ts";
-import { CreateBrandDto } from "../dto/brand/create-brand.dto.ts";
-import { UpdateBrandDto } from "../dto/brand/update-brand.dto.ts";
-import { BrandService } from "../services/brand.service.ts";
-import { BaseResponse } from "../utils/responseFormat.ts";
-import { GenericControllerImpl } from "./generic-impl.controller.ts";
+import { BrandDto } from "../dto/brand/brand.dto.js";
+import { CreateBrandDto } from "../dto/brand/create-brand.dto.js";
+import { UpdateBrandDto } from "../dto/brand/update-brand.dto.js";
+import { BrandService } from "../services/brand.service.js";
+import { BaseResponse } from "../utils/responseFormat.js";
+import { GenericControllerImpl } from "./generic-impl.controller.js";
 
 
 export class BrandController extends GenericControllerImpl<

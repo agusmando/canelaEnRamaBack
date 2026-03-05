@@ -1,9 +1,9 @@
-import { OrderDto } from "../dto/order/order.dto.ts";
-import { CreateOrderDto } from "../dto/order/create-order.dto.ts";
-import { UpdateOrderDto } from "../dto/order/update-order.dto.ts";
-import { OrderService } from "../services/order.service.ts";
-import { BaseResponse } from "../utils/responseFormat.ts";
-import { GenericControllerImpl } from "./generic-impl.controller.ts";
+import { OrderDto } from "../dto/order/order.dto.js";
+import { CreateOrderDto } from "../dto/order/create-order.dto.js";
+import { UpdateOrderDto } from "../dto/order/update-order.dto.js";
+import { OrderService } from "../services/order.service.js";
+import { BaseResponse } from "../utils/responseFormat.js";
+import { GenericControllerImpl } from "./generic-impl.controller.js";
 
 export class OrderController extends GenericControllerImpl<
   OrderDto,

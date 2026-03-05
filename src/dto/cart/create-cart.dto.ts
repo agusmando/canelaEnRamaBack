@@ -1,4 +1,4 @@
-import { CreateCartItemDto } from "../cart-item/create-cart-item.dto.ts";
+import { CreateCartItemDto } from "../cart-item/create-cart-item.dto.js";
 
 export class CreateCartDto {
 

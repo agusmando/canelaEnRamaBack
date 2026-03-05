@@ -1,13 +1,13 @@
-import { CreateProductVariantDto } from "../dto/product-variant/create-product-variant.dto.ts";
-import { ProductVariantDto } from "../dto/product-variant/product-variant.dto.ts";
-import { GenericServiceImpl } from "./generic-impl.service.ts";
-import { UpdateProductVariantDto } from "../dto/product-variant/update-product-variant.dto.ts";
-import { productVariantPostProcessingMapping } from "../mappings/product-variants/product-variant-post-procesing.mapping.ts";
-import { ProductVariantRepository } from "../repository/product-variant.repository.ts";
-import { NotFoundError } from "../errors/application/NotFoundError.ts";
-import { BadRequestError } from "../errors/application/BadRequestError.ts";
-import { ImageService } from "./image.service.ts";
-import { ServerError } from "../errors/application/ServerError.ts";
+import { CreateProductVariantDto } from "../dto/product-variant/create-product-variant.dto.js";
+import { ProductVariantDto } from "../dto/product-variant/product-variant.dto.js";
+import { GenericServiceImpl } from "./generic-impl.service.js";
+import { UpdateProductVariantDto } from "../dto/product-variant/update-product-variant.dto.js";
+import { productVariantPostProcessingMapping } from "../mappings/product-variants/product-variant-post-procesing.mapping.js";
+import { ProductVariantRepository } from "../repository/product-variant.repository.js";
+import { NotFoundError } from "../errors/application/NotFoundError.js";
+import { BadRequestError } from "../errors/application/BadRequestError.js";
+import { ImageService } from "./image.service.js";
+import { ServerError } from "../errors/application/ServerError.js";
 
 export class ProductVariantService extends GenericServiceImpl<
   ProductVariantDto,

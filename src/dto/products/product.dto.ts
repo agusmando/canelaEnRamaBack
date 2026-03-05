@@ -1,6 +1,6 @@
-import { CategoryDto } from "../category/category.dto.ts";
-import { TagDto } from "../tags/tag.dto.ts";
-import { ProductVariantDto } from "../product-variant/product-variant.dto.ts";
+import { CategoryDto } from "../category/category.dto.js";
+import { TagDto } from "../tags/tag.dto.js";
+import { ProductVariantDto } from "../product-variant/product-variant.dto.js";
 
 export class ProductDto {
   name: string;

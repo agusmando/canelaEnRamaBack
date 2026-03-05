@@ -1,10 +1,10 @@
 import { PrismaClient } from "@prisma/client";
-import { prismaQueryBuilder } from "../utils/prismaQueryBuilder.ts";
-import type { GenericRepositoryInterface } from "./generic-repository.interface.ts";
-import { prismaCreateEntityBuilder } from "../utils/prismaCreateEntityBuilder.ts";
-import { prismaUpdateEntityBuilder } from "../utils/prismaUpdateEntityBuilder.ts";
-import mappingSelector from "../utils/mappingSelector.ts";
-import { DatabaseError } from "../errors/infra/DatabaseError.ts";
+import { prismaQueryBuilder } from "../utils/prismaQueryBuilder.js";
+import type { GenericRepositoryInterface } from "./generic-repository.interface.js";
+import { prismaCreateEntityBuilder } from "../utils/prismaCreateEntityBuilder.js";
+import { prismaUpdateEntityBuilder } from "../utils/prismaUpdateEntityBuilder.js";
+import mappingSelector from "../utils/mappingSelector.js";
+import { DatabaseError } from "../errors/infra/DatabaseError.js";
 
 export class GenericRepositoryImpl<
   T,

@@ -1,16 +1,16 @@
-import { GenericServiceImpl } from "./generic-impl.service.ts";
-import { OrderDto } from "../dto/order/order.dto.ts";
-import { CreateOrderDto } from "../dto/order/create-order.dto.ts";
-import { UpdateOrderDto } from "../dto/order/update-order.dto.ts";
-import { ValidationError } from "../errors/application/ValidationError.ts";
-import { OrderRepository } from "../repository/order.repository.ts";
-import { ProductVariantService } from "./product-variant.service.ts";
-import { CreateOrderItemDto } from "../dto/order-item/create-order-item.dto.ts";
-import { NotFoundError } from "../errors/application/NotFoundError.ts";
-import { UpdateOrderItemDto } from "../dto/order-item/update-order-item.dto.ts";
-import { StockMovementService } from "./stockMovement.service.ts";
-import { OfferService } from "./offer.service.ts";
-import { PricingService } from "./pricing.service.ts";
+import { GenericServiceImpl } from "./generic-impl.service.js";
+import { OrderDto } from "../dto/order/order.dto.js";
+import { CreateOrderDto } from "../dto/order/create-order.dto.js";
+import { UpdateOrderDto } from "../dto/order/update-order.dto.js";
+import { ValidationError } from "../errors/application/ValidationError.js";
+import { OrderRepository } from "../repository/order.repository.js";
+import { ProductVariantService } from "./product-variant.service.js";
+import { CreateOrderItemDto } from "../dto/order-item/create-order-item.dto.js";
+import { NotFoundError } from "../errors/application/NotFoundError.js";
+import { UpdateOrderItemDto } from "../dto/order-item/update-order-item.dto.js";
+import { StockMovementService } from "./stockMovement.service.js";
+import { OfferService } from "./offer.service.js";
+import { PricingService } from "./pricing.service.js";
 
 export class OrderService extends GenericServiceImpl<
   OrderDto,

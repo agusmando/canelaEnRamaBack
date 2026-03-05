@@ -1,4 +1,4 @@
-import { ProductDto } from "../products/product.dto.ts";
+import { ProductDto } from "../products/product.dto.js";
 
 export class UpdateBrandDto {
   name: string;

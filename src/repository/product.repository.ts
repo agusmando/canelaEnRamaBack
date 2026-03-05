@@ -1,15 +1,15 @@
 import { PrismaClient } from "@prisma/client";
-import { GenericRepositoryImpl } from "./generic.repository.ts";
-import { CreateProductDto } from "../dto/products/create-product.dto.ts";
-import { ProductDto } from "../dto/products/product.dto.ts";
-import { UpdateProductDto } from "../dto/products/update-product.dto.ts";
-import { prismaCreateEntityBuilder } from "../utils/prismaCreateEntityBuilder.ts";
-import { productCreateMapping } from "../mappings/products/product-create.mapping.ts";
-import { ProductVariantRepository } from "../repository/product-variant.repository.ts";
-import { productUpdateMapping } from "../mappings/products/product-update.mapping.ts";
-import { prismaUpdateEntityBuilder } from "../utils/prismaUpdateEntityBuilder.ts";
-import { UpdateProductTagDto } from "../dto/products/update-product-tag.dto.ts";
-import { ImageService } from "../services/image.service.ts";
+import { GenericRepositoryImpl } from "./generic.repository.js";
+import { CreateProductDto } from "../dto/products/create-product.dto.js";
+import { ProductDto } from "../dto/products/product.dto.js";
+import { UpdateProductDto } from "../dto/products/update-product.dto.js";
+import { prismaCreateEntityBuilder } from "../utils/prismaCreateEntityBuilder.js";
+import { productCreateMapping } from "../mappings/products/product-create.mapping.js";
+import { ProductVariantRepository } from "../repository/product-variant.repository.js";
+import { productUpdateMapping } from "../mappings/products/product-update.mapping.js";
+import { prismaUpdateEntityBuilder } from "../utils/prismaUpdateEntityBuilder.js";
+import { UpdateProductTagDto } from "../dto/products/update-product-tag.dto.js";
+import { ImageService } from "../services/image.service.js";
 
 export class ProductRepository extends GenericRepositoryImpl<
   ProductDto,

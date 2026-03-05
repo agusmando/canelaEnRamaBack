@@ -1,4 +1,4 @@
-import { CartDto } from "../cart/cart.dto.ts";
+import { CartDto } from "../cart/cart.dto.js";
 
 0
 export class UserDto {

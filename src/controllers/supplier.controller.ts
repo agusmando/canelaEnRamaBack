@@ -1,9 +1,9 @@
-import { CreateSupplierDto } from "../dto/supplier/create-supplier.dto.ts";
-import { SupplierDto } from "../dto/supplier/supplier.dto.ts";
-import { UpdateSupplierDto } from "../dto/supplier/update-supplier.dto.ts";
-import { SupplierService } from "../services/supplier.service.ts";
-import { BaseResponse } from "../utils/responseFormat.ts";
-import { GenericControllerImpl } from "./generic-impl.controller.ts";
+import { CreateSupplierDto } from "../dto/supplier/create-supplier.dto.js";
+import { SupplierDto } from "../dto/supplier/supplier.dto.js";
+import { UpdateSupplierDto } from "../dto/supplier/update-supplier.dto.js";
+import { SupplierService } from "../services/supplier.service.js";
+import { BaseResponse } from "../utils/responseFormat.js";
+import { GenericControllerImpl } from "./generic-impl.controller.js";
 
 export class SupplierController extends GenericControllerImpl<
   SupplierDto,

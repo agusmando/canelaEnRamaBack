@@ -1,6 +1,6 @@
 import express from "express";
-import { TagController } from "../controllers/tag.controller.ts";
-import { isAuthenticated, requireRole } from "../middleware/auth.middleware.ts";
+import { TagController } from "../controllers/tag.controller.js";
+import { isAuthenticated, requireRole } from "../middleware/auth.middleware.js";
 const router = express.Router();
 
 const tagsController = new TagController();

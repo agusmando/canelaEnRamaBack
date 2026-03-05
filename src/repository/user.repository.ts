@@ -1,6 +1,6 @@
 import { PrismaClient } from "@prisma/client/extension";
-import { GenericRepositoryImpl } from "./generic.repository.ts";
-import { UserDto } from "../dto/user/user.dto.ts";
+import { GenericRepositoryImpl } from "./generic.repository.js";
+import { UserDto } from "../dto/user/user.dto.js";
 
 export class UserRepository extends GenericRepositoryImpl<
   UserDto,

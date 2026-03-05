@@ -1,9 +1,9 @@
-import { CreateOfferDto } from "../dto/offer/create-offer.dto.ts";
-import { OfferDto } from "../dto/offer/offer.dto.ts";
-import { UpdateOfferDto } from "../dto/offer/update-offer.dto.ts";
-import { ValidationError } from "../errors/application/ValidationError.ts";
-import { GenericServiceImpl } from "./generic-impl.service.ts";
-import { ProductVariantService } from "./product-variant.service.ts";
+import { CreateOfferDto } from "../dto/offer/create-offer.dto.js";
+import { OfferDto } from "../dto/offer/offer.dto.js";
+import { UpdateOfferDto } from "../dto/offer/update-offer.dto.js";
+import { ValidationError } from "../errors/application/ValidationError.js";
+import { GenericServiceImpl } from "./generic-impl.service.js";
+import { ProductVariantService } from "./product-variant.service.js";
 
 export class OfferService extends GenericServiceImpl<
   OfferDto,

@@ -1,5 +1,5 @@
-import { ForbidenError } from "./ForbidenError.ts";
-import { UnAuthorizedError } from "./UnauthorizedError.ts";
-import { InvalidCredentialsError } from "./InvalidCredentialsError.ts";
+import { ForbidenError } from "./ForbidenError.js";
+import { UnAuthorizedError } from "./UnauthorizedError.js";
+import { InvalidCredentialsError } from "./InvalidCredentialsError.js";
 
 export { ForbidenError, UnAuthorizedError, InvalidCredentialsError };

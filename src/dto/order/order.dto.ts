@@ -1,6 +1,6 @@
 
-import { UserDto } from "../user/user.dto.ts";
-import { OrderItemDto } from "../order-item/order-item.dto.ts";
+import { UserDto } from "../user/user.dto.js";
+import { OrderItemDto } from "../order-item/order-item.dto.js";
 export class OrderDto {
   id: number;
   userSuperTokensId?: string;

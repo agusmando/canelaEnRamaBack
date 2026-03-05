@@ -1,4 +1,4 @@
-import { ImageRepository } from "./../repository/image.repository.ts";
+import { ImageRepository } from "./../repository/image.repository.js";
 
 export class ImageService {
   imageRepository: ImageRepository;

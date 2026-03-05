@@ -1,25 +1,25 @@
-import { CreateProductDto } from "./../dto/products/create-product.dto.ts";
-import { ProductDto } from "../dto/products/product.dto.ts";
-import { UpdateProductDto } from "../dto/products/update-product.dto.ts";
-import { UpdateProductTagDto } from "../dto/products/update-product-tag.dto.ts";
-import { productPostProcessingMapping } from "../mappings/products/product-post-procesing.mapping.ts";
+import { CreateProductDto } from "./../dto/products/create-product.dto.js";
+import { ProductDto } from "../dto/products/product.dto.js";
+import { UpdateProductDto } from "../dto/products/update-product.dto.js";
+import { UpdateProductTagDto } from "../dto/products/update-product-tag.dto.js";
+import { productPostProcessingMapping } from "../mappings/products/product-post-procesing.mapping.js";
 import {
   ProductHasNoVariantsError,
   InvalidMeasureError,
   ProductHasNoCategoryError,
-} from "../errors/domain/product/index-product.error.ts";
+} from "../errors/domain/product/index-product.error.js";
 import {
   ValidationError,
   NotFoundError,
   BadRequestError,
-} from "../errors/application/index-app.error.ts";
-import { GenericServiceImpl } from "./generic-impl.service.ts";
-import { ProductRepository } from "../repository/product.repository.ts";
-import { ProductVariantRepository } from "../repository/product-variant.repository.ts";
-import { ImageService } from "./image.service.ts";
-import { StockMovementService } from "./stockMovement.service.ts";
-import { StoreProcedureError } from "../errors/infra/StoreProcedureError.ts";
-import { productVariantPostProcessingMapping } from "../mappings/product-variants/product-variant-post-procesing.mapping.ts";
+} from "../errors/application/index-app.error.js";
+import { GenericServiceImpl } from "./generic-impl.service.js";
+import { ProductRepository } from "../repository/product.repository.js";
+import { ProductVariantRepository } from "../repository/product-variant.repository.js";
+import { ImageService } from "./image.service.js";
+import { StockMovementService } from "./stockMovement.service.js";
+import { StoreProcedureError } from "../errors/infra/StoreProcedureError.js";
+import { productVariantPostProcessingMapping } from "../mappings/product-variants/product-variant-post-procesing.mapping.js";
 
 export class ProductService extends GenericServiceImpl<
   ProductDto,

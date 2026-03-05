@@ -1,15 +1,15 @@
 // import { PrismaClient } from "@prisma/client";
 import Prisma from "@prisma/client";
-import { prismaQueryBuilder } from "../utils/prismaQueryBuilder.ts";
-import { prismaCreateEntityBuilder } from "../utils/prismaCreateEntityBuilder.ts";
-import { prismaUpdateEntityBuilder } from "../utils/prismaUpdateEntityBuilder.ts";
-import { BaseResponse, PaginatedResponse } from "../utils/responseFormat.ts";
-import type GenericServiceInterface from "./generic-service.interface.ts";
-import { AppError } from "../errors/AppError.ts";
-import mappingSelector from "../utils/mappingSelector.ts";
-import { GenericRepositoryImpl } from "../repository/generic.repository.ts";
-import { NotFoundError } from "../errors/application/NotFoundError.ts";
-import { ServerError } from "../errors/application/ServerError.ts";
+import { prismaQueryBuilder } from "../utils/prismaQueryBuilder.js";
+import { prismaCreateEntityBuilder } from "../utils/prismaCreateEntityBuilder.js";
+import { prismaUpdateEntityBuilder } from "../utils/prismaUpdateEntityBuilder.js";
+import { BaseResponse, PaginatedResponse } from "../utils/responseFormat.js";
+import type GenericServiceInterface from "./generic-service.interface.js";
+import { AppError } from "../errors/AppError.js";
+import mappingSelector from "../utils/mappingSelector.js";
+import { GenericRepositoryImpl } from "../repository/generic.repository.js";
+import { NotFoundError } from "../errors/application/NotFoundError.js";
+import { ServerError } from "../errors/application/ServerError.js";
 
 export class GenericServiceImpl<T, U, V>
   implements GenericServiceInterface<T, U, V>

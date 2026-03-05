@@ -1,12 +1,12 @@
-import { GenericServiceImpl } from "./generic-impl.service.ts";
-import { CartDto } from "../dto/cart/cart.dto.ts";
-import { CreateCartDto } from "../dto/cart/create-cart.dto.ts";
-import { UpdateCartDto } from "../dto/cart/update-cart.dto.ts";
-import { NotFoundError } from "../errors/application/NotFoundError.ts";
-import { ValidationError } from "../errors/application/ValidationError.ts";
-import { CartRepository } from "../repository/cart.repository.ts";
+import { GenericServiceImpl } from "./generic-impl.service.js";
+import { CartDto } from "../dto/cart/cart.dto.js";
+import { CreateCartDto } from "../dto/cart/create-cart.dto.js";
+import { UpdateCartDto } from "../dto/cart/update-cart.dto.js";
+import { NotFoundError } from "../errors/application/NotFoundError.js";
+import { ValidationError } from "../errors/application/ValidationError.js";
+import { CartRepository } from "../repository/cart.repository.js";
 import { v4 as uuidv4 } from "uuid";
-import { ServerError } from "../errors/application/ServerError.ts";
+import { ServerError } from "../errors/application/ServerError.js";
 
 export class CartService extends GenericServiceImpl<
   CartDto,

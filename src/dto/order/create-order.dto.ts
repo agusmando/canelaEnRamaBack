@@ -1,4 +1,4 @@
-import { CreateOrderItemDto } from "../order-item/create-order-item.dto.ts";
+import { CreateOrderItemDto } from "../order-item/create-order-item.dto.js";
 
 export class CreateOrderDto {
   userSuperTokensId: string;

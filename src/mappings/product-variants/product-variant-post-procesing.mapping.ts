@@ -1,4 +1,4 @@
-import { ProductVariantDto } from "../../dto/product-variant/product-variant.dto.ts";
+import { ProductVariantDto } from "../../dto/product-variant/product-variant.dto.js";
 
 export const productVariantPostProcessingMapping = (
   product: ProductVariantDto,

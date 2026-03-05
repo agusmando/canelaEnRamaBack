@@ -1,6 +1,6 @@
 import express from "express";
-import { OfferController } from "../controllers/offer.controller.ts";
-import { isAuthenticated, requireRole } from "../middleware/auth.middleware.ts";
+import { OfferController } from "../controllers/offer.controller.js";
+import { isAuthenticated, requireRole } from "../middleware/auth.middleware.js";
 const router = express.Router();
 
 const offerController = new OfferController();

@@ -1,10 +1,10 @@
-import { CreateOfferDto } from "../dto/offer/create-offer.dto.ts";
-import { OfferDto } from "../dto/offer/offer.dto.ts";
-import { UpdateOfferDto } from "../dto/offer/update-offer.dto.ts";
-import { OfferService } from "../services/offer.service.ts";
-import { BaseResponse } from "../utils/responseFormat.ts";
-// import { OfferService } from "../services/offer.service.ts";s
-import { GenericControllerImpl } from "./generic-impl.controller.ts";
+import { CreateOfferDto } from "../dto/offer/create-offer.dto.js";
+import { OfferDto } from "../dto/offer/offer.dto.js";
+import { UpdateOfferDto } from "../dto/offer/update-offer.dto.js";
+import { OfferService } from "../services/offer.service.js";
+import { BaseResponse } from "../utils/responseFormat.js";
+// import { OfferService } from "../services/offer.service.js";s
+import { GenericControllerImpl } from "./generic-impl.controller.js";
 
 
 export class OfferController extends GenericControllerImpl<

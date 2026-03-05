@@ -1,7 +1,7 @@
 import express from "express";
-import { ProductController } from "../controllers/product.controller.ts";
-import { isAuthenticated, requireRole } from "../middleware/auth.middleware.ts";
-import { cloudinaryUpload, upload } from "../middleware/fileUploader.ts";
+import { ProductController } from "../controllers/product.controller.js";
+import { isAuthenticated, requireRole } from "../middleware/auth.middleware.js";
+import { cloudinaryUpload, upload } from "../middleware/fileUploader.js";
 
 const router = express.Router();
 

@@ -1,6 +1,6 @@
 import express from "express";
-import { OrderController } from "../controllers/order.controller.ts";
-import { isAuthenticated, requireRole, optionalSession } from "../middleware/auth.middleware.ts";
+import { OrderController } from "../controllers/order.controller.js";
+import { isAuthenticated, requireRole, optionalSession } from "../middleware/auth.middleware.js";
 const router = express.Router();
 
 const orderController = new OrderController();

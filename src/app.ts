@@ -1,8 +1,8 @@
 import cors from "cors";
 import express from "express";
-import rutas from "./routes/index.route.ts";
-import { errorHandler as canelaErrorHandler } from "./middleware/errorHandler.ts";
-import { initSupertokens } from "./config/supertokens/supertokens.config.ts";
+import rutas from "./routes/index.route.js";
+import { errorHandler as canelaErrorHandler } from "./middleware/errorHandler.js";
+import { initSupertokens } from "./config/supertokens/supertokens.config.js";
 import supertokens from "supertokens-node";
 import {
   errorHandler as supertokensErrorHandler,

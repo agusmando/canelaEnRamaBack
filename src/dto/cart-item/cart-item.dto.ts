@@ -1,5 +1,5 @@
-import { CartDto } from "../cart/cart.dto.ts";
-import { ProductVariantDto } from "../product-variant/product-variant.dto.ts";
+import { CartDto } from "../cart/cart.dto.js";
+import { ProductVariantDto } from "../product-variant/product-variant.dto.js";
 
 export class CartItemDto {
   id: number;

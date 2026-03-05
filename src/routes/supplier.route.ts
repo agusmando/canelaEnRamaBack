@@ -1,6 +1,6 @@
 import express from "express";
-import { SupplierController } from "../controllers/supplier.controller.ts";
-import { isAuthenticated, requireRole } from "../middleware/auth.middleware.ts";
+import { SupplierController } from "../controllers/supplier.controller.js";
+import { isAuthenticated, requireRole } from "../middleware/auth.middleware.js";
 const router = express.Router();
 
 const supplierController = new SupplierController();

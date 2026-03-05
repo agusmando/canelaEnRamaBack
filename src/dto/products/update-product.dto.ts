@@ -1,5 +1,5 @@
-import { CreateProductVariantDto } from "../product-variant/create-product-variant.dto.ts";
-import { TagDto } from "../tags/tag.dto.ts";
+import { CreateProductVariantDto } from "../product-variant/create-product-variant.dto.js";
+import { TagDto } from "../tags/tag.dto.js";
 
 export class UpdateProductDto {
   name: string;

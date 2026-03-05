@@ -1,4 +1,4 @@
-import { OfferDto } from "../../dto/offer/offer.dto.ts";
+import { OfferDto } from "../../dto/offer/offer.dto.js";
 
 export const offerPostProcessingQueryMapping = (offer: OfferDto) => {
   let finalOffer = { ...offer };

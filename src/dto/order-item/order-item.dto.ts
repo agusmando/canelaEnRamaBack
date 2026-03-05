@@ -1,5 +1,5 @@
-import { OrderDto } from "../order/order.dto.ts";
-import { ProductVariantDto } from "../product-variant/product-variant.dto.ts";
+import { OrderDto } from "../order/order.dto.js";
+import { ProductVariantDto } from "../product-variant/product-variant.dto.js";
 
 export class OrderItemDto {
   id: number;

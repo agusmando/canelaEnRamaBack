@@ -1,4 +1,4 @@
-import { UpdateCartItemDto } from "../cart-item/update-cart-item.dto.ts";
+import { UpdateCartItemDto } from "../cart-item/update-cart-item.dto.js";
 
 export class UpdateCartDto {
   sessionId?: string;

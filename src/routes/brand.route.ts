@@ -1,6 +1,6 @@
 import express from "express";
-import { BrandController } from "../controllers/brand.controller.ts";
-import { isAuthenticated, requireRole } from "../middleware/auth.middleware.ts";
+import { BrandController } from "../controllers/brand.controller.js";
+import { isAuthenticated, requireRole } from "../middleware/auth.middleware.js";
 const router = express.Router();
 
 const brandController = new BrandController();

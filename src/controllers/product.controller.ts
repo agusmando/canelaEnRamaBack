@@ -1,9 +1,9 @@
-import { CreateProductDto } from "../dto/products/create-product.dto.ts";
-import { ProductDto } from "../dto/products/product.dto.ts";
-import { UpdateProductDto } from "../dto/products/update-product.dto.ts";
-import { ProductService } from "../services/product.service.ts";
-import { BaseResponse } from "../utils/responseFormat.ts";
-import { GenericControllerImpl } from "./generic-impl.controller.ts";
+import { CreateProductDto } from "../dto/products/create-product.dto.js";
+import { ProductDto } from "../dto/products/product.dto.js";
+import { UpdateProductDto } from "../dto/products/update-product.dto.js";
+import { ProductService } from "../services/product.service.js";
+import { BaseResponse } from "../utils/responseFormat.js";
+import { GenericControllerImpl } from "./generic-impl.controller.js";
 
 const productService = new ProductService();
 

@@ -1,4 +1,4 @@
-import { orderItemCreateMapping } from "../order-item/order-item-create.mapping.ts";
+import { orderItemCreateMapping } from "../order-item/order-item-create.mapping.js";
 
 
 export const orderCreateMapping = {

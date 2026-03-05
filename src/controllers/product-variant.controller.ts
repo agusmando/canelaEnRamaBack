@@ -1,9 +1,9 @@
-import { CreateProductVariantDto } from "../dto/product-variant/create-product-variant.dto.ts";
-import { ProductVariantDto } from "../dto/product-variant/product-variant.dto.ts";
-import { UpdateProductVariantDto } from "../dto/product-variant/update-product-variant.dto.ts";
-import { ProductVariantService } from "../services/product-variant.service.ts";
-import { BaseResponse } from "../utils/responseFormat.ts";
-import { GenericControllerImpl } from "./generic-impl.controller.ts";
+import { CreateProductVariantDto } from "../dto/product-variant/create-product-variant.dto.js";
+import { ProductVariantDto } from "../dto/product-variant/product-variant.dto.js";
+import { UpdateProductVariantDto } from "../dto/product-variant/update-product-variant.dto.js";
+import { ProductVariantService } from "../services/product-variant.service.js";
+import { BaseResponse } from "../utils/responseFormat.js";
+import { GenericControllerImpl } from "./generic-impl.controller.js";
 
 export class ProductVariantController extends GenericControllerImpl<
   ProductVariantDto,

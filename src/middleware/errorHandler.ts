@@ -1,25 +1,25 @@
-import { BaseResponse } from "../utils/responseFormat.ts";
+import { BaseResponse } from "../utils/responseFormat.js";
 import {
   BadRequestError,
   ConflictError,
   NotFoundError,
   ServerError,
   ValidationError
-} from "../errors/application/index-app.error.ts"; // application errors
+} from "../errors/application/index-app.error.js"; // application errors
 import {
   ForbidenError,
   InvalidCredentialsError,
   UnAuthorizedError,
-} from "../errors/domain/auth/index-auth.error.ts";
+} from "../errors/domain/auth/index-auth.error.js";
 import {
   InvalidMeasureError,
   ProductHasNoCategoryError,
   ProductHasNoVariantsError
-} from "../errors/domain/product/index-product.error.ts";
+} from "../errors/domain/product/index-product.error.js";
 import {
   DatabaseError,
   ExternalServiceError
-} from "../errors/infra/index-infra.error.ts";
+} from "../errors/infra/index-infra.error.js";
 
 
 export const errorHandler = (err: any, req: any, res: any, next: any) => {

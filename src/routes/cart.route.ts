@@ -1,6 +1,6 @@
 import express from "express";
-import { CartController } from "../controllers/cart.controller.ts";
-import { isAuthenticated, requireRole, optionalSession } from "../middleware/auth.middleware.ts";
+import { CartController } from "../controllers/cart.controller.js";
+import { isAuthenticated, requireRole, optionalSession } from "../middleware/auth.middleware.js";
 const router = express.Router();
 
 const cartController = new CartController();

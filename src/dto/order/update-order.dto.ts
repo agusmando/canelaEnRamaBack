@@ -1,4 +1,4 @@
-import { UpdateOrderItemDto } from "../order-item/update-order-item.dto.ts";
+import { UpdateOrderItemDto } from "../order-item/update-order-item.dto.js";
 
 export class UpdateOrderDto {
   totalPrice: number;

@@ -1,4 +1,4 @@
-import { ExternalServiceError } from "./ExternalServiceError.ts";
-import { DatabaseError } from "./DatabaseError.ts";
+import { ExternalServiceError } from "./ExternalServiceError.js";
+import { DatabaseError } from "./DatabaseError.js";
 
 export { ExternalServiceError, DatabaseError };

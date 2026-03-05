@@ -1,9 +1,9 @@
 import { PrismaClient } from "@prisma/client";
-import { GenericRepositoryImpl } from "./generic.repository.ts";
-import { SupplierDto } from "../dto/supplier/supplier.dto.ts";
-import { CreateSupplierDto } from "../dto/supplier/create-supplier.dto.ts";
-import { UpdateSupplierDto } from "../dto/supplier/update-supplier.dto.ts";
-import { UpdateSupplierBrandDto } from "../dto/supplier/update-supplier-brand.dto.ts";
+import { GenericRepositoryImpl } from "./generic.repository.js";
+import { SupplierDto } from "../dto/supplier/supplier.dto.js";
+import { CreateSupplierDto } from "../dto/supplier/create-supplier.dto.js";
+import { UpdateSupplierDto } from "../dto/supplier/update-supplier.dto.js";
+import { UpdateSupplierBrandDto } from "../dto/supplier/update-supplier-brand.dto.js";
 export class SupplierRepository extends GenericRepositoryImpl<
   SupplierDto,
   CreateSupplierDto,

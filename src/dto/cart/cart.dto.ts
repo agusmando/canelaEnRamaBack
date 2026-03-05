@@ -1,5 +1,5 @@
-import { UserDto } from "../user/user.dto.ts";
-import { CartItemDto } from "../cart-item/cart-item.dto.ts";
+import { UserDto } from "../user/user.dto.js";
+import { CartItemDto } from "../cart-item/cart-item.dto.js";
 
 
 export class CartDto {

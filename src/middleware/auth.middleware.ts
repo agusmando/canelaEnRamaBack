@@ -1,6 +1,6 @@
 import { verifySession } from "supertokens-node/recipe/session/framework/express";
 import UserRoles from "supertokens-node/recipe/userroles";
-import { BaseResponse } from "../utils/responseFormat.ts";
+import { BaseResponse } from "../utils/responseFormat.js";
 // import { Response } from "express";
 
 // 1. Middleware básico para verificar que está logueado

@@ -1,13 +1,13 @@
-import { BaseResponse, PaginatedResponse } from "../utils/responseFormat.ts";
+import { BaseResponse, PaginatedResponse } from "../utils/responseFormat.js";
 import { PrismaClient } from "@prisma/client";
-import { UpdateSupplierBrandDto } from "../dto/supplier/update-supplier-brand.dto.ts";
-import { GenericServiceImpl } from "./generic-impl.service.ts";
-import { SupplierDto } from "../dto/supplier/supplier.dto.ts";
-import { CreateSupplierDto } from "../dto/supplier/create-supplier.dto.ts";
-import { UpdateSupplierDto } from "../dto/supplier/update-supplier.dto.ts";
-import { NotFoundError } from "../errors/application/NotFoundError.ts";
-import { ValidationError } from "../errors/application/ValidationError.ts";
-import { SupplierRepository } from "../repository/supplier.repository.ts";
+import { UpdateSupplierBrandDto } from "../dto/supplier/update-supplier-brand.dto.js";
+import { GenericServiceImpl } from "./generic-impl.service.js";
+import { SupplierDto } from "../dto/supplier/supplier.dto.js";
+import { CreateSupplierDto } from "../dto/supplier/create-supplier.dto.js";
+import { UpdateSupplierDto } from "../dto/supplier/update-supplier.dto.js";
+import { NotFoundError } from "../errors/application/NotFoundError.js";
+import { ValidationError } from "../errors/application/ValidationError.js";
+import { SupplierRepository } from "../repository/supplier.repository.js";
 
 export class SupplierService extends GenericServiceImpl<
   SupplierDto,

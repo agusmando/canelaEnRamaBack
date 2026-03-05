@@ -1,14 +1,14 @@
-import { CartItemRepository } from "./cart-item.repository.ts";
+import { CartItemRepository } from "./cart-item.repository.js";
 import { PrismaClient } from "@prisma/client";
-import { CartDto } from "../dto/cart/cart.dto.ts";
-import { CreateCartDto } from "../dto/cart/create-cart.dto.ts";
-import { UpdateCartDto } from "../dto/cart/update-cart.dto.ts";
-import { GenericRepositoryImpl } from "./generic.repository.ts";
-import { cartUpdateMapping } from "../mappings/cart/cart-update.mapping.ts";
-import { prismaUpdateEntityBuilder } from "../utils/prismaUpdateEntityBuilder.ts";
-import { StoreProcedureError } from "../errors/infra/StoreProcedureError.ts";
-import { UpdateCartItemDto } from "../dto/cart-item/update-cart-item.dto.ts";
-import { DatabaseError } from "../errors/infra/DatabaseError.ts";
+import { CartDto } from "../dto/cart/cart.dto.js";
+import { CreateCartDto } from "../dto/cart/create-cart.dto.js";
+import { UpdateCartDto } from "../dto/cart/update-cart.dto.js";
+import { GenericRepositoryImpl } from "./generic.repository.js";
+import { cartUpdateMapping } from "../mappings/cart/cart-update.mapping.js";
+import { prismaUpdateEntityBuilder } from "../utils/prismaUpdateEntityBuilder.js";
+import { StoreProcedureError } from "../errors/infra/StoreProcedureError.js";
+import { UpdateCartItemDto } from "../dto/cart-item/update-cart-item.dto.js";
+import { DatabaseError } from "../errors/infra/DatabaseError.js";
 
 export class CartRepository extends GenericRepositoryImpl<
   CartDto,

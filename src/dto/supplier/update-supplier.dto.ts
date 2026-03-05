@@ -1,4 +1,4 @@
-import { BrandDto } from "../brand/brand.dto.ts";
+import { BrandDto } from "../brand/brand.dto.js";
 
 export class UpdateSupplierDto {
   name: string;

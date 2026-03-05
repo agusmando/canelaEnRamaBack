@@ -1,10 +1,10 @@
 import { PrismaClient } from "@prisma/client";
-import { GenericRepositoryImpl } from "./generic.repository.ts";  
-import { UpdateBrandDto } from "../dto/brand/update-brand.dto.ts";
-import { CreateBrandDto } from "../dto/brand/create-brand.dto.ts";
-import { BrandDto } from "../dto/brand/brand.dto.ts";
-import { ProductRepository } from "./product.repository.ts";
-import { UpdateBrandProductDto } from "../dto/brand/update-brand-product.dto.ts";
+import { GenericRepositoryImpl } from "./generic.repository.js";  
+import { UpdateBrandDto } from "../dto/brand/update-brand.dto.js";
+import { CreateBrandDto } from "../dto/brand/create-brand.dto.js";
+import { BrandDto } from "../dto/brand/brand.dto.js";
+import { ProductRepository } from "./product.repository.js";
+import { UpdateBrandProductDto } from "../dto/brand/update-brand-product.dto.js";
 
 export class BrandRepository extends GenericRepositoryImpl<
   BrandDto,

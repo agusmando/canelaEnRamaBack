@@ -1,7 +1,7 @@
-import { DependencyDto } from "../dependency/dependency.dto.ts";
-import { ProductDto } from "../products/product.dto.ts";
-import { MovementDto } from "../movement/movement.dto.ts";
-import { OfferDto } from "../offer/offer.dto.ts";
+import { DependencyDto } from "../dependency/dependency.dto.js";
+import { ProductDto } from "../products/product.dto.js";
+import { MovementDto } from "../movement/movement.dto.js";
+import { OfferDto } from "../offer/offer.dto.js";
 
 export class ProductVariantDto {
   id: number;

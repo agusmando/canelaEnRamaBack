@@ -1,11 +1,11 @@
 import { PrismaClient } from "@prisma/client";
-import { GenericRepositoryImpl } from "./generic.repository.ts";
-import { OrderItemDto } from "../dto/order-item/order-item.dto.ts";
-import { CreateOrderItemDto } from "../dto/order-item/create-order-item.dto.ts";
-import { UpdateOrderItemDto } from "../dto/order-item/update-order-item.dto.ts";
-import { prismaCreateEntityBuilder } from "../utils/prismaCreateEntityBuilder.ts";
-import { orderItemCreateMapping } from "../mappings/order-item/order-item-create.mapping.ts";
-import { DatabaseError } from "../errors/infra/DatabaseError.ts";
+import { GenericRepositoryImpl } from "./generic.repository.js";
+import { OrderItemDto } from "../dto/order-item/order-item.dto.js";
+import { CreateOrderItemDto } from "../dto/order-item/create-order-item.dto.js";
+import { UpdateOrderItemDto } from "../dto/order-item/update-order-item.dto.js";
+import { prismaCreateEntityBuilder } from "../utils/prismaCreateEntityBuilder.js";
+import { orderItemCreateMapping } from "../mappings/order-item/order-item-create.mapping.js";
+import { DatabaseError } from "../errors/infra/DatabaseError.js";
 
 export class OrderItemRepository extends GenericRepositoryImpl<
   OrderItemDto,

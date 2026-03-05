@@ -1,10 +1,10 @@
 import { PrismaClient } from "@prisma/client";
-import { GenericRepositoryImpl } from "./generic.repository.ts";
-import { CartItemDto } from "../dto/cart-item/cart-item.dto.ts";
-import { CreateCartItemDto } from "../dto/cart-item/create-cart-item.dto.ts";
-import { UpdateCartItemDto } from "../dto/cart-item/update-cart-item.dto.ts";
-import { prismaCreateEntityBuilder } from "../utils/prismaCreateEntityBuilder.ts";
-import { cartItemCreateMapping } from "../mappings/cart-item/cart-item-create.mapping.ts";
+import { GenericRepositoryImpl } from "./generic.repository.js";
+import { CartItemDto } from "../dto/cart-item/cart-item.dto.js";
+import { CreateCartItemDto } from "../dto/cart-item/create-cart-item.dto.js";
+import { UpdateCartItemDto } from "../dto/cart-item/update-cart-item.dto.js";
+import { prismaCreateEntityBuilder } from "../utils/prismaCreateEntityBuilder.js";
+import { cartItemCreateMapping } from "../mappings/cart-item/cart-item-create.mapping.js";
 
 export class CartItemRepository extends GenericRepositoryImpl<
   CartItemDto,

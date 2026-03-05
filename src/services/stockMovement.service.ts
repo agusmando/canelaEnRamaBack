@@ -1,6 +1,6 @@
 import { PrismaClient } from "@prisma/client/extension";
-import { StoreProcedureError } from "../errors/infra/StoreProcedureError.ts";
-import { StockMovementRepository } from "../repository/stockMovement.repository.ts";
+import { StoreProcedureError } from "../errors/infra/StoreProcedureError.js";
+import { StockMovementRepository } from "../repository/stockMovement.repository.js";
 export class StockMovementService {
   stockMovementRepository: StockMovementRepository;
   constructor() {

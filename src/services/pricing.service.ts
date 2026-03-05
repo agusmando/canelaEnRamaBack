@@ -1,5 +1,5 @@
-import { OfferDto } from "../dto/offer/offer.dto.ts";
-import { OfferService } from "./offer.service.ts";
+import { OfferDto } from "../dto/offer/offer.dto.js";
+import { OfferService } from "./offer.service.js";
 
 export type RoundingStrategy =
   | "NONE"

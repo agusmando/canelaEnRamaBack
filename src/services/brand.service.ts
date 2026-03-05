@@ -1,11 +1,11 @@
-import { UpdateBrandProductDto } from "../dto/brand/update-brand-product.dto.ts";
-import { GenericServiceImpl } from "./generic-impl.service.ts";
-import { BrandDto } from "../dto/brand/brand.dto.ts";
-import { CreateBrandDto } from "../dto/brand/create-brand.dto.ts";
-import { UpdateBrandDto } from "../dto/brand/update-brand.dto.ts";
-import { NotFoundError } from "../errors/application/NotFoundError.ts";
-import { ValidationError } from "../errors/application/ValidationError.ts";
-import { BrandRepository } from "../repository/brand.repository.ts";
+import { UpdateBrandProductDto } from "../dto/brand/update-brand-product.dto.js";
+import { GenericServiceImpl } from "./generic-impl.service.js";
+import { BrandDto } from "../dto/brand/brand.dto.js";
+import { CreateBrandDto } from "../dto/brand/create-brand.dto.js";
+import { UpdateBrandDto } from "../dto/brand/update-brand.dto.js";
+import { NotFoundError } from "../errors/application/NotFoundError.js";
+import { ValidationError } from "../errors/application/ValidationError.js";
+import { BrandRepository } from "../repository/brand.repository.js";
 
 export class BrandService extends GenericServiceImpl<
   BrandDto,

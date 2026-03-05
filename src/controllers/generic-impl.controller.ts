@@ -1,6 +1,6 @@
-import { GenericServiceImpl } from "../services/generic-impl.service.ts";
-import { BaseResponse, PaginatedResponse } from "../utils/responseFormat.ts";
-import type GenericControllerInterface from "./generic-controller.interface.ts";
+import { GenericServiceImpl } from "../services/generic-impl.service.js";
+import { BaseResponse, PaginatedResponse } from "../utils/responseFormat.js";
+import type GenericControllerInterface from "./generic-controller.interface.js";
 
 export class GenericControllerImpl<T, U, V>
   implements GenericControllerInterface

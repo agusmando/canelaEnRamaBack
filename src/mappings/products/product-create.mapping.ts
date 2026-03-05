@@ -1,7 +1,3 @@
-
-// product-create.mapping.ts
-import { productVariantCreateMapping } from '../product-variants/product-variant-create.mapping.ts';
-
 export const productCreateMapping = {
   // Campos simples del producto
   categoryId: { parseInt: true }, // Si envías el ID directamente en el body

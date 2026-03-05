@@ -54,7 +54,7 @@ export default function mappingSelector(entity: string) {
         search: import("../mappings/tags/tag-search.mapping.js").then(
           (module) => module.tagSearchQueryMapping,
         ),
-        // create: import('../mappings/products/products-create.mapping.ts').then(module => module.productCreateMapping)
+        // create: import('../mappings/products/products-create.mapping.js').then(module => module.productCreateMapping)
       };
     case "category":
       return {

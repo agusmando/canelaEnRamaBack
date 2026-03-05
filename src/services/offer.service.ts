@@ -113,7 +113,7 @@ export class OfferService extends GenericServiceImpl<
     const discount = offer.discountValue || 0;
     return {
       unitAfter: Math.max(0, currentPrice - discount),
-      offerType: "$" + discount,
+      offerType: "-$" + discount,
     };
   }
 

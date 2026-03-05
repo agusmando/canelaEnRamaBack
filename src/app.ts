@@ -14,14 +14,20 @@ initSupertokens();
 const app = express();
 app.use(express.json());
 
+const corsMiddleware = cors({
+  origin: true, // devuelve el Origin recibido y permite credentials
+  allowedHeaders: ["content-type", ...supertokens.getAllCORSHeaders()],
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+});
 
-app.use(
-  cors({
-    origin: "http://localhost:3000",
-    allowedHeaders: ["content-type", ...supertokens.getAllCORSHeaders()],
-    credentials: true,
-  })
-);
+// app.use(
+//   cors({
+//     origin: "http://localhost:3000",
+//     allowedHeaders: ["content-type", ...supertokens.getAllCORSHeaders()],
+//     credentials: true,
+//   })
+// );
 // const corsMiddleware = cors({
 //   origin: function (origin, callback) {
 //     const allowedOrigins = [
@@ -48,7 +54,7 @@ app.use(
 //   ],
 // });
 
-// app.use(corsMiddleware);
+app.use(corsMiddleware);
 
 /**
  * ⚠️ ESTO ES LO CLAVE

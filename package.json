@@ -7,7 +7,7 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "nodemon ./src/server.ts",
-    "build": "npx prisma generate"
+    "build": "npx prisma generate --schema=./src/config/prisma/schema.prisma"
   },
   "repository": {
     "type": "git",

@@ -1,3 +1,4 @@
+import { StockMovementRepository } from './../repository/stockMovement.repository.js';
 import { CreateProductVariantDto } from "../dto/product-variant/create-product-variant.dto.js";
 import { ProductVariantDto } from "../dto/product-variant/product-variant.dto.js";
 import { GenericServiceImpl } from "./generic-impl.service.js";
@@ -8,6 +9,7 @@ import { NotFoundError } from "../errors/application/NotFoundError.js";
 import { BadRequestError } from "../errors/application/BadRequestError.js";
 import { ImageService } from "./image.service.js";
 import { ServerError } from "../errors/application/ServerError.js";
+import { StoreProcedureError } from '../errors/infra/StoreProcedureError.js';
 
 export class ProductVariantService extends GenericServiceImpl<
   ProductVariantDto,
@@ -16,11 +18,78 @@ export class ProductVariantService extends GenericServiceImpl<
 > {
   imageService: ImageService;
   productVariantRepository: ProductVariantRepository;
+  stockMovementRepository: StockMovementRepository;
   constructor() {
     super("productVariant");
     this.productVariantRepository = new ProductVariantRepository();
+    this.stockMovementRepository = new StockMovementRepository();
     this.imageService = new ImageService();
   }
+
+  async createVariant(
+    createData: CreateProductVariantDto,
+    uploadedFilesByField: any[],
+    tx?: any
+  ): Promise<ProductVariantDto> {
+    
+    return this.productVariantRepository.withTransaction(async (tx) => {
+      if (!createData) {
+        uploadedFilesByField &&
+          (await this.imageService.abortImageUpload(uploadedFilesByField));
+        throw new BadRequestError();
+      }
+      if (createData.productId == 0 || !createData.productId) {
+        uploadedFilesByField &&
+          (await this.imageService.abortImageUpload(uploadedFilesByField));
+        throw new BadRequestError();  
+      }
+
+      const stagedV = {
+        name: createData.name,
+        currentStock: createData.currentStock,
+      }
+      createData.currentStock = 0;
+  
+      const createdV = await this.productVariantRepository.createVariant(
+        createData,
+        uploadedFilesByField,
+        tx
+      );
+
+      if (createdV.hasComponents && createdV.hasComponents.length > 0) {
+        try {
+          await this.productVariantRepository.recalculateSingleMixPrice(
+            createdV.id,
+            tx,
+          );
+          await this.stockMovementRepository.processMixProduction(
+            createdV.id,
+            stagedV.currentStock,
+            tx,
+          );
+        } catch (error) {
+          throw new StoreProcedureError(
+            "recalculate_mix_price/process_mix_production",
+            error,
+          );
+        }
+      } else {
+        if (createdV.name == stagedV.name) {
+          console.log(
+            "ingreso " + createdV.name + " " + createdV.currentStock,
+          );
+          await this.stockMovementRepository.createStockMovement(
+            createdV.id,
+            stagedV.currentStock,
+            "IN",
+            tx,
+          );
+        }
+      }
+
+      return createdV
+    })
+  }       
 
   async updateVariant(
     id: number,
@@ -29,19 +98,19 @@ export class ProductVariantService extends GenericServiceImpl<
   ): Promise<ProductVariantDto> {
     const postMapping = productVariantPostProcessingMapping;
 
-    if (!id || id == 0) {
-      uploadedFilesByField &&
-        (await this.imageService.abortImageUpload(uploadedFilesByField));
-      throw new NotFoundError();
-    }
-
-    if (!data) {
-      uploadedFilesByField &&
-        (await this.imageService.abortImageUpload(uploadedFilesByField));
-      throw new BadRequestError();
-    }
-
+    
     return this.productVariantRepository.withTransaction(async (tx) => {
+      if (!id || id == 0) {
+        uploadedFilesByField &&
+          (await this.imageService.abortImageUpload(uploadedFilesByField));
+        throw new NotFoundError();
+      }
+  
+      if (!data) {
+        uploadedFilesByField &&
+          (await this.imageService.abortImageUpload(uploadedFilesByField));
+        throw new BadRequestError();
+      }
       let updatedVariant = await this.productVariantRepository.updateVariant(
         id,
         data,

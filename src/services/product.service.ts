@@ -74,6 +74,7 @@ export class ProductService extends GenericServiceImpl<
 
       let stockManagement: { name: string; currentStock: number }[] = [];
       createData.variants.forEach((variant) => {
+        if (!variant.currentStock) return variant.currentStock = 0;
         stockManagement.push({
           name: variant.name,
           currentStock: variant.currentStock,
@@ -87,9 +88,6 @@ export class ProductService extends GenericServiceImpl<
         tx,
       );
 
-      // Manage stock
-
-      console.log("product", product);
       // Post-creation processing
       const postMapping = productVariantPostProcessingMapping;
       const postVariants = product.variants.map((variant: any) => {

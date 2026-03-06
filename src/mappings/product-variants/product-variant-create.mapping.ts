@@ -5,6 +5,7 @@ export const productVariantCreateMapping = {
   contentAmount: { parseInt: true },
   currentStock: { parseInt: true },
   roundingOption: { parseInt: true },
+  productId: { parseInt: true },
   
   // Floats (IMPORTANTE: FormData envía strings, Prisma requiere Float)
   price: { parseFloat: true },
@@ -19,6 +20,7 @@ export const productVariantCreateMapping = {
   availablePedidosYa: { parseBoolean: true },
 
   // Relaciones Anidadas dentro de la variante
+  product: { relation: true, connectField: "id", allowCreate: false },
   movements: { 
     relation: true, 
     allowCreate: true,

@@ -23,6 +23,32 @@ export class ProductVariantRepository extends GenericRepositoryImpl<
     this.imageService = new ImageService();
   }
 
+  async createVariant(
+    data: CreateProductVariantDto,
+    uploadedFilesByField?: any[],
+    tx?: PrismaClient,
+  ) {
+    let createData = data;
+    // Crea la query para las imagenes
+    if (
+      uploadedFilesByField &&
+      Array.isArray(uploadedFilesByField) &&
+      uploadedFilesByField.length > 0
+    ) {
+      createData = {
+        ...createData,
+        images: uploadedFilesByField,
+      };
+    }
+
+    let createdProductVariant;
+
+    console.log("a ver la data creada", createData);
+    createdProductVariant = await super.create(createData, tx);
+
+    return createdProductVariant;
+  }
+
   async updateVariant(
     id: number,
     data: UpdateProductVariantDto,

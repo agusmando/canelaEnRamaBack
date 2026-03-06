@@ -11,8 +11,9 @@ export class CreateProductVariantDto {
   roundingOption: number;
   packagingOptions?: number[];
   requestTime?: string;
-  hasComponents?: { productId: number; quantity: number }[];
+  hasComponents?: { productVariantId: number; quantity: number }[];
   stockThreshold: number;
+  images?: any[];
   constructor(
     name: string,
     productId: number,
@@ -27,7 +28,8 @@ export class CreateProductVariantDto {
     roundingOption: number,
     packagingOptions?: number[],
     requestTime?: string,
-    hasComponents?: { productId: number; quantity: number }[]
+    hasComponents?: { productVariantId: number; quantity: number }[],
+    images?: any[],
   ) {
     this.name = name;
     this.productId = productId;
@@ -43,5 +45,6 @@ export class CreateProductVariantDto {
     this.stockThreshold = stockThreshold;
     this.availableWeb = availableWeb;
     this.availablePedidosYa = availablePedidosYa;
+    this.images = images;
   }
 }

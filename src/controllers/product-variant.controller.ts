@@ -17,6 +17,22 @@ export class ProductVariantController extends GenericControllerImpl<
     this.productVariantService = new ProductVariantService();
   }
 
+  async create(req: any, res: any, next: any) {
+    try {
+      const data = req.body;
+      const files = req.files;
+      const response = await this.productVariantService.createVariant(
+        data,
+        files
+      );
+      res
+        .status(200)
+        .json(new BaseResponse(200, "Product variant created", response));
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async update(req: any, res: any, next: any) {
     try {
       const data = req.body;

@@ -10,11 +10,10 @@ export const productVariantPostProcessingMapping = (
   const rawPrice =
     finalVariant.price * finalVariant.profitMargin + finalVariant.price;
   const roundingOption = finalVariant.roundingOption;
-  console.log("AAAAAAA VEEEEEEER",rawPrice, roundingOption);
   finalVariant.finalPrice =
     Math.ceil(rawPrice / roundingOption) * roundingOption;
-  const { profitMargin, price, ...rest } = finalVariant;
-  return rest;
+  // const { profitMargin, price, ...rest } = finalVariant;
+  return finalVariant;
 };
 
 // export const productVariantStockMovement = (

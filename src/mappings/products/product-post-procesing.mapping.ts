@@ -14,8 +14,8 @@ export const productPostProcessingMapping = (product: ProductDto) => {
       const roundingOption = variant.roundingOption;
       variant.finalPrice =
         Math.ceil(rawPrice / roundingOption) * roundingOption;
-      const { profitMargin, price, ...rest } = variant;
-      return rest;
+      // const { profitMargin, price, ...rest } = variant;
+      return variant;
     },
   );
   // .filter(Boolean);

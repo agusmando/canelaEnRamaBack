@@ -28,7 +28,7 @@ export const initSupertokens = () =>
       // learn more about this on https://supertokens.com/docs/session/appinfo
       appName: "Canela en Rama",
       apiDomain: "http://localhost:8080",
-      websiteDomain: "http://localhost:3000",
+      websiteDomain: "http://localhost:5173",
       apiBasePath: "/api/auth",
       websiteBasePath: "/auth",
     },

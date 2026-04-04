@@ -5,4 +5,8 @@ export class UserService {
   constructor() {
     this.userRepository = new UserRepository();
   }
+
+  async findOneBySupertokensId(supertokensId: string) {
+    return this.userRepository.findOneBySupertokensId(supertokensId);
+  }
 }

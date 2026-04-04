@@ -141,6 +141,12 @@ export default function mappingSelector(entity: string) {
             (module) => module.orderItemUpdateMapping,
           ),
       };
+    case "user":
+      return {
+        search: import("../mappings/user/user-search.mapping.js").then(
+          (module) => module.userSearchQueryMapping,
+        ),
+      };
   }
 
   // throw new Error(`No mapping found for entity: ${entity}`);

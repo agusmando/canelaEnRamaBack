@@ -27,7 +27,7 @@ export const initSupertokens = () =>
     appInfo: {
       // learn more about this on https://supertokens.com/docs/session/appinfo
       appName: "Canela en Rama",
-      apiDomain: "http://localhost:8080",
+      apiDomain: "https://canelaenramaback.onrender.com",
       websiteDomain: "http://localhost:5173",
       apiBasePath: "/api/auth",
       websiteBasePath: "/auth",

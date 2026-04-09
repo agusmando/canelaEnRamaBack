@@ -27,6 +27,9 @@ export const requireRole = (allowedRoles: string[]) => {
     const { roles } = await UserRoles.getRolesForUser(tenantId, userId);
     // Verificamos si el usuario tiene al menos uno de los roles permitidos
     const hasRole = roles.some((role) => allowedRoles.includes(role));
+    console.log("hasRole", hasRole)
+    console.log("roles", roles)
+    console.log("allowedRoles", allowedRoles)
     if (!hasRole) {
       const response = new BaseResponse(
         403,

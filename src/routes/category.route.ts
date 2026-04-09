@@ -5,7 +5,7 @@ const router = express.Router();
 
 const categoryController = new CategoryController();
 
-const staff = ["Admin", "Employee"];
+const staff = ["ADMIN", "EMPLOYEE"];
 
 router
   .route("/")

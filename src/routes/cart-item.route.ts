@@ -5,7 +5,7 @@ const router = express.Router();
 
 const cartItemController = new CartItemController();
 
-const staff = ["Admin", "Employee"];
+const staff = ["ADMIN", "EMPLOYEE"];
 
 router
   .route("/")
@@ -27,7 +27,7 @@ router
 //   .route("/:id/products")
 //   .put(
 //     isAuthenticated,
-//     requireRole(["Admin"]),
+//     requireRole(["ADMIN"]),
 //     cartItemController.addBrandProducts.bind(cartItemController)
 //   )
 

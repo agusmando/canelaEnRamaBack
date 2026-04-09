@@ -7,7 +7,7 @@ const router = express.Router();
 
 const productController = new ProductController();
 
-const adminRoles = ["Admin", "Employee"];
+const adminRoles = ["ADMIN", "EMPLOYEE"];
 
 router
   .route("/")
@@ -39,12 +39,12 @@ router
   .route("/:id/active/")
   .delete(
     isAuthenticated,
-    requireRole(["Admin"]),
+    requireRole(["ADMIN"]),
     productController.deactivate.bind(productController)
   )
   .put(
     isAuthenticated,
-    requireRole(["Admin"]),
+    requireRole(["ADMIN"]),
     productController.activate.bind(productController)
   );
 export default router;

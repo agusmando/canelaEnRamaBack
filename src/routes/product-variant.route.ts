@@ -7,7 +7,7 @@ const router = express.Router();
 
 const productVariantController = new ProductVariantController();
 
-const adminRoles = ["Admin", "Employee"];
+const adminRoles = ["ADMIN", "EMPLOYEE"];
 
 router.route("/")  
   .post(

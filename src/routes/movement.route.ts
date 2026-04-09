@@ -5,7 +5,7 @@ const router = express.Router();
 
 const movementController = new MovementController();
 
-const staff = ["Admin", "Employee"];
+const staff = ["ADMIN", "EMPLOYEE"];
 
 router.use(isAuthenticated);
 router.use(requireRole(staff));

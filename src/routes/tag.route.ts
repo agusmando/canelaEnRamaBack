@@ -5,7 +5,7 @@ const router = express.Router();
 
 const tagsController = new TagController();
 
-const staff = ["Admin", "Employee"];
+const staff = ["ADMIN", "EMPLOYEE"];
 
 router
   .route("/")

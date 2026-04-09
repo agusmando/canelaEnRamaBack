@@ -5,7 +5,7 @@ const router = express.Router();
 
 const offerController = new OfferController();
 
-const staff = ["Admin", "Employee"];
+const staff = ["ADMIN", "EMPLOYEE"];
 
 router.use(isAuthenticated);
 router.use(requireRole(staff));

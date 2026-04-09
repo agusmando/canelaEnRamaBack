@@ -5,7 +5,7 @@ const router = express.Router();
 
 const orderItemController = new OrderItemController();
 
-const staff = ["Admin", "Employee"];
+const staff = ["ADMIN", "EMPLOYEE"];
 
 router
   .route("/")
@@ -27,7 +27,7 @@ router
 //   .route("/:id/products")
 //   .put(
 //     isAuthenticated,
-//     requireRole(["Admin"]),
+//     requireRole(["ADMIN"]),
 //     orderItemController.addBrandProducts.bind(orderItemController)
 //   )
 

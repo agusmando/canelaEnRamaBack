@@ -5,6 +5,9 @@ import { UpdateOrderDto } from "../dto/order/update-order.dto.js";
 import { translatePrismaError } from "../errors/infra/translatePrismaError.js";
 
 const ORDER_INCLUDE = {
+  shipment: {
+    include: { events: { orderBy: [{ createdAt: "asc" as const }, { id: "asc" as const }] } },
+  },
   orderItems: {
     orderBy: { id: "asc" as const },
     include: {

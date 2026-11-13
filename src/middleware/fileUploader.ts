@@ -9,7 +9,14 @@ const imageService = new ImageService();
 export function cloudinaryUpload(folderOrFn?: string | ((req: any) => string)) {
   return async (req: any, _res: any, next: any) => {
     try {
-      if (!req.files?.length && !req.file) {
+      // req.files es un array con upload.array() y un objeto { campo: [archivos] }
+      // con upload.fields() (banners): ambos casos cuentan como "hay archivos".
+      const hasFiles =
+        !!req.file ||
+        (Array.isArray(req.files)
+          ? req.files.length > 0
+          : !!req.files && Object.values(req.files).some((arr: any) => arr?.length));
+      if (!hasFiles) {
         return next();
       }
       // debugging: ensure multer ran

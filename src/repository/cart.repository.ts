@@ -25,6 +25,11 @@ export class CartRepository extends GenericRepositoryImpl<CartDto, CreateCartDto
     super("cart");
   }
 
+  /** Listados con `detalle`: mismas relaciones que el carrito (ofertas incluidas) para poder cotizarlo. */
+  includeQuery(): Record<string, any> {
+    return CART_INCLUDE;
+  }
+
   /** Busca por token de invitado (sessionId) o por id de usuario. */
   async getCart(token: string, tx?: any): Promise<any> {
     try {

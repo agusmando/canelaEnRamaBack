@@ -13,6 +13,7 @@ import { ConflictError } from "../errors/application/ConflictError.js";
 import { ForbidenError } from "../errors/domain/auth/ForbidenError.js";
 import type { Actor } from "../middleware/auth.middleware.js";
 import { CartService } from "./cart.service.js";
+import { ShipmentRepository } from "../repository/shipment.repository.js";
 
 export const PAYMENT_TYPES = ["DEBIT", "CREDIT", "CASH", "TRANSFER", "MERCADOPAGO"];
 const ORDER_STATUSES = ["PENDING", "PROCESSING", "SHIPPED", "DELIVERED", "CANCELLED"];
@@ -55,6 +56,7 @@ export class OrderService extends GenericServiceImpl<OrderDto, CreateOrderDto, U
     private readonly stockRepository = new StockMovementRepository(),
     private readonly pricingService = new PricingService(),
     private readonly cartService = new CartService(),
+    private readonly shipmentRepository = new ShipmentRepository(),
   ) {
     super(orderRepository);
   }
@@ -266,6 +268,21 @@ export class OrderService extends GenericServiceImpl<OrderDto, CreateOrderDto, U
       fields.totalPrice = Math.round(fields.totalPrice * 100) / 100;
       if (order.orderItems.every((it: any) => CLOSED_ITEM_STATUSES.includes(it.status))) {
         fields.status = "CANCELLED";
+      }
+
+      // Si la orden se cancela, su envío (si no terminó) también
+      const shipment = order.shipment;
+      if (
+        fields.status === "CANCELLED" &&
+        shipment &&
+        !["DELIVERED", "RETURNED", "CANCELLED"].includes(shipment.status)
+      ) {
+        await this.shipmentRepository.updateShipment(
+          shipment.id,
+          { status: "CANCELLED" },
+          { status: "CANCELLED", description: "Envío cancelado junto con el pedido" },
+          tx,
+        );
       }
 
       return this.orderRepository.updateOrderFields(id, fields, tx);

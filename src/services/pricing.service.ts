@@ -16,6 +16,40 @@ export type PriceQuote = {
   priceUnits: number;
 };
 
+/** Oferta vigente de una variante, resumida para mostrar en catálogo y dashboard. */
+export type ActiveOfferInfo = {
+  id: number;
+  scope: "VARIANT" | "PRODUCT";
+  discountType: string;
+  discountValue: number | null;
+  discountQuantity: number | null;
+  quantityToGet: number | null;
+  finishTime: Date | null;
+  /** Etiqueta corta: "20% off", "-$100", "3x2", "20% off desde 3". */
+  label: string;
+};
+
+const fmtMoney = (n: number) => "$" + Number(n).toLocaleString("es-AR", { maximumFractionDigits: 2 });
+
+export function offerLabel(o: OfferDto): string {
+  const value = Number(o.discountValue ?? 0);
+  switch (o.discountType) {
+    case "PERCENTAGE":
+      return `${value}% off`;
+    case "FIXED":
+      return `-${fmtMoney(value)}`;
+    case "BUY_ONE_GET_MORE":
+    case "BUY_MORE_GET_MORE":
+      return `${o.discountQuantity}x${o.quantityToGet}`;
+    case "BUY_MORE_GET_DISCOUNT":
+      return `${value}% off desde ${o.discountQuantity}`;
+    case "BUY_MORE_GET_FIXED_DISCOUNT":
+      return `-${fmtMoney(value)} desde ${o.discountQuantity}`;
+    default:
+      return "Oferta";
+  }
+}
+
 /**
  * Cálculo de precios de venta. Única fuente para carrito, órdenes y catálogo.
  */
@@ -84,6 +118,44 @@ export class PricingService {
       discountAppliedSnapshot: round2(Math.max(0, listTotal - total)),
       offerTypeSnapshot: offerType,
       priceUnits,
+    };
+  }
+
+  /**
+   * Oferta vigente de una variante y su precio por unidad de precio (kg/u)
+   * con la oferta aplicada a 1 unidad. `offerPrice` es null si la oferta
+   * depende de la cantidad (ej. 3x2) o no baja el precio.
+   */
+  variantOffer(
+    variant: any,
+    productOffers?: OfferDto[],
+  ): { activeOffer: ActiveOfferInfo | null; offerPrice: number | null } {
+    const variantOffers: OfferDto[] = variant?.offers ?? [];
+    const offer = this.selectOffer(
+      variantOffers,
+      productOffers ?? variant?.product?.offers ?? [],
+      Number(variant?.currentStock ?? 0),
+      Number(variant?.stockThreshold ?? 0),
+    );
+    if (!offer) return { activeOffer: null, offerPrice: null };
+    const unitPrice = computeFinalPrice(variant);
+    let offerPrice: number | null = null;
+    if (unitPrice > 0) {
+      const after = round2(this.offerService.applyOffer(unitPrice, 1, offer).unitAfter);
+      if (after < unitPrice) offerPrice = after;
+    }
+    return {
+      activeOffer: {
+        id: offer.id,
+        scope: variantOffers.some((o) => o.id === offer.id) ? "VARIANT" : "PRODUCT",
+        discountType: offer.discountType,
+        discountValue: offer.discountValue ?? null,
+        discountQuantity: offer.discountQuantity ?? null,
+        quantityToGet: offer.quantityToGet ?? null,
+        finishTime: offer.finishTime ?? null,
+        label: offerLabel(offer),
+      },
+      offerPrice,
     };
   }
 

@@ -26,10 +26,9 @@ model Product {
   variants ProductVariant[]
 
   // Medidas (Esto define qué es físicamente)
-  measure       Measure @default(KG)
-  offers        Offer[]
-  // Review      Review[]
-  // offers      Offer[]
+  measure Measure  @default(KG)
+  offers  Offer[]
+  reviews Review[]
 }
 
 model ProductVariant {
@@ -37,17 +36,17 @@ model ProductVariant {
   productId Int
 
   // Atributos
-  name             String      @default("default")
+  name             String  @default("default")
   price            Float
-  profitMargin     Float       @default(0)
-  currentStock     Int         @default(0)
-  active           Boolean     @default(true) // Apaga solo esta presentación
-  contentMeasure   Measure @default(KG) 
-  contentAmount    Int?        // Por ejemplo un frasco de 60cc, 150ml, 360g, etc
+  profitMargin     Float   @default(0)
+  currentStock     Int     @default(0)
+  active           Boolean @default(true) // Apaga solo esta presentación
+  contentMeasure   Measure @default(KG)
+  contentAmount    Int? // Por ejemplo un frasco de 60cc, 150ml, 360g, etc
   packagingOptions Float[]
-  requestTime      String      @default("")
-  stockThreshold   Int         @default(0)
-  roundingOption   Int    @default(10)
+  requestTime      String  @default("")
+  stockThreshold   Int     @default(0)
+  roundingOption   Int     @default(10)
 
   // Relación con el padre
   product       Product      @relation(fields: [productId], references: [id])
@@ -57,13 +56,14 @@ model ProductVariant {
   // Tengo componentes (si soy un Mix):
   hasComponents Dependency[] @relation("MixVariant")
 
-  movements     StockMovement[]
-  
-  offers        Offer[]
-  images        Image[]
+  movements StockMovement[]
+
+  offers Offer[]
+  images Image[]
 
   CartItem   CartItem[]
   orderItems OrderItem[]
+  reviews    Review[]
 
   availableWeb       Boolean @default(true)
   availablePedidosYa Boolean @default(true)
@@ -179,18 +179,104 @@ enum DiscountType {
   BUY_MORE_GET_FIXED_DISCOUNT // Compra un producto y obtienes un descuento fijo (usa discountQuantity igual, pero usa discountValue para saber el descuento fijo)
 }
 
-// model Review {
-//   id        Int      @id @default(autoincrement())
-//   productId Int
-//   userSuperTokensId    Int
-//   rating    Int
-//   comment   String?
-//   createdAt DateTime @default(now())
-//   updatedAt DateTime @updatedAt
+// Opinión de un comprador sobre una variante. Se publica cuando el staff la aprueba.
+model Review {
+  id                Int          @id @default(autoincrement())
+  productId         Int // desnormalizado para listar/promediar por producto
+  productVariantId  Int
+  userSuperTokensId String
+  orderId           Int? // pedido ENTREGADO que acredita la compra
+  rating            Int // 1..5
+  title             String?
+  comment           String?
+  status            ReviewStatus @default(PENDING)
+  rejectionReason   String?
+  reply             String? // respuesta pública de la tienda
+  repliedAt         DateTime?
+  moderatedAt       DateTime?
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
 
-//   product Product @relation(fields: [productId], references: [id])
-//   user    User    @relation(fields: [userSuperTokensId], references: [id])
-// }
+  product        Product        @relation(fields: [productId], references: [id])
+  productVariant ProductVariant @relation(fields: [productVariantId], references: [id])
+  user           User           @relation(fields: [userSuperTokensId], references: [supertokensId])
+
+  @@unique([userSuperTokensId, productVariantId])
+  @@index([productId, status])
+  @@index([status])
+}
+
+enum ReviewStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+// Reseñas traídas de Google Places (caché local; Google devuelve hasta 5 por consulta)
+model GoogleReview {
+  id             Int       @id @default(autoincrement())
+  googleId       String    @unique // "places/{placeId}/reviews/{reviewId}"
+  authorName     String
+  authorPhotoUrl String?
+  authorUrl      String?
+  rating         Int
+  text           String?
+  language       String?
+  relativeTime   String?
+  publishedAt    DateTime?
+  featured       Boolean   @default(false) // se muestra en la web
+  active         Boolean   @default(true)
+  fetchedAt      DateTime  @default(now())
+}
+
+// Resumen del local en Google (una fila por placeId)
+model GooglePlace {
+  placeId         String    @id
+  name            String?
+  rating          Float?
+  userRatingCount Int?
+  googleMapsUri   String?
+  lastSyncAt      DateTime?
+  lastError       String?
+}
+
+model Banner {
+  id                   Int             @id @default(autoincrement())
+  placement            BannerPlacement
+  name                 String // nombre interno y alt de la imagen
+  eyebrow              String?
+  headline             String?
+  text                 String?
+  ctaLabel             String?
+  linkUrl              String?
+  size                 BannerSize? // solo HOME_RECOMMENDATION
+  desktopImageUrl      String?
+  desktopImagePublicId String?
+  mobileImageUrl       String?
+  mobileImagePublicId  String?
+  backgroundColor      String?
+  textColor            String?
+  position             Int             @default(0)
+  startsAt             DateTime?
+  endsAt               DateTime?
+  active               Boolean         @default(true)
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime        @updatedAt
+
+  @@index([placement, active, position])
+}
+
+enum BannerPlacement {
+  HOME_HERO
+  HOME_RECOMMENDATION
+  CATALOG_STRIP
+  ANNOUNCEMENT_BAR
+}
+
+enum BannerSize {
+  SQUARE
+  WIDE
+}
 
 model Image {
   id               Int            @id @default(autoincrement())
@@ -211,6 +297,7 @@ model User {
   updatedAt     DateTime @updatedAt
   cart          Cart?
   orders        Order[]
+  reviews       Review[]
 
   // Ejemplo: si después quieres órdenes:
 }
@@ -263,6 +350,7 @@ model Order {
   // PENDING (recién creada, esperando confirmación/pago) -> PROCESSING -> SHIPPED -> DELIVERED
   status           OrderStatus @default(PENDING)
   orderItems       OrderItem[]
+  shipment         Shipment?
 }
 
 enum OrderStatus {
@@ -276,17 +364,17 @@ enum OrderStatus {
 model OrderItem {
   id               Int  @id @default(autoincrement())
   orderId          Int
-  productVariantId Int? 
+  productVariantId Int?
 
-  productNameSnapshot String // Ej: "Yogurt"
-  variantNameSnapshot String // Ej: "Vainilla"
-  unitPriceSnapshot   Float // El precio al que se vendió EXACTAMENTE ese día
-  discountAppliedSnapshot Float @default(0) // El descuento que se aplicó EXACTAMENTE ese dia
-  offerTypeSnapshot String @default("") // Ej: "BUY_ONE_GET_MORE"
+  productNameSnapshot     String // Ej: "Yogurt"
+  variantNameSnapshot     String // Ej: "Vainilla"
+  unitPriceSnapshot       Float // El precio al que se vendió EXACTAMENTE ese día
+  discountAppliedSnapshot Float  @default(0) // El descuento que se aplicó EXACTAMENTE ese dia
+  offerTypeSnapshot       String @default("") // Ej: "BUY_ONE_GET_MORE"
 
-  quantity        Int
-  status          OrderItemStatus @default(FULFILLED)
-  awaitingStockAt DateTime?
+  quantity           Int
+  status             OrderItemStatus @default(FULFILLED)
+  awaitingStockAt    DateTime?
   selectedBulkOption Float?
 
   Order          Order           @relation(fields: [orderId], references: [id])
@@ -301,13 +389,63 @@ enum OrderItemStatus {
   RETURNED // El cliente lo regresa
 }
 
-// model Shipment {
-//   id        Int       @id @default(autoincrement())
-//   orderId   Int
-//   status    String
-//   shippedAt DateTime?
-//   createdAt DateTime  @default(now())
-//   updatedAt DateTime  @updatedAt
+// Envío o retiro de una orden (1:1). Sin integración con transportistas: el
+// staff carga transportista/código externo y va avanzando el estado.
+model Shipment {
+  id                  Int            @id @default(autoincrement())
+  orderId             Int            @unique
+  trackingCode        String         @unique // código público de seguimiento
+  method              ShipmentMethod @default(DELIVERY)
+  status              ShipmentStatus @default(PENDING)
+  carrier             String?
+  carrierTrackingCode String?
+  carrierTrackingUrl  String?
+  recipientName       String?
+  phone               String?
+  address             String?
+  city                String?
+  province            String?
+  postalCode          String?
+  notes               String?
+  cost                Float          @default(0)
+  estimatedDeliveryAt DateTime?
+  shippedAt           DateTime?
+  deliveredAt         DateTime?
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
 
-//   order Order @relation(fields: [orderId], references: [id])
-// }
+  order  Order           @relation(fields: [orderId], references: [id])
+  events ShipmentEvent[]
+
+  @@index([status])
+}
+
+model ShipmentEvent {
+  id          Int            @id @default(autoincrement())
+  shipmentId  Int
+  status      ShipmentStatus
+  description String?
+  location    String?
+  createdAt   DateTime       @default(now())
+
+  shipment Shipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+
+  @@index([shipmentId])
+}
+
+enum ShipmentMethod {
+  DELIVERY
+  PICKUP
+}
+
+enum ShipmentStatus {
+  PENDING
+  PREPARING
+  READY_FOR_PICKUP
+  SHIPPED
+  OUT_FOR_DELIVERY
+  FAILED_ATTEMPT
+  DELIVERED
+  RETURNED
+  CANCELLED
+}

@@ -14,6 +14,10 @@ import cartItemRoutes from "./cart-item.route.js";
 import orderRoutes from "./order.route.js";
 import orderItemRoutes from "./order-item.route.js";
 import userRoutes from "./user.route.js";
+import shipmentRoutes from "./shipment.route.js";
+import reviewRoutes from "./review.route.js";
+import googleReviewRoutes from "./google-review.route.js";
+import bannerRoutes from "./banner.route.js";
 
 router.get("/health", (_req, res) => {
   res.status(200).json({ status: "ok" });
@@ -33,5 +37,9 @@ router.use("/cart", cartRoutes);
 router.use("/order/item", orderItemRoutes);
 router.use("/order", orderRoutes);
 router.use("/user", userRoutes);
+router.use("/shipment", shipmentRoutes);
+router.use("/review", reviewRoutes);
+router.use("/google-review", googleReviewRoutes);
+router.use("/banner", bannerRoutes);
 
 export default router;

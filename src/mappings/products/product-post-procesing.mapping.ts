@@ -5,6 +5,8 @@ export const productPostProcessingMapping = (product: ProductDto) => {
   if (!product?.variants?.length) return product;
   return {
     ...product,
-    variants: product.variants.map(productVariantPostProcessingMapping),
+    variants: product.variants.map((v) =>
+      productVariantPostProcessingMapping(v, (product as any).offers),
+    ),
   };
 };

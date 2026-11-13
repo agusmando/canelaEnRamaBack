@@ -48,9 +48,10 @@ const statusFor = (err: any): number => {
     case err instanceof StoreProcedureError:
       return err.businessMessage ? 409 : 500;
     // INFRASTRUCTURE ERRORS
+    case err instanceof ExternalServiceError:
+      return 502; // falló un servicio de terceros (ej. Google Places)
     case err instanceof ServerError:
     case err instanceof DatabaseError:
-    case err instanceof ExternalServiceError:
     default:
       return 500;
   }
@@ -73,7 +74,7 @@ export const errorHandler = (rawErr: any, req: any, res: any, next: any) => {
 
   // No exponemos detalles internos de errores 500 en producción
   const message =
-    status >= 500 && process.env.NODE_ENV === "production"
+    status >= 500 && status !== 502 && process.env.NODE_ENV === "production"
       ? "Internal server error"
       : err.message;
 

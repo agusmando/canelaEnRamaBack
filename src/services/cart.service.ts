@@ -56,6 +56,19 @@ export class CartService extends GenericServiceImpl<CartDto, CreateCartDto, Upda
     super(cartRepository);
   }
 
+  /** Listado de staff: con `detalle`, cada carrito viene cotizado (ofertas y totales). */
+  async getListedElements(
+    filters: any,
+    paginate = false,
+    currentPage = 1,
+    amountPerPage = 10,
+    detalle = false,
+  ) {
+    const result = await super.getListedElements(filters, paginate, currentPage, amountPerPage, detalle);
+    if (!detalle) return result;
+    return { ...result, entityList: result.entityList.map((c: any) => this.withPricing(c)) };
+  }
+
   /**
    * Crea un carrito. Si el usuario logueado ya tiene uno, le suma los ítems y
    * lo devuelve (no falla por la unique constraint).

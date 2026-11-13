@@ -1,24 +1,23 @@
 export class MovementDto {
   id: number;
-  productId: number;
+  productVariantId: number;
   quantity: number;
+  priceAtTime: number;
   type: string;
   createdAt: Date;
-  updatedAt: Date;
-
   constructor(
     id: number,
-    productId: number,
+    productVariantId: number,
     quantity: number,
+    priceAtTime: number,
     type: string,
     createdAt: Date,
-    updatedAt: Date
   ) {
     this.id = id;
-    this.productId = productId;
+    this.productVariantId = productVariantId;
     this.quantity = quantity;
+    this.priceAtTime = priceAtTime;
     this.type = type;
     this.createdAt = createdAt;
-    this.updatedAt = updatedAt;
   }
 }

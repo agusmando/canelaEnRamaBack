@@ -1,8 +1,7 @@
 import { CreateMovementDto } from "../dto/movement/create-movement.dto.js";
 import { MovementDto } from "../dto/movement/movement.dto.js";
+import { StockMovementService } from "../services/stockMovement.service.js";
 import { GenericControllerImpl } from "./generic-impl.controller.js";
-
-// const tagService = new TagService();
 
 export class MovementController extends GenericControllerImpl<
   MovementDto,
@@ -10,6 +9,6 @@ export class MovementController extends GenericControllerImpl<
   CreateMovementDto
 > {
   constructor() {
-    super("stockMovement");
+    super(new StockMovementService());
   }
 }

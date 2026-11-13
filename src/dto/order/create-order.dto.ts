@@ -8,6 +8,8 @@ export class CreateOrderDto {
   status: string;
   orderItems: CreateOrderItemDto[] = [];
   estimatedReadyAt?: Date;
+  /** Checkout: usa las líneas del carrito del usuario y lo vacía. */
+  fromCart?: boolean;
 
   constructor(
     userSuperTokensId: string,

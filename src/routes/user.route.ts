@@ -1,17 +1,12 @@
 import express from "express";
 import { UserController } from "../controllers/user.controller.js";
-import { isAuthenticated, requireRole } from "../middleware/auth.middleware.js";
-const router = express.Router();
+import { attachRoles, isAuthenticated } from "../middleware/auth.middleware.js";
 
+const router = express.Router();
 const userController = new UserController();
 
-// const staff = ["ADMIN", "EMPLOYEE"];
-
-// router.use(isAuthenticated);
-// router.use(requireRole(staff));
-
-router
-  .route("/:supertokensId")
-  .get(userController.getOneBySupertokensId.bind(userController));
+router.use(isAuthenticated, attachRoles);
+router.get("/me", userController.getMe.bind(userController));
+router.get("/:supertokensId", userController.getOneBySupertokensId.bind(userController));
 
 export default router;

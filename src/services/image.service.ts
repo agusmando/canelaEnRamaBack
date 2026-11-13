@@ -6,18 +6,8 @@ export class ImageService {
     this.imageRepository = new ImageRepository();
   }
 
-  async uploadBuffer(
-    buffer: Buffer,
-    mimetype: string,
-    folder?: string,
-    publicId?: string,
-  ) {
-    return this.imageRepository.uploadBuffer(
-      buffer,
-      mimetype,
-      folder,
-      publicId,
-    );
+  async uploadBuffer(buffer: Buffer, mimetype: string, folder?: string, publicId?: string) {
+    return this.imageRepository.uploadBuffer(buffer, mimetype, folder, publicId);
   }
 
   async abortImageUpload(uploadedFilesByField?: any[]) {
@@ -26,43 +16,38 @@ export class ImageService {
   }
 
   createImageQuery(images?: any) {
-    let result: any;
-    const filesForEntity: any[] = Array.isArray(images) ? images : [];
-    // Si tiene imágenes disponibles, las gestiona
-    if (filesForEntity.length > 0) {
-      const imagesToCreate =
-        filesForEntity.length > 0
-          ? filesForEntity.map((u: any) => ({
-              public_id: u.public_id,
-              secure_url: u.secure_url,
-            }))
-          : undefined;
-
-      result = imagesToCreate ? { images: { create: imagesToCreate } } : {};
-    }
-    return result;
+    const files: any[] = Array.isArray(images) ? images : [];
+    if (files.length === 0) return {};
+    return {
+      images: {
+        create: files.map((u: any) => ({ public_id: u.public_id, secure_url: u.secure_url })),
+      },
+    };
   }
 
-  async deleteImage(foundImages: { public_id: string; id: number }[]) {
-    let imagePromises: any[] = [];
-    return this.imageRepository.withTransaction(async (tx) => {
-      foundImages.forEach(async (image: any) => {
-        imagePromises.push(
-          this.imageRepository.deleteImageDb(image.id, tx),
-        );
-        imagePromises.push(
-          this.imageRepository.cloudinaryDelete(image.publicId),
-        );
-      });
-      return await Promise.all(imagePromises);
-    });
+  /**
+   * Borra las imágenes de la base dentro de la transacción y devuelve los
+   * public_id para eliminarlos de Cloudinary DESPUÉS del commit
+   * (ver `deleteFromCloudinary`). Así un rollback no deja imágenes huérfanas.
+   */
+  async removeImagesDb(
+    removeImages: { id: number }[] | undefined,
+    variantId: number,
+    tx?: any,
+  ): Promise<string[]> {
+    if (!removeImages?.length) return [];
+    const ids = removeImages.map((image) => Number(image.id)).filter(Boolean);
+    const found = await this.imageRepository.findManyImagesDb(ids, tx);
+    const owned = found.filter((img: any) => img.productVariantId === variantId);
+    await this.imageRepository.deleteManyImagesDb(
+      owned.map((img: any) => img.id),
+      variantId,
+      tx,
+    );
+    return owned.map((img: any) => img.public_id);
   }
 
-  async removeImages(removeImages?: { id: number }[]) {
-    if (removeImages && removeImages.length > 0) {
-      const imageIds = removeImages.map((image: any) => image.id);
-      const foundImages = await this.imageRepository.findManyImagesDb(imageIds);
-      return await this.deleteImage(foundImages);
-    }
+  async deleteFromCloudinary(publicIds: string[]) {
+    await Promise.allSettled(publicIds.map((id) => this.imageRepository.cloudinaryDelete(id)));
   }
 }

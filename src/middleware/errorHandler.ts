@@ -4,7 +4,7 @@ import {
   ConflictError,
   NotFoundError,
   ServerError,
-  ValidationError
+  ValidationError,
 } from "../errors/application/index-app.error.js"; // application errors
 import {
   ForbidenError,
@@ -14,60 +14,68 @@ import {
 import {
   InvalidMeasureError,
   ProductHasNoCategoryError,
-  ProductHasNoVariantsError
+  ProductHasNoVariantsError,
 } from "../errors/domain/product/index-product.error.js";
 import {
   DatabaseError,
-  ExternalServiceError
+  ExternalServiceError,
 } from "../errors/infra/index-infra.error.js";
+import { StoreProcedureError } from "../errors/infra/StoreProcedureError.js";
+import { translatePrismaError } from "../errors/infra/translatePrismaError.js";
 
-
-export const errorHandler = (err: any, req: any, res: any, next: any) => {
+const statusFor = (err: any): number => {
   switch (true) {
     // APPLICATION ERRORS
     case err instanceof BadRequestError:
-      res.status(400).json(new BaseResponse(400, err.message, {}));
-      break;
-    case err instanceof ConflictError:
-      res.status(409).json(new BaseResponse(409, err.message, {}));
-      break;
-    case err instanceof NotFoundError:
-      res.status(404).json(new BaseResponse(404, err.message, {}));
-      break;
-    case err instanceof ServerError:
-      res.status(500).json(new BaseResponse(500, err.message, {}));
-      break;
     case err instanceof ValidationError:
-      res.status(400).json(new BaseResponse(400, err.message, {}));
-      break;
+      return 400;
+    case err instanceof ConflictError:
+      return 409;
+    case err instanceof NotFoundError:
+      return 404;
     // DOMAIN AUTH ERRORS
     case err instanceof ForbidenError:
-      res.status(403).json(new BaseResponse(403, err.message, {}));
-      break;
+      return 403;
     case err instanceof InvalidCredentialsError:
-      res.status(401).json(new BaseResponse(401, err.message, {}));
-      break;
     case err instanceof UnAuthorizedError:
-      res.status(401).json(new BaseResponse(401, err.message, {}));
-      break;
+      return 401;
     // DOMAIN PRODUCT ERRORS
     case err instanceof InvalidMeasureError:
-      res.status(400).json(new BaseResponse(400, err.message, {}));
-      break;
     case err instanceof ProductHasNoCategoryError:
-      res.status(400).json(new BaseResponse(400, err.message, {}));
-      break;
     case err instanceof ProductHasNoVariantsError:
-      res.status(400).json(new BaseResponse(400, err.message, {}));
-      break;
+      return 400;
+    // Regla de negocio violada dentro de una función SQL (RAISE EXCEPTION)
+    case err instanceof StoreProcedureError:
+      return err.businessMessage ? 409 : 500;
     // INFRASTRUCTURE ERRORS
+    case err instanceof ServerError:
     case err instanceof DatabaseError:
-      res.status(500).json(new BaseResponse(500, err.message, {}));
-      break;
     case err instanceof ExternalServiceError:
-      res.status(500).json(new BaseResponse(500, err.message, {}));
-      break;
     default:
-      res.status(500).json(new BaseResponse(500, err.message, {}));
+      return 500;
   }
+};
+
+export const errorHandler = (rawErr: any, req: any, res: any, next: any) => {
+  if (res.headersSent) return next(rawErr);
+
+  // JSON mal formado enviado por el cliente
+  if (rawErr?.type === "entity.parse.failed") {
+    return res.status(400).json(new BaseResponse(400, "Invalid JSON body", {}));
+  }
+
+  const err = translatePrismaError(rawErr);
+  const status = statusFor(err);
+
+  if (status >= 500) {
+    console.error(`[${req.method} ${req.originalUrl}]`, rawErr);
+  }
+
+  // No exponemos detalles internos de errores 500 en producción
+  const message =
+    status >= 500 && process.env.NODE_ENV === "production"
+      ? "Internal server error"
+      : err.message;
+
+  res.status(status).json(new BaseResponse(status, message, {}));
 };

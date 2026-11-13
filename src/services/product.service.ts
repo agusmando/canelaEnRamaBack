@@ -2,187 +2,133 @@ import { CreateProductDto } from "./../dto/products/create-product.dto.js";
 import { ProductDto } from "../dto/products/product.dto.js";
 import { UpdateProductDto } from "../dto/products/update-product.dto.js";
 import { UpdateProductTagDto } from "../dto/products/update-product-tag.dto.js";
-import { productPostProcessingMapping } from "../mappings/products/product-post-procesing.mapping.js";
 import {
   ProductHasNoVariantsError,
   InvalidMeasureError,
   ProductHasNoCategoryError,
 } from "../errors/domain/product/index-product.error.js";
-import {
-  ValidationError,
-  NotFoundError,
-  BadRequestError,
-} from "../errors/application/index-app.error.js";
+import { ValidationError, NotFoundError, BadRequestError } from "../errors/application/index-app.error.js";
 import { GenericServiceImpl } from "./generic-impl.service.js";
 import { ProductRepository } from "../repository/product.repository.js";
 import { ProductVariantRepository } from "../repository/product-variant.repository.js";
+import { StockMovementRepository } from "../repository/stockMovement.repository.js";
 import { ImageService } from "./image.service.js";
-import { StockMovementService } from "./stockMovement.service.js";
-import { StoreProcedureError } from "../errors/infra/StoreProcedureError.js";
-import { productVariantPostProcessingMapping } from "../mappings/product-variants/product-variant-post-procesing.mapping.js";
+
+/** Con multipart/form-data los arrays/objetos llegan como string JSON. */
+const parseJsonField = <T>(value: T | string | undefined): T | undefined => {
+  if (typeof value !== "string") return value;
+  try {
+    return JSON.parse(value) as T;
+  } catch {
+    throw new BadRequestError("JSON inválido en un campo del formulario");
+  }
+};
+
+/**
+ * `upload.array("image")` deja una lista plana de archivos subidos: se asignan
+ * a la primera variante. Si llega una lista por variante, se respeta.
+ */
+const groupFilesByVariant = (files: any): any[][] => {
+  if (!Array.isArray(files) || files.length === 0) return [];
+  return Array.isArray(files[0]) ? files : [files];
+};
 
 export class ProductService extends GenericServiceImpl<
   ProductDto,
   CreateProductDto,
   UpdateProductDto
 > {
-  productRepository: ProductRepository;
-  productVariantRepository: ProductVariantRepository;
-  stockMovementRepository: StockMovementService;
-  imageService: ImageService;
+  readonly productRepository: ProductRepository;
+  readonly productVariantRepository: ProductVariantRepository;
+  readonly stockRepository: StockMovementRepository;
+  readonly imageService: ImageService;
 
-  constructor() {
-    super("product");
-    this.productRepository = new ProductRepository();
-    this.productVariantRepository = new ProductVariantRepository();
-    this.stockMovementRepository = new StockMovementService();
-    this.imageService = new ImageService();
+  constructor(
+    productVariantRepository = new ProductVariantRepository(),
+    productRepository = new ProductRepository(productVariantRepository),
+    stockRepository = new StockMovementRepository(),
+    imageService = new ImageService(),
+  ) {
+    super(productRepository);
+    this.productRepository = productRepository;
+    this.productVariantRepository = productVariantRepository;
+    this.stockRepository = stockRepository;
+    this.imageService = imageService;
   }
 
-  async createProduct(
-    createData: CreateProductDto,
-    uploadedFilesByField: any[],
-  ): Promise<ProductDto> {
-    return this.productRepository.withTransaction(async (tx) => {
-      if (
-        createData.variants.length == 0 ||
-        !createData.variants ||
-        createData.measure == "" ||
-        !createData.measure ||
-        createData.categoryId == 0 ||
-        !createData.categoryId ||
-        !createData.name ||
-        createData.description == ""
-      ) {
-        uploadedFilesByField &&
-          (await this.imageService.abortImageUpload(uploadedFilesByField));
-        if (createData.variants.length == 0 || !createData.variants) {
-          throw new ProductHasNoVariantsError();
-        }
-        if (createData.measure == "" || !createData.measure) {
-          throw new InvalidMeasureError();
-        }
-        if (createData.categoryId == 0 || !createData.categoryId) {
-          throw new ProductHasNoCategoryError();
-        }
-        if (!createData.name || createData.description == "") {
-          throw new ValidationError(
-            "Product name and description are required for creating a product",
-          );
-        }
+  async createProduct(rawData: CreateProductDto, uploadedFiles: any[]): Promise<ProductDto> {
+    try {
+      const createData: CreateProductDto = {
+        ...rawData,
+        variants: parseJsonField(rawData?.variants) ?? [],
+        Tags: parseJsonField(rawData?.Tags),
+      };
+
+      if (!createData.variants?.length) throw new ProductHasNoVariantsError();
+      if (!createData.measure) throw new InvalidMeasureError();
+      if (!Number(createData.categoryId)) throw new ProductHasNoCategoryError();
+      if (!createData.name) {
+        throw new ValidationError("El nombre del producto es requerido");
+      }
+      if (!Number(createData.brandId)) {
+        throw new ValidationError("brandId es requerido");
       }
 
-      let stockManagement: { name: string; currentStock: number }[] = [];
-      createData.variants.forEach((variant) => {
-        if (!variant.currentStock) return variant.currentStock = 0;
-        stockManagement.push({
-          name: variant.name,
-          currentStock: variant.currentStock,
-        });
-        variant.currentStock = 0;
-      });
-      // Creating the product
-      const product = await this.productRepository.createProduct(
-        createData,
-        uploadedFilesByField,
-        tx,
-      );
+      // El stock inicial se registra como movimiento, no se escribe directo
+      const initialStocks = createData.variants.map((v) => Number(v.currentStock) || 0);
+      createData.variants = createData.variants.map((v) => ({ ...v, currentStock: 0 }));
 
-      // Post-creation processing
-      const postMapping = productVariantPostProcessingMapping;
-      const postVariants = product.variants.map((variant: any) => {
-        if (!variant.profitMargin || !variant.price) return variant;
-        return postMapping(variant);
-      });
-      product.variants = postVariants;
+      return await this.productRepository.withTransaction(async (tx) => {
+        const product = await this.productRepository.createProduct(
+          createData,
+          groupFilesByVariant(uploadedFiles),
+          tx,
+        );
 
-      // Recalculate mix price
-      if (createData?.variants && createData.variants.length > 0) {
-        for (const createdV of product.variants) {
-          for (const stagedV of stockManagement) {
-            if (createdV.hasComponents && createdV.hasComponents.length > 0) {
-              try {
-                await this.productVariantRepository.recalculateSingleMixPrice(
-                  createdV.id,
-                  tx,
-                );
-                await this.stockMovementRepository.processMixProduction(
-                  createdV.id,
-                  stagedV.currentStock,
-                  tx,
-                );
-              } catch (error) {
-                throw new StoreProcedureError(
-                  "recalculate_mix_price/process_mix_production",
-                  error,
-                );
-              }
+        // Las variantes anidadas se insertan en orden: ordenar por id = orden del body
+        const created = [...(product.variants ?? [])].sort((a: any, b: any) => a.id - b.id);
+        for (const [idx, variant] of created.entries()) {
+          const isMix = (variant.hasComponents?.length ?? 0) > 0;
+          if (isMix) {
+            await this.stockRepository.recalculateMixPrice(variant.id, tx);
+          }
+          const stock = initialStocks[idx] ?? 0;
+          if (stock > 0) {
+            if (isMix) {
+              await this.stockRepository.processMixProduction(variant.id, stock, tx);
             } else {
-              if (createdV.name == stagedV.name) {
-                console.log(
-                  "ingreso " + createdV.name + " " + createdV.currentStock,
-                );
-                await this.stockMovementRepository.createStockMovement(
-                  createdV.id,
-                  stagedV.currentStock,
-                  "IN",
-                  tx,
-                );
-              }
+              await this.stockRepository.createStockMovement(variant.id, stock, "IN", tx);
             }
           }
         }
-        // await this.productVariantRepository.recalculateSingleMixPrice(
-        //   product.variants[0].id,
-        //   tx,
-        // );
-        // await this.stockMovementRepository.createStockMovement(
-        //   product.variants[0].id,
-        //   tx,
-        // );
-      }
-
-      return product;
-    });
+        return this.productRepository.getById(product.id, tx);
+      });
+    } catch (error) {
+      await this.imageService.abortImageUpload(uploadedFiles);
+      throw error;
+    }
   }
 
+  /**
+   * Actualiza datos del producto y gestiona variantes en lote.
+   * Los precios/stock se modifican por variante (PUT /product/variant/:id).
+   */
   async updateProduct(id: number, data: UpdateProductDto): Promise<ProductDto> {
-    const postMapping = productPostProcessingMapping;
-
-    if (!id || id == 0) {
-      throw new NotFoundError();
-    }
-
-    if (!data) {
-      throw new BadRequestError();
-    }
+    if (!id) throw new NotFoundError();
+    if (!data) throw new BadRequestError();
 
     return this.productRepository.withTransaction(async (tx) => {
-      // Updating the product
-      let updatedProduct = await this.productRepository.update(id, data);
-      console.log("a ver la data updateada", updatedProduct);
+      const updated = await this.productRepository.update(id, data, tx);
+      if (!updated) throw new NotFoundError();
 
-      //Post-updating processing
-      if (postMapping && updatedProduct) {
-        updatedProduct = postMapping(updatedProduct as any);
-      }
+      const hasVariantChanges =
+        !!data.addVariants?.length ||
+        !!data.activateVariants?.length ||
+        !!data.deactivateVariants?.length ||
+        !!data.removeVariants?.length;
 
-      // Recalculate all mixes prices from one product
-      if (data.price || data.profitMargin) {
-        this.productVariantRepository.recalculateAllMixesFromProduct(
-          Number(id),
-          tx,
-        );
-      }
-
-      // Add, remove, activate or deactivate variants from one product
-      if (
-        (data.addVariants && data.addVariants.length > 0) ||
-        (data.activateVariants && data.activateVariants.length > 0) ||
-        (data.deactivateVariants && data.deactivateVariants.length > 0) ||
-        (data.removeVariants && data.removeVariants.length > 0)
-      ) {
-        await this.productVariantRepository.handleVariantsUpdate(
+      if (hasVariantChanges) {
+        const added = await this.productVariantRepository.handleVariantsUpdate(
           Number(id),
           data.activateVariants,
           data.deactivateVariants,
@@ -190,8 +136,15 @@ export class ProductService extends GenericServiceImpl<
           data.removeVariants,
           tx,
         );
+        // Stock inicial de las variantes nuevas como movimiento IN
+        for (const [idx, variant] of added.entries()) {
+          const stock = Number(data.addVariants?.[idx]?.currentStock) || 0;
+          if (stock > 0) {
+            await this.stockRepository.createStockMovement(variant.id, stock, "IN", tx);
+          }
+        }
       }
-      return updatedProduct;
+      return this.productRepository.getById(id, tx);
     });
   }
 
@@ -200,21 +153,10 @@ export class ProductService extends GenericServiceImpl<
     tagData: UpdateProductTagDto,
     addingTag: boolean,
   ): Promise<ProductDto> {
-    if (!productId || productId == 0) {
-      throw new NotFoundError();
+    if (!productId) throw new NotFoundError();
+    if (!tagData?.tagsId?.length) {
+      throw new ValidationError("Tag ids are required for adding tags to product");
     }
-    if (!tagData.tagsId || tagData.tagsId.length == 0) {
-      throw new ValidationError(
-        "Tag ids are required for adding tags to product",
-      );
-    }
-    return this.productRepository.withTransaction(async (tx) => {
-      return await this.productRepository.addRemoveTags(
-        Number(productId),
-        tagData,
-        addingTag,
-        tx,
-      );
-    });
+    return this.productRepository.addRemoveTags(Number(productId), tagData, addingTag);
   }
 }

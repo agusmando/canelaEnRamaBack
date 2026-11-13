@@ -1,47 +1,54 @@
 // src/utils/prismaUpdateEntityBuilder.ts
 
+const parseScalar = (map: any, val: any) => {
+  if (val === null || val === undefined) return val;
+  if (map.parseInt) return parseInt(val, 10);
+  if (map.parseFloat) return parseFloat(val);
+  if (map.parseBoolean) return val === true || val === "true" || val === 1 || val === "1";
+  if (map.parseFloatArray) {
+    const arr = Array.isArray(val) ? val : String(val).split(",");
+    return arr.map((v: any) => parseFloat(v)).filter((n: number) => !Number.isNaN(n));
+  }
+  return val;
+};
+
+/**
+ * Construye el `data` de un update de Prisma. Solo pasan los campos declarados
+ * en el mapping (whitelist): cualquier otro campo del body se ignora.
+ */
 export const prismaUpdateEntityBuilder = (data: any, mapping?: any) => {
   if (!data || typeof data !== "object") return data;
   const result: any = {};
 
-  console.log("prismaUpdateEntityBuilder", data);
   for (const key of Object.keys(data)) {
     const map = mapping?.[key];
     const val = data[key];
-    console.log("prismaUpdateEntityBuilder", key, val, map);
 
     // 1. Si no hay mapping para este campo, lo ignoramos (seguridad)
-    if (!map) continue;
+    if (!map || val === undefined) continue;
 
-    // 2. CASO ESPECIAL: Transformación personalizada (La clave para tu inventario)
-    // Pasamos 'val' (el valor del campo) y 'data' (el objeto completo por si necesitamos otros campos como 'movementType')
-    if (map.transform && typeof map.transform === "function") {
-      const transformedData = map.transform(val, data);
-      Object.assign(result, transformedData);
+    // 2. Transformación personalizada
+    if (typeof map.transform === "function") {
+      Object.assign(result, map.transform(val, data));
       continue;
     }
 
-    // 3. Lógica Estándar de Relaciones (Arrays)
+    // 3. Relaciones (Arrays): reemplaza la lista completa
     if (map.relation && Array.isArray(val)) {
-      // En updates, usualmente queremos 'set' para reemplazar la lista de relaciones (ej: Tags)
       result[key] = {
-        set: val.map((item: any) => ({
-          [map.connectField || "id"]: item.id || item,
-        })),
+        set: val.map((item: any) => ({ [map.connectField || "id"]: item?.id ?? item })),
       };
       continue;
     }
 
-    // 4. Lógica Estándar de Relaciones (Objeto único)
+    // 4. Relaciones (Objeto único)
     if (map.relation && val && typeof val === "object") {
-      result[key] = {
-        connect: { [map.connectField || "id"]: val.id || val },
-      };
+      result[key] = { connect: { [map.connectField || "id"]: val.id ?? val } };
       continue;
     }
 
     // 5. Campos simples (Primitivos)
-    result[map.field || key] = val;
+    result[map.field || key] = parseScalar(map, val);
   }
 
   return result;

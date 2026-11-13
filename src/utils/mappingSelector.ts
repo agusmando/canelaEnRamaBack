@@ -1,5 +1,4 @@
 export default function mappingSelector(entity: string) {
-  console.log("Selecting mapping for entity:", entity);
   switch (entity) {
     case "product":
       return {
@@ -92,7 +91,7 @@ export default function mappingSelector(entity: string) {
           (module) => module.offerCreateMapping,
         ),
         update: import("../mappings/offers/offer-update.mapping.js").then(
-          (module) => module.productUpdateMapping,
+          (module) => module.offerUpdateMapping,
         ),
       };
     case "cart":
@@ -109,6 +108,9 @@ export default function mappingSelector(entity: string) {
       };
     case "cartItem":
       return {
+        search: import("../mappings/cart-item/cart-item-search.mapping.js").then(
+          (module) => module.cartItemSearchQueryMapping,
+        ),
         create:
           import("../mappings/cart-item/cart-item-create.mapping.js").then(
             (module) => module.cartItemCreateMapping,
@@ -132,6 +134,9 @@ export default function mappingSelector(entity: string) {
       };
     case "orderItem":
       return {
+        search: import("../mappings/order-item/order-item-search.mapping.js").then(
+          (module) => module.orderItemSearchQueryMapping,
+        ),
         create:
           import("../mappings/order-item/order-item-create.mapping.js").then(
             (module) => module.orderItemCreateMapping,

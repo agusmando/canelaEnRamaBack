@@ -1,279 +1,196 @@
-import { StockMovementRepository } from './../repository/stockMovement.repository.js';
 import { CreateProductVariantDto } from "../dto/product-variant/create-product-variant.dto.js";
 import { ProductVariantDto } from "../dto/product-variant/product-variant.dto.js";
-import { GenericServiceImpl } from "./generic-impl.service.js";
 import { UpdateProductVariantDto } from "../dto/product-variant/update-product-variant.dto.js";
-import { productVariantPostProcessingMapping } from "../mappings/product-variants/product-variant-post-procesing.mapping.js";
+import { GenericServiceImpl } from "./generic-impl.service.js";
 import { ProductVariantRepository } from "../repository/product-variant.repository.js";
+import { StockMovementRepository } from "../repository/stockMovement.repository.js";
 import { NotFoundError } from "../errors/application/NotFoundError.js";
-import { BadRequestError } from "../errors/application/BadRequestError.js";
+import { ValidationError } from "../errors/application/ValidationError.js";
 import { ImageService } from "./image.service.js";
-import { ServerError } from "../errors/application/ServerError.js";
-import { StoreProcedureError } from '../errors/infra/StoreProcedureError.js';
+
+type ComponentInput = { productVariantId: number; quantity: number };
+
+const toNumber = (value: unknown): number | undefined => {
+  if (value === undefined || value === null || value === "") return undefined;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : undefined;
+};
 
 export class ProductVariantService extends GenericServiceImpl<
   ProductVariantDto,
   CreateProductVariantDto,
   UpdateProductVariantDto
 > {
-  imageService: ImageService;
-  productVariantRepository: ProductVariantRepository;
-  stockMovementRepository: StockMovementRepository;
-  constructor() {
-    super("productVariant");
-    this.productVariantRepository = new ProductVariantRepository();
-    this.stockMovementRepository = new StockMovementRepository();
-    this.imageService = new ImageService();
+  readonly productVariantRepository: ProductVariantRepository;
+  readonly stockRepository: StockMovementRepository;
+  readonly imageService: ImageService;
+
+  constructor(
+    productVariantRepository = new ProductVariantRepository(),
+    stockRepository = new StockMovementRepository(),
+    imageService = new ImageService(),
+  ) {
+    super(productVariantRepository);
+    this.productVariantRepository = productVariantRepository;
+    this.stockRepository = stockRepository;
+    this.imageService = imageService;
   }
 
+  /**
+   * Crea una variante. El stock inicial NO se escribe directo: se crea en 0 y
+   * se registra un movimiento IN (o una producción si es un mix).
+   */
   async createVariant(
     createData: CreateProductVariantDto,
-    uploadedFilesByField: any[],
-    tx?: any
+    uploadedFiles: any[],
   ): Promise<ProductVariantDto> {
-    
-    return this.productVariantRepository.withTransaction(async (tx) => {
-      if (!createData) {
-        uploadedFilesByField &&
-          (await this.imageService.abortImageUpload(uploadedFilesByField));
-        throw new BadRequestError();
+    try {
+      if (!createData || !toNumber(createData.productId)) {
+        throw new ValidationError("productId es requerido");
       }
-      if (createData.productId == 0 || !createData.productId) {
-        uploadedFilesByField &&
-          (await this.imageService.abortImageUpload(uploadedFilesByField));
-        throw new BadRequestError();  
+      if (!createData.name) {
+        throw new ValidationError("name es requerido");
       }
 
-      const stagedV = {
-        name: createData.name,
-        currentStock: createData.currentStock,
-      }
-      createData.currentStock = 0;
-  
-      const createdV = await this.productVariantRepository.createVariant(
-        createData,
-        uploadedFilesByField,
-        tx
-      );
+      const initialStock = toNumber(createData.currentStock) ?? 0;
 
-      if (createdV.hasComponents && createdV.hasComponents.length > 0) {
-        try {
-          await this.productVariantRepository.recalculateSingleMixPrice(
-            createdV.id,
-            tx,
-          );
-          await this.stockMovementRepository.processMixProduction(
-            createdV.id,
-            stagedV.currentStock,
-            tx,
-          );
-        } catch (error) {
-          throw new StoreProcedureError(
-            "recalculate_mix_price/process_mix_production",
-            error,
-          );
+      return await this.productVariantRepository.withTransaction(async (tx) => {
+        const created: any = await this.productVariantRepository.createVariant(
+          { ...createData, currentStock: 0 },
+          uploadedFiles,
+          tx,
+        );
+        const isMix = (created.hasComponents?.length ?? 0) > 0;
+
+        if (isMix) {
+          await this.stockRepository.recalculateMixPrice(created.id, tx);
         }
-      } else {
-        if (createdV.name == stagedV.name) {
-          console.log(
-            "ingreso " + createdV.name + " " + createdV.currentStock,
-          );
-          await this.stockMovementRepository.createStockMovement(
-            createdV.id,
-            stagedV.currentStock,
-            "IN",
-            tx,
-          );
+        if (initialStock > 0) {
+          if (isMix) {
+            await this.stockRepository.processMixProduction(created.id, initialStock, tx);
+          } else {
+            await this.stockRepository.createStockMovement(created.id, initialStock, "IN", tx);
+          }
         }
-      }
+        return this.productVariantRepository.getById(created.id, tx);
+      });
+    } catch (error) {
+      await this.imageService.abortImageUpload(uploadedFiles);
+      throw error;
+    }
+  }
 
-      return createdV
-    })
-  }       
-
+  /**
+   * Actualiza una variante.
+   *   - currentStock:   valor ABSOLUTO (inventario). Registra ADJUSTMENT por la diferencia.
+   *   - stockIncrement: delta. Positivo en un mix = producir (consume componentes).
+   *   - price / profitMargin: recalcula en cascada los mixes que usan esta variante.
+   *   - add/edit/removeComponents: modifica la receta y recalcula el precio del mix.
+   */
   async updateVariant(
     id: number,
     data: UpdateProductVariantDto,
-    uploadedFilesByField: any[],
+    uploadedFiles: any[],
   ): Promise<ProductVariantDto> {
-    const postMapping = productVariantPostProcessingMapping;
+    let removedPublicIds: string[] = [];
+    try {
+      if (!id) throw new NotFoundError();
+      if (!data) throw new ValidationError("body vacío");
 
-    
-    return this.productVariantRepository.withTransaction(async (tx) => {
-      if (!id || id == 0) {
-        uploadedFilesByField &&
-          (await this.imageService.abortImageUpload(uploadedFilesByField));
-        throw new NotFoundError();
-      }
-  
-      if (!data) {
-        uploadedFilesByField &&
-          (await this.imageService.abortImageUpload(uploadedFilesByField));
-        throw new BadRequestError();
-      }
-      let updatedVariant = await this.productVariantRepository.updateVariant(
-        id,
-        data,
-        uploadedFilesByField,
-        tx
-      );
-
-      console.log("a ver la data updateada", updatedVariant);
-
-      //Post processing mapping
-      if (postMapping && updatedVariant) {
-        updatedVariant = postMapping(updatedVariant as any);
-      }
-
-      // Actualiza situaciones de stock y precio relacionadas con el stock de un mix, y el precio de sus componentes.
-      await this.mixRelatedStockQueries(data, id, updatedVariant as any, tx);
-
-      if (
-        (data.addComponents && data.addComponents.length > 0) ||
-        (data.removeComponents && data.removeComponents.length > 0) ||
-        (data.editComponents && data.editComponents.length > 0)
-      ) {
-        await this.handleVariantsUpdate(
-          Number(id),
-          data.removeComponents,
-          data.editComponents,
-          data.addComponents,
-          tx
+      const result = await this.productVariantRepository.withTransaction(async (tx) => {
+        const updated: any = await this.productVariantRepository.updateVariant(
+          id,
+          data,
+          uploadedFiles,
+          tx,
         );
-      }
+        if (!updated) throw new NotFoundError();
 
-      if (data.removeImages && data.removeImages.length > 0) {
-        await this.imageService.removeImages(data.removeImages);
-      }
+        // 1. Receta del mix
+        const recipeChanged = await this.applyComponentChanges(id, data, tx);
 
-      return updatedVariant;
-    });
+        // 2. Precio: si cambió el costo/margen o la receta, recalcular mixes que me usan
+        const priceChanged =
+          data.price !== undefined || data.profitMargin !== undefined || recipeChanged;
+        if (priceChanged) {
+          await this.stockRepository.recalculateMixesUsingComponent(id, tx);
+        }
+
+        // 3. Stock
+        const targetStock = toNumber(data.currentStock);
+        const increment = toNumber(data.stockIncrement);
+        if (targetStock !== undefined && increment !== undefined) {
+          throw new ValidationError("Enviar currentStock o stockIncrement, no ambos");
+        }
+        if (targetStock !== undefined) {
+          await this.stockRepository.setStockLevel(id, targetStock, tx);
+        } else if (increment) {
+          const isMix = (updated.hasComponents?.length ?? 0) > 0;
+          if (increment > 0 && isMix) {
+            await this.stockRepository.processMixProduction(id, increment, tx);
+          } else {
+            await this.stockRepository.createStockMovement(
+              id,
+              increment,
+              increment < 0 ? "OUT" : "IN",
+              tx,
+            );
+          }
+        }
+
+        // 4. Imágenes a eliminar (solo DB; Cloudinary después del commit)
+        removedPublicIds = await this.imageService.removeImagesDb(data.removeImages, id, tx);
+
+        return this.productVariantRepository.getById(id, tx);
+      });
+
+      await this.imageService.deleteFromCloudinary(removedPublicIds);
+      return result;
+    } catch (error) {
+      await this.imageService.abortImageUpload(uploadedFiles);
+      throw error;
+    }
   }
 
-  // añade, elimina y edita componentes de un mix. Luego recalcula el precio del mix
-  async handleVariantsUpdate(
+  /** Aplica cambios de receta. Devuelve true si hubo cambios. */
+  private async applyComponentChanges(
     mixVariantId: number,
-    removeComponents?: { productVariantId: number }[],
-    editComponents?: { productVariantId: number; quantity: number }[],
-    addComponents?: { productVariantId: number; quantity: number }[],
-    tx?: any
-  ) {
-    try {
-      if (removeComponents) {
-        const componentPromises = removeComponents.map(async (component: any) => {
-        return await this.productVariantRepository.removeVariant(
-          mixVariantId,
-          component.productVariantId,
-          tx
-        );
-      });
-      await Promise.all(componentPromises);
-      await this.productVariantRepository.recalculateSingleMixPrice(
-        mixVariantId,
-        tx
-      );
+    data: UpdateProductVariantDto,
+    tx: any,
+  ): Promise<boolean> {
+    const remove = data.removeComponents ?? [];
+    const edit = (data.editComponents ?? []) as ComponentInput[];
+    const add = (data.addComponents ?? []) as ComponentInput[];
+    if (!remove.length && !edit.length && !add.length) return false;
+
+    for (const c of remove) {
+      await this.productVariantRepository.removeComponent(mixVariantId, c.productVariantId, tx);
     }
-    if (editComponents) {
-      const componentPromises = editComponents.map(
-        async (component: { productVariantId: number; quantity: number }) => {
-          return await this.productVariantRepository.updateMixVariant(
-            mixVariantId,
-            component.productVariantId,
-            component.quantity,
-            tx
-          );
-        },
-      );
-      await Promise.all(componentPromises);
-      await this.productVariantRepository.recalculateSingleMixPrice(
-        mixVariantId,
-        tx
-      );
-    }
-    if (addComponents) {
-      const componentPromises = addComponents.map(async (component: any) => {
-        return await this.productVariantRepository.addComponentToVariant(
-          component.productVariantId,
-          mixVariantId,
-          component.quantity,
-          tx
-        );
-      });
-      await Promise.all(componentPromises);
-      await this.productVariantRepository.recalculateSingleMixPrice(
-        mixVariantId,
-        tx
-      );
+    for (const c of edit) {
+      if (!(Number(c.quantity) > 0)) {
+        throw new ValidationError("La cantidad de un componente debe ser mayor a 0");
       }
-    } catch (error: any) {
-      throw new ServerError("handleVariantsUpdate", error);
+      await this.productVariantRepository.updateComponentQuantity(
+        mixVariantId,
+        c.productVariantId,
+        c.quantity,
+        tx,
+      );
     }
+    for (const c of add) {
+      await this.stockRepository.addComponentToVariant(
+        c.productVariantId,
+        mixVariantId,
+        c.quantity,
+        tx,
+      );
+    }
+    await this.stockRepository.recalculateMixPrice(mixVariantId, tx);
+    return true;
   }
 
-  // Actualiza situaciones de stock y precio relacionadas con el stock de un mix, y el precio de sus componentes
-  async mixRelatedStockQueries(
-    requestData: any,
-    id: number,
-    updatedVariant: any,
-    tx?: any
-  ) {
-    try {
-      console.log('mixRelatedStockQueries', requestData, id, 'is ', updatedVariant.currentStock ? 'with currentStock' : 'with stockIncrement')
-
-      if (
-        (requestData.price || requestData.profitMargin) &&
-        updatedVariant.isComponentOf &&
-        updatedVariant.isComponentOf.length > 0
-      ) {
-        await this.productVariantRepository.recalculateAllMixesFromProduct(
-          Number(id),
-          tx
-        );
-      }
-      if (requestData.currentStock) {
-        if ( 
-          requestData.currentStock > 0 && 
-          updatedVariant.hasComponents &&
-          updatedVariant.hasComponents.length > 0
-        ) {
-          await this.productVariantRepository.processMixProduction(
-            Number(id),
-            requestData.currentStock,
-            tx
-          );
-        } else {
-          console.log("requestData.currentStock", requestData.currentStock)
-          await this.productVariantRepository.createStockMovement(
-            Number(id),
-            requestData.currentStock,
-            "ADJUSTMENT",
-            tx  
-          )
-        }
-      }
-      if (requestData.stockIncrement && !requestData.currentStock) {
-        if (
-          requestData.stockIncrement > 0 &&
-          updatedVariant.hasComponents &&
-          updatedVariant.hasComponents.length > 0
-        ) {
-          await this.productVariantRepository.processMixProduction(
-            Number(id),
-            requestData.stockIncrement,
-            tx
-          );
-        } else {
-          await this.productVariantRepository.createStockMovement(
-            Number(id),
-            requestData.stockIncrement,
-            requestData.stockIncrement < 0 ? "OUT" : "IN",
-            tx
-          );
-        }
-      }
-
-    } catch (error: any) {
-      throw new ServerError("mixRelatedStockQueries", error);
-    }
+  /** Variante lista para vender (con producto, ofertas e imágenes). */
+  async findForSale(id: number, tx?: any) {
+    return this.productVariantRepository.findForSale(id, tx);
   }
 }

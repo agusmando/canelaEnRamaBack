@@ -1,101 +1,58 @@
-// import { PrismaClient } from "@prisma/client";
-import Prisma from "@prisma/client";
-import { prismaQueryBuilder } from "../utils/prismaQueryBuilder.js";
-import { prismaCreateEntityBuilder } from "../utils/prismaCreateEntityBuilder.js";
-import { prismaUpdateEntityBuilder } from "../utils/prismaUpdateEntityBuilder.js";
-import { BaseResponse, PaginatedResponse } from "../utils/responseFormat.js";
 import type GenericServiceInterface from "./generic-service.interface.js";
-import { AppError } from "../errors/AppError.js";
-import mappingSelector from "../utils/mappingSelector.js";
-import { GenericRepositoryImpl } from "../repository/generic.repository.js";
+import { GenericRepositoryImpl, type SearchResult } from "../repository/generic.repository.js";
 import { NotFoundError } from "../errors/application/NotFoundError.js";
-import { ServerError } from "../errors/application/ServerError.js";
 
-export class GenericServiceImpl<T, U, V>
-  implements GenericServiceInterface<T, U, V>
-{
-  private mappingPromise:
-    | {
-        search: Promise<any>;
-        create: Promise<any>;
-        update: Promise<any>;
-        post: Promise<any>;
-      }
-    | undefined;
-  protected controllerName: string;
-  private genericRepositoryImpl: GenericRepositoryImpl<T, U, V>;
-  constructor(controllerName: string) {
-    this.controllerName = controllerName;
-    this.genericRepositoryImpl = new GenericRepositoryImpl(
-      controllerName
-    );
+/**
+ * Servicio CRUD genérico.
+ *
+ * Dos formas de usarlo:
+ *   - CRUD puro:            new GenericServiceImpl("tag")
+ *   - Con repo propio:      class OrderService extends GenericServiceImpl<...> {
+ *                             constructor(private repo = new OrderRepository()) { super(repo); }
+ *                           }
+ * En el segundo caso el CRUD heredado y los métodos propios usan EL MISMO
+ * repositorio, y se puede sobreescribir cualquier método sin efectos colaterales.
+ */
+export class GenericServiceImpl<T, U, V> implements GenericServiceInterface<T, U, V> {
+  protected readonly repository: GenericRepositoryImpl<T, U, V>;
+
+  constructor(repositoryOrModel: string | GenericRepositoryImpl<T, U, V>) {
+    this.repository =
+      typeof repositoryOrModel === "string"
+        ? new GenericRepositoryImpl<T, U, V>(repositoryOrModel)
+        : repositoryOrModel;
   }
 
+  /** Listado con filtros. Una lista vacía NO es un error: devuelve []. */
   async getListedElements(
-    receivedDto: T[],
+    filters: any,
     paginate: boolean = false,
     currentPage: number = 1,
     amountPerPage: number = 10,
-    detalle: boolean = false
-  ): Promise<{
-    entityList: T[];
-    currentPage: number;
-    amountPerPage: number;
-    totalElements: number;
-  }> {
-    const response = await this.genericRepositoryImpl.search(
-      receivedDto,
-      paginate,
-      currentPage,
-      amountPerPage,
-      detalle
-    );
-    if (response.entityList === undefined || response.entityList.length === 0) {
-      throw new NotFoundError()
-    }
-    return {
-      ...response,
-      entityList: response.entityList ?? [],
-    };
+    detalle: boolean = false,
+  ): Promise<SearchResult<T>> {
+    return this.repository.search(filters, paginate, currentPage, amountPerPage, detalle);
   }
+
   async findOne(id: number): Promise<T> {
-    const entity = await this.genericRepositoryImpl.getById(id);
-    if (!entity) {
-      throw new NotFoundError()
-    }
+    const entity = await this.repository.getById(id);
+    if (!entity) throw new NotFoundError();
     return entity;
   }
-  
-  async create(data: U): Promise<any> {
-    const newEntity = await this.genericRepositoryImpl.create(data);
-    if (!newEntity) {
-      throw new ServerError("Generic service error", "Error creating entity")
-    } else {
-      return;
-    }
+
+  async create(data: U): Promise<T> {
+    return this.repository.create(data);
   }
-  async update(id: number, data: V): Promise<any> {
-    const newEntity = await this.genericRepositoryImpl.update(id, data);
-    if (!newEntity) {
-      throw new ServerError("Generic service error", "Error updating entity")
-    } else {
-      return;
-    }
+
+  async update(id: number, data: V): Promise<T> {
+    return this.repository.update(id, data);
   }
-  async deactivate(id: number): Promise<any> {
-    const entity = await this.genericRepositoryImpl.deactivate(id);
-    if (!entity) {
-      throw new NotFoundError()
-    } else {
-      return;
-    }
+
+  async deactivate(id: number): Promise<T> {
+    return this.repository.deactivate(id);
   }
-  async activate(id: number): Promise<any> {
-    const entity = await this.genericRepositoryImpl.activate(id);
-    if (!entity) {
-      throw new NotFoundError()
-    } else {
-      return;
-    }
+
+  async activate(id: number): Promise<T> {
+    return this.repository.activate(id);
   }
 }

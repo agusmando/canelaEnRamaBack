@@ -10,10 +10,10 @@ export class SupplierController extends GenericControllerImpl<
   CreateSupplierDto,
   UpdateSupplierDto
 > {
-  supplierService: SupplierService;
-  constructor() {
-    super("supplier");
-    this.supplierService = new SupplierService();
+  readonly supplierService: SupplierService;
+  constructor(supplierService = new SupplierService()) {
+    super(supplierService);
+    this.supplierService = supplierService;
   }
 
   async addSupplierBrands(req: any, res: any, next: any) {

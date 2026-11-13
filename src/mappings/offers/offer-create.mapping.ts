@@ -4,7 +4,7 @@ export const offerCreateMapping = {
   productVariantId: { parseInt: true },
   productId: { parseInt: true },
   active: { parseBoolean: true },
-  discountValue: { parseInt: true },
+  discountValue: { parseFloat: true },
   // discountType: { parseInt: true },
   discountQuantity: { parseInt: true },
   quantityToGet: { parseInt: true },

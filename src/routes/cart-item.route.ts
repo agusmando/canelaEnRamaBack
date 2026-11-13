@@ -1,34 +1,16 @@
 import express from "express";
 import { CartItemController } from "../controllers/cart-item.controller.js";
-import { isAuthenticated, requireRole } from "../middleware/auth.middleware.js";
-const router = express.Router();
+import { isAuthenticated, requireRole, STAFF_ROLES } from "../middleware/auth.middleware.js";
 
+const router = express.Router();
 const cartItemController = new CartItemController();
 
-const staff = ["ADMIN", "EMPLOYEE"];
-
-router
-  .route("/")
-  .get(
-    isAuthenticated,
-    requireRole(staff),
-    cartItemController.findAll.bind(cartItemController),
-  ) // borrar
-  .post(cartItemController.create.bind(cartItemController));
-router
-  .route("/:id")
-  .get(
-    isAuthenticated,
-    requireRole(staff),
-    cartItemController.findOne.bind(cartItemController),
-  )
-  .put(cartItemController.update.bind(cartItemController));
-// router
-//   .route("/:id/products")
-//   .put(
-//     isAuthenticated,
-//     requireRole(["ADMIN"]),
-//     cartItemController.addBrandProducts.bind(cartItemController)
-//   )
+// Solo lectura para staff. Los ítems se gestionan con PUT /cart/:token.
+router.get(
+  "/",
+  isAuthenticated,
+  requireRole(STAFF_ROLES),
+  cartItemController.findAll.bind(cartItemController),
+);
 
 export default router;

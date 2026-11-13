@@ -54,19 +54,13 @@ export const prismaCreateEntityBuilder = (data: any, mapping?: any) => {
         }
         // Si es para CONECTAR por ID (ej: Tags)
         else {
-          if (!Number.isNaN(val[0].id)) {
-            result[key] = {
-              connect: val.map((it: any) => ({
-                [map.connectField || "id"]: Number(it.id || it),
-              })),
-            };
-          } else {
-            result[key] = {
-              connect: val.map((it: any) => ({
-                [map.connectField || "id"]: it.id || it,
-              })),
-            };
-          }
+          result[key] = {
+            connect: val.map((it: any) => {
+              const raw = it?.id ?? it;
+              const asNumber = Number(raw);
+              return { [map.connectField || "id"]: Number.isNaN(asNumber) ? raw : asNumber };
+            }),
+          };
         }
       }
 
@@ -87,11 +81,10 @@ export const prismaCreateEntityBuilder = (data: any, mapping?: any) => {
       // CASO C: Primitivos que son FK directas (a veces pasa)
       else {
         // Normalmente esto no se mapea como 'relation', pero por si acaso
-        if (!Number.isNaN(val[0].id)) {
-          result[key] = { connect: { [map.connectField || "id"]: Number(val) } };
-        } else {
-            result[key] = { connect: { [map.connectField || "id"]: val } };
-          }
+        const asNumber = Number(val);
+        result[key] = {
+          connect: { [map.connectField || "id"]: Number.isNaN(asNumber) ? val : asNumber },
+        };
       }
     }
   }

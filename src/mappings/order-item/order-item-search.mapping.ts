@@ -1,19 +1,8 @@
-
-export const orderSearchQueryMapping = {
-  ofuscatedId: { field: "id", type: "number" },
-  ofuscatedQuantity: { field: "quantity", type: "number" },
-  ofuscatedProductVariant: {
-    field: "productVariant",
-    type: "relationArray",
-    childField: "id",
-    expand: ["product", "offers"],
-  },
-  ofuscatedOrder: { field: "order", type: "object", childField: "id" },
-
+export const orderItemSearchQueryMapping = {
+  orderId: { field: "orderId", type: "number" },
+  productVariantId: { field: "productVariantId", type: "number" },
   productNameSnapshot: { field: "productNameSnapshot", type: "string" },
   variantNameSnapshot: { field: "variantNameSnapshot", type: "string" },
-  unitPriceSnapshot: { field: "unitPriceSnapshot", type: "number" },
-  status: { field: "status", type: "string" },
+  status: { field: "status", type: "enum" },
   awaitingStockAt: { field: "awaitingStockAt", type: "date", operation: "gte" },
-  ofustactedSelectedBulkOption: { field: "selectedBulkOption", type: "number" },
 };

@@ -6,6 +6,8 @@ export class CartItemDto {
   quantity: number;
   productVariant?: ProductVariantDto;
   productVariantId: number;
+  /** Tamaño de paquete (g/u). 0 o ausente = venta suelta / presentación más chica. */
+  selectedBulkOption?: number;
   createdAt: Date;
   cart?: CartDto;
   cartId: number;

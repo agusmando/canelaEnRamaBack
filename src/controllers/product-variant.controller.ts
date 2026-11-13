@@ -3,31 +3,24 @@ import { ProductVariantDto } from "../dto/product-variant/product-variant.dto.js
 import { UpdateProductVariantDto } from "../dto/product-variant/update-product-variant.dto.js";
 import { ProductVariantService } from "../services/product-variant.service.js";
 import { BaseResponse } from "../utils/responseFormat.js";
-import { GenericControllerImpl } from "./generic-impl.controller.js";
+import { GenericControllerImpl, parseId } from "./generic-impl.controller.js";
 
 export class ProductVariantController extends GenericControllerImpl<
   ProductVariantDto,
   CreateProductVariantDto,
   UpdateProductVariantDto
 > {
-  productVariantService: ProductVariantService;
+  readonly productVariantService: ProductVariantService;
 
-  constructor() {
-    super("productVariant");
-    this.productVariantService = new ProductVariantService();
+  constructor(productVariantService = new ProductVariantService()) {
+    super(productVariantService);
+    this.productVariantService = productVariantService;
   }
 
   async create(req: any, res: any, next: any) {
     try {
-      const data = req.body;
-      const files = req.files;
-      const response = await this.productVariantService.createVariant(
-        data,
-        files
-      );
-      res
-        .status(200)
-        .json(new BaseResponse(200, "Product variant created", response));
+      const response = await this.productVariantService.createVariant(req.body, req.files);
+      res.status(201).json(new BaseResponse(201, "Product variant created", response));
     } catch (error) {
       next(error);
     }
@@ -35,17 +28,12 @@ export class ProductVariantController extends GenericControllerImpl<
 
   async update(req: any, res: any, next: any) {
     try {
-      const data = req.body;
-      const objectId = Number(req.params.id);
-      const files = req.files;
       const response = await this.productVariantService.updateVariant(
-        objectId,
-        data,
-        files
+        parseId(req.params.id),
+        req.body,
+        req.files,
       );
-      res
-        .status(200)
-        .json(new BaseResponse(200, "Product variant updated", response));
+      res.status(200).json(new BaseResponse(200, "Product variant updated", response));
     } catch (error) {
       next(error);
     }

@@ -1,105 +1,88 @@
-export const prismaQueryBuilder = (receivedDto: any, mappingRules: any) => {
+/**
+ * Traduce los query params a un `where` de Prisma según las reglas del mapping.
+ * Los campos que no estén en el mapping se ignoran (whitelist).
+ */
+export const prismaQueryBuilder = (receivedDto: any, mappingRules: any = {}) => {
   const where: any = {};
+  const and: any[] = [];
 
-  for (const key in receivedDto) {
+  for (const key in receivedDto ?? {}) {
     const value = receivedDto[key];
-
     if (value === undefined || value === null || value === "") continue;
 
-    const config = mappingRules[key];
+    const config = mappingRules?.[key];
     if (!config || !config.type) continue; // campo no permitido
 
-    console.log("test", key, value, config);
+    switch (config.type) {
+      case "string":
+        where[config.field] = { contains: String(value), mode: "insensitive" };
+        break;
 
-    if (config.type === "string") {
-      where[config.field] = { contains: value, mode: "insensitive" };
-    }
-
-    if (config.type === "number") {
-      where[config.field] = Number(value);
-    }
-
-    if (config.type === "boolean") {
-      where[config.field] = value === "true" || value === true;
-    }
-
-    if (config.type === "object") {
-      where[config.field] = {
-        [config.childField]: { contains: value, mode: "insensitive" },
-      };
-    }
-
-    if (config.type === "numberRange") {
-      if (config.operation === "gte") {
-        where[config.field] = { ...where[config.field], gte: Number(value) };
+      case "number": {
+        const n = Number(value);
+        if (!Number.isNaN(n)) where[config.field] = n;
+        break;
       }
-      if (config.operation === "lte") {
-        where[config.field] = { ...where[config.field], lte: Number(value) };
-      }
-    }
 
-    if (config.type === "enum") {
-      where[config.field] = value;
-    }
+      case "boolean":
+        where[config.field] = value === "true" || value === true;
+        break;
 
-    if (config.type === "date") {
-      const dateValue = new Date(value);
-      if (config.operation === "eq") {
+      case "object":
         where[config.field] = {
-          ...where[config.field],
-          gte: dateValue,
-          lte: new Date(dateValue.getTime() + 24 * 60 * 60 * 1000),
+          [config.childField]: { contains: String(value), mode: "insensitive" },
         };
-      }
-      if (config.operation === "gte") {
-        where[config.field] = { ...where[config.field], gte: dateValue };
-      }
-      if (config.operation === "lte") {
-        where[config.field] = { ...where[config.field], lte: dateValue };
-      }
-    }
+        break;
 
-    // ARRAY DE STRINGS
-    if (config.type === "stringArray") {
-      where[config.field] = {};
-
-      // modo básico (buscar que contenga 1 valor)
-      if (config.operator === "contains") {
-        where[config.field].has = value;
+      case "numberRange": {
+        const n = Number(value);
+        if (Number.isNaN(n)) break;
+        if (config.operation === "gte" || config.operation === "lte") {
+          where[config.field] = { ...where[config.field], [config.operation]: n };
+        }
+        break;
       }
 
-      // contiene alguno
-      if (config.operator === "oneOf") {
-        where[config.field].hasSome = value;
+      case "enum":
+        where[config.field] = Array.isArray(value) ? { in: value } : value;
+        break;
+
+      case "date": {
+        const dateValue = new Date(value);
+        if (Number.isNaN(dateValue.getTime())) break;
+        if (config.operation === "eq") {
+          where[config.field] = {
+            ...where[config.field],
+            gte: dateValue,
+            lt: new Date(dateValue.getTime() + 24 * 60 * 60 * 1000),
+          };
+        } else if (config.operation === "gte" || config.operation === "lte") {
+          where[config.field] = { ...where[config.field], [config.operation]: dateValue };
+        }
+        break;
       }
 
-      // contiene todos
-      if (config.operator === "containsAll") {
-        where[config.field].hasEvery = value;
-      }
-    }
+      case "stringArray":
+        if (config.operator === "contains") where[config.field] = { has: value };
+        if (config.operator === "oneOf") where[config.field] = { hasSome: [].concat(value) };
+        if (config.operator === "containsAll") where[config.field] = { hasEvery: [].concat(value) };
+        break;
 
-    // ARRAY DE OBJETOS (RELACIÓN)
-    if (config.type === "relationArray") {
-      // console.log('relationArray', value, typeof value, Array.isArray(value))
-      if (value.length > 1 && Array.isArray(value)) {
-        where["AND"] = value.map((val: string) => ({
-          [config.field]: {
-            some: {
-              [config.childField]: { contains: val, mode: "insensitive" },
+      case "relationArray": {
+        // ?tags=a&tags=b -> debe tener AMBOS tags
+        const values: string[] = Array.isArray(value) ? value : [value];
+        for (const val of values) {
+          and.push({
+            [config.field]: {
+              some: { [config.childField]: { contains: String(val), mode: "insensitive" } },
             },
-          },
-        }));
-      } else {
-        where[config.field] = {
-          some: {
-            [config.childField]: { contains: value, mode: "insensitive" },
-          },
-        };
+          });
+        }
+        break;
       }
-
-      console.log("where relationArray", where);
     }
   }
+
+  if (and.length) where.AND = and;
   return where;
 };

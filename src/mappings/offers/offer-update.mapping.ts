@@ -1,4 +1,4 @@
-export const productUpdateMapping = {
+export const offerUpdateMapping = {
   // Campos simples
   startTime: { field: "startTime" },
   finishTime: { field: "finishTime" },

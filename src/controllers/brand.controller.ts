@@ -11,10 +11,10 @@ export class BrandController extends GenericControllerImpl<
   CreateBrandDto,
   UpdateBrandDto
 > {
-  brandService: BrandService;
-  constructor() {
-    super("brand");
-    this.brandService = new BrandService();
+  readonly brandService: BrandService;
+  constructor(brandService = new BrandService()) {
+    super(brandService);
+    this.brandService = brandService;
   }
 
   async addBrandProducts(req: any, res: any, next: any) {

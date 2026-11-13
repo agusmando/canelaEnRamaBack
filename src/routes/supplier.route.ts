@@ -1,11 +1,11 @@
 import express from "express";
 import { SupplierController } from "../controllers/supplier.controller.js";
-import { isAuthenticated, requireRole } from "../middleware/auth.middleware.js";
+import { isAuthenticated, requireRole, STAFF_ROLES } from "../middleware/auth.middleware.js";
 const router = express.Router();
 
 const supplierController = new SupplierController();
 
-const staff = ["ADMIN", "EMPLOYEE"];
+const staff = STAFF_ROLES;
 
 router.use(isAuthenticated);
 router.use(requireRole(staff));

@@ -1,108 +1,60 @@
-import { PrismaClient } from "@prisma/client";
 import { GenericRepositoryImpl } from "./generic.repository.js";
 import { CreateProductDto } from "../dto/products/create-product.dto.js";
 import { ProductDto } from "../dto/products/product.dto.js";
 import { UpdateProductDto } from "../dto/products/update-product.dto.js";
-import { prismaCreateEntityBuilder } from "../utils/prismaCreateEntityBuilder.js";
-import { productCreateMapping } from "../mappings/products/product-create.mapping.js";
 import { ProductVariantRepository } from "../repository/product-variant.repository.js";
-import { productUpdateMapping } from "../mappings/products/product-update.mapping.js";
-import { prismaUpdateEntityBuilder } from "../utils/prismaUpdateEntityBuilder.js";
 import { UpdateProductTagDto } from "../dto/products/update-product-tag.dto.js";
-import { ImageService } from "../services/image.service.js";
+import { translatePrismaError } from "../errors/infra/translatePrismaError.js";
+import { productPostProcessingMapping } from "../mappings/products/product-post-procesing.mapping.js";
 
 export class ProductRepository extends GenericRepositoryImpl<
   ProductDto,
   CreateProductDto,
   UpdateProductDto
 > {
-  protected prisma: PrismaClient;
   protected productVariantRepository: ProductVariantRepository;
-  protected imageService: ImageService;
-  constructor() {
+  constructor(productVariantRepository = new ProductVariantRepository()) {
     super("product");
-    this.prisma = new PrismaClient({
-      log: ["query", "info", "warn", "error"],
-    });
-    this.productVariantRepository = new ProductVariantRepository();
-    this.imageService = new ImageService();
+    this.productVariantRepository = productVariantRepository;
   }
+
+  /**
+   * Crea el producto con sus variantes anidadas.
+   * @param filesByVariant imágenes ya subidas, una lista por variante (mismo índice).
+   */
   async createProduct(
     createData: CreateProductDto,
-    uploadedFilesByField?: any[],
-    tx?: PrismaClient
+    filesByVariant?: any[][],
+    tx?: any,
   ): Promise<any> {
-    const mapping = productCreateMapping;
-    
-    // Crea la query para las variantes del producto (campos normales)
     const variants = await this.productVariantRepository.createBaseVariantQuery(
       createData.variants,
-      uploadedFilesByField
+      filesByVariant,
     );
-    console.log("Pasa variantes", variants);
-
-    // const finalQuery = prismaCreateEntityBuilder(createData, mapping);
-    const data: any = {
-      ...createData,
-      variants: { create: variants },
-    };
-
-    console.log("data", data)
-
-    // TODO: Pensar en la creación múltiple de variantes
-    // Si la primera variante tiene componentes, las agrega a su query
-    // if (
-    //   variants.length === 1 &&
-    //   variants[0].hasComponents &&
-    //   variants[0].hasComponents.length > 0
-    // ) {
-    //   data.variants = {
-    //     ...variants[0],
-    //     hasComponents: {
-    //       create: variants[0].hasComponents.map(
-    //         (component: any) =>
-    //           ({
-    //             productVariantId: Number(component.productVariantId),
-    //             quantity: component.quantity,
-    //           } as any)
-    //       ),
-    //     },
-    //   };
-    // }
-
-    console.log(data);
-    console.log(JSON.stringify(data.variants));
-    // Crea el producto
-    let product = await super.create(data, tx);
-
-    return product;
+    return super.create({ ...createData, variants: { create: variants } }, tx);
   }
 
   async addRemoveTags(
     id: number,
     tagData: UpdateProductTagDto,
     addingTag: boolean,
-    tx?: PrismaClient
+    tx?: any,
   ): Promise<any> {
-    let data = {
-      Tags: {
-        [addingTag ? "connect" : "disconnect"]: tagData.tagsId.map(
-          (tagId: any) => ({ id: tagId.id })
-        ),
-      },
-    };
-    console.log(JSON.stringify(data));
-    
-    const model = tx ?? this.prisma;
-    return await model.product.update({
-      where: { id },
-      data,
-      include: {
-        Tags: true,
-        variants: true,
-        Category: true,
-        Brand: true,
-      },
-    });
+    try {
+      const product = await (tx ?? this.prisma).product.update({
+        where: { id },
+        data: {
+          Tags: {
+            [addingTag ? "connect" : "disconnect"]: tagData.tagsId.map((tag: any) => ({
+              id: Number(tag?.id ?? tag),
+            })),
+          },
+        },
+        include: { Tags: true, variants: true, Category: true, Brand: true },
+      });
+      return productPostProcessingMapping(product as any);
+    } catch (error) {
+      throw translatePrismaError(error);
+    }
   }
 }

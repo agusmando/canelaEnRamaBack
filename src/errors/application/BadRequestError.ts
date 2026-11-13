@@ -1,6 +1,6 @@
 export class BadRequestError extends Error {
-  constructor() {
-    super("Bad request");
+  constructor(message = "Bad request") {
+    super(message);
     this.name = "BadRequestError";
   }
 }

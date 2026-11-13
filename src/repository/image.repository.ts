@@ -1,7 +1,7 @@
 import cloudinary from "cloudinary";
 import streamifier from "streamifier";
 import dotenv from "dotenv";
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "../config/prisma/client.js";
 dotenv.config();
 
 cloudinary.v2.config({
@@ -11,12 +11,7 @@ cloudinary.v2.config({
 });
 
 export class ImageRepository {
-  prisma: PrismaClient;
-  constructor() {
-    this.prisma = new PrismaClient({
-      log: ["query", "info", "warn", "error"],
-    });
-  }
+  prisma = prisma;
 
   async uploadBuffer(
     buffer: Buffer,
@@ -29,13 +24,6 @@ export class ImageRepository {
       if (folder) opts.folder = folder;
       if (publicId) opts.public_id = publicId;
 
-      console.log("cloudinary upload opts:", {
-        folder,
-        publicId,
-        mimetype,
-        size: buffer?.length,
-      });
-
       const uploadStream = cloudinary.v2.uploader.upload_stream(
         opts,
         (error: any, result: any) => {
@@ -43,10 +31,6 @@ export class ImageRepository {
             console.error("cloudinary upload error:", error);
             return reject(error);
           }
-          console.log("cloudinary upload result:", {
-            public_id: result?.public_id,
-            url: result?.secure_url,
-          });
           resolve(result);
         },
       );
@@ -78,7 +62,7 @@ export class ImageRepository {
     }
   }
 
-  async findManyImagesDb(imageIds: any[], tx?: PrismaClient) {
+  async findManyImagesDb(imageIds: any[], tx?: any) {
     const model = tx ?? this.prisma;
     return await model.image.findMany({
       where: {
@@ -87,7 +71,7 @@ export class ImageRepository {
     });
   }
 
-  async deleteImageDb(imageId: number, tx?: PrismaClient) {
+  async deleteImageDb(imageId: number, tx?: any) {
     const model = tx ?? this.prisma;
     return await model.image.delete({
       where: {
@@ -96,9 +80,13 @@ export class ImageRepository {
     });
   }
 
-  async withTransaction<R>(
-    callback: (tx: PrismaClient) => Promise<R>,
-  ): Promise<R> {
-    return this.prisma.$transaction(callback as any) as Promise<R>;
+  async deleteManyImagesDb(imageIds: number[], variantId?: number, tx?: any) {
+    const model = tx ?? this.prisma;
+    return await model.image.deleteMany({
+      where: {
+        id: { in: imageIds },
+        ...(variantId ? { productVariantId: variantId } : {}),
+      },
+    });
   }
 }

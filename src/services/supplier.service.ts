@@ -1,5 +1,3 @@
-import { BaseResponse, PaginatedResponse } from "../utils/responseFormat.js";
-import { PrismaClient } from "@prisma/client";
 import { UpdateSupplierBrandDto } from "../dto/supplier/update-supplier-brand.dto.js";
 import { GenericServiceImpl } from "./generic-impl.service.js";
 import { SupplierDto } from "../dto/supplier/supplier.dto.js";
@@ -14,11 +12,8 @@ export class SupplierService extends GenericServiceImpl<
   CreateSupplierDto,
   UpdateSupplierDto
 > {
-  protected supplierRepository: SupplierRepository;
-
-  constructor() {
-    super("supplier");
-    this.supplierRepository = new SupplierRepository();
+  constructor(protected readonly supplierRepository = new SupplierRepository()) {
+    super(supplierRepository);
   }
 
   async addRemoveBrands(
@@ -35,13 +30,6 @@ export class SupplierService extends GenericServiceImpl<
       );
     }
 
-    return this.supplierRepository.withTransaction(async (tx) => {
-      return await this.supplierRepository.addRemoveBrands(
-        Number(supplierId),
-        brandData,
-        addingBrand,
-        tx,
-      );
-    });
+    return this.supplierRepository.addRemoveBrands(Number(supplierId), brandData, addingBrand);
   }
 }

@@ -232,15 +232,20 @@ model Cart {
 }
 
 model CartItem {
-  cartId           Int
-  productVariantId Int
-  quantity         Int
-  createdAt        DateTime @default(now())
+  cartId             Int
+  productVariantId   Int
+  // Tamaño del paquete elegido (g o u, uno de ProductVariant.packagingOptions).
+  // 0 = venta suelta: `quantity` está en gramos (KG) o unidades.
+  // > 0 = `quantity` es la cantidad de paquetes de ese tamaño.
+  selectedBulkOption Float    @default(0)
+  quantity           Int
+  createdAt          DateTime @default(now())
 
   cart           Cart           @relation(fields: [cartId], references: [id])
   productVariant ProductVariant @relation(fields: [productVariantId], references: [id])
 
-  @@id([cartId, productVariantId])
+  // La misma variante puede estar en varias presentaciones (2x250g + 1x500g)
+  @@id([cartId, productVariantId, selectedBulkOption])
 }
 
 model Order {
@@ -255,7 +260,7 @@ model Order {
   paymentType String
 
   estimatedReadyAt DateTime? // Fecha estimada de entrega/retiro
-  // Usar un Enum o mantener tu modelo OrderStatus
+  // PENDING (recién creada, esperando confirmación/pago) -> PROCESSING -> SHIPPED -> DELIVERED
   status           OrderStatus @default(PENDING)
   orderItems       OrderItem[]
 }

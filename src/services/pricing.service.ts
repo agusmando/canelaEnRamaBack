@@ -1,157 +1,108 @@
 import { OfferDto } from "../dto/offer/offer.dto.js";
 import { OfferService } from "./offer.service.js";
+import { computeFinalPrice, stockUnitsToPriceUnits } from "../utils/pricing.js";
 
-export type RoundingStrategy =
-  | "NONE"
-  | "DECADE"
-  | "HUNDRED"
-  | "CENT"
-  | "CUSTOM";
+const round2 = (n: number) => Math.round(n * 100) / 100;
 
+export type PriceQuote = {
+  /** Precio de lista por unidad de precio (kg o unidad), ya redondeado. */
+  unitPriceSnapshot: number;
+  /** Total de la línea con descuento aplicado. */
+  totalPriceSnapshot: number;
+  /** Descuento total de la línea (en $). */
+  discountAppliedSnapshot: number;
+  offerTypeSnapshot: string;
+  /** Cantidad expresada en unidades de precio (kg o unidades). */
+  priceUnits: number;
+};
+
+/**
+ * Cálculo de precios de venta. Única fuente para carrito, órdenes y catálogo.
+ */
 export class PricingService {
-  private offerService: OfferService;
+  constructor(private readonly offerService = new OfferService()) {}
 
-  constructor() {
-    this.offerService = new OfferService();
-  }
-
-  // calcula el precio base final del variant (price * profitMargin)
-  //   computeBaseFinalPrice(productVariant: any): number {
-  //     const price = Number(productVariant.price ?? 0);
-  //     const profit = Number(productVariant.profitMargin ?? 1);
-  //     return (price * profit) + price;
-  //   }
-
-  // aplica la oferta (usa OfferService) y devuelve unidad y total (offerService debe devolver precio unitario)
-  applyOffers(
-    baseUnitPrice: number,
-    quantityPackages: number,
+  /**
+   * Elige la oferta vigente que aplica: primero las de la variante, si no las
+   * del producto. Entre las vigentes, la más reciente (mayor id).
+   */
+  selectOffer(
+    variantOffers: OfferDto[] = [],
+    productOffers: OfferDto[] = [],
     currentStock: number,
-    offers: OfferDto[],
-    productOriginalStockThreshold: number,
-  ) {
-    const lastOffer = offers?.[offers.length - 1];
-    const threshold =
-      lastOffer?.stockThreshold && productOriginalStockThreshold
-        ? Math.max(lastOffer.stockThreshold, productOriginalStockThreshold)
-        : productOriginalStockThreshold || lastOffer?.stockThreshold;
-    if (
-      !offers ||
-      offers.length === 0 ||
-      !lastOffer ||
-      lastOffer.active === false ||
-      (threshold && currentStock < threshold) ||
-      (lastOffer.finishTime && lastOffer.finishTime < new Date()) ||
-      (lastOffer.startTime && lastOffer.startTime >= new Date())
-    ) {
-      const total = baseUnitPrice * quantityPackages;
-      return {
-        unitPriceAfterOffer: baseUnitPrice,
-        totalAfterOffer: total,
-        discountApplied: 0,
-        offerType: null,
-      };
-    }
-
-    // OfferService.applyOffer actualmente devuelve unit price (o promedio). Ajustar si necesario.
-    const { unitAfter, offerType } = this.offerService.applyOffer(
-      baseUnitPrice,
-      quantityPackages,
-      currentStock,
-      offers,
-    );
-    const total = unitAfter * quantityPackages;
-    const discountApplied = Math.max(
-      0,
-      baseUnitPrice * quantityPackages - total,
-    );
-    console.log("discountApplied", {
-      unitPriceAfterOffer: baseUnitPrice,
-      totalAfterOffer: total,
-      discountApplied,
-      offerType,
-    });
-    return {
-      unitPriceAfterOffer: baseUnitPrice,
-      totalAfterOffer: total ? total : baseUnitPrice * quantityPackages,
-      discountApplied: discountApplied ? discountApplied : 0,
-      offerType: offerType ? offerType : "",
+    variantStockThreshold: number,
+    now = new Date(),
+  ): OfferDto | undefined {
+    const isValid = (offer: OfferDto) => {
+      if (offer.active === false) return false;
+      if (offer.startTime && new Date(offer.startTime) > now) return false;
+      if (offer.finishTime && new Date(offer.finishTime) < now) return false;
+      const threshold = Math.max(Number(offer.stockThreshold) || 0, variantStockThreshold || 0);
+      // Si el stock cae por debajo del umbral, la oferta deja de aplicar
+      return !(threshold > 0 && currentStock < threshold);
     };
+    const pick = (offers: OfferDto[]) =>
+      offers.filter(isValid).sort((a, b) => (b.id ?? 0) - (a.id ?? 0))[0];
+    return pick(variantOffers) ?? pick(productOffers);
   }
 
-  // Aplica el redondeo según necesario
-  applyRounding(value: number, strategy: RoundingStrategy): number {
-    switch (strategy) {
-      case "NONE":
-        return value;
-      case "DECADE":
-        return Math.ceil(value / 10) * 10;
-      case "HUNDRED":
-        return Math.ceil(value / 100) * 100;
-      default:
-        return value;
-    }
-  }
-
-  // main helper used by OrderService: recibe variant + cantidad (paquetes o unidades según tu dominio)
-  async priceForOrderItem(args: {
+  /**
+   * Cotiza una línea.
+   * @param quantity  paquetes si hay `selectedBulkOption`; si no, gramos (KG) o unidades.
+   * @param selectedBulkOption tamaño del paquete en gramos/unidades.
+   */
+  quote(args: {
     productVariant: any;
-    requestedQuantity: number; // en "paquetes" como usas en el resto de tu lógica
-    selectedBulkOption?: number; // packaging factor (si corresponde)
-  }) {
-    const { productVariant, requestedQuantity, selectedBulkOption } = args;
+    quantity: number;
+    selectedBulkOption?: number | null;
+  }): PriceQuote {
+    const { productVariant, quantity, selectedBulkOption } = args;
+    const unitPrice = computeFinalPrice(productVariant);
 
-    // 1) calcular base por paquete
-    const baseUnitPrice = productVariant.finalPrice || 0;
+    const stockUnits = selectedBulkOption ? quantity * selectedBulkOption : quantity;
+    const priceUnits = stockUnitsToPriceUnits(stockUnits, productVariant.contentMeasure);
 
-    // 2) Normalizar cantidad según packaging si es necesario (mantener la misma semántica que computeFulfillment)
-    const contentMeasure = productVariant.contentMeasure;
-    const processedQuantity =
-      contentMeasure == "KG" ? requestedQuantity / 1000 : requestedQuantity; // Si es kilogramos, dividir gramos por mil
-    let finalQuantity = selectedBulkOption // Si viene empaquetado, multiplicamos por la cantidad requerida
-      ? processedQuantity * selectedBulkOption
-      : processedQuantity;
-
-    console.log(
-      "productVariant",
+    const offer = this.selectOffer(
       productVariant.offers,
-      productVariant.product.offers,
+      productVariant.product?.offers,
+      Number(productVariant.currentStock ?? 0),
+      Number(productVariant.stockThreshold ?? 0),
     );
 
-    // 3) aplicar ofertas
-
-    const offers =
-      productVariant.offers.length > 0
-        ? productVariant.offers
-        : productVariant.product.offers || [];
-
-    const offerResult = this.applyOffers(
-      baseUnitPrice,
-      Number(finalQuantity || 0),
-      Number(productVariant.currentStock || 0),
-      offers,
-      Number(productVariant.stockThreshold),
-    );
-
-    // 4) aplicar redondeo al precio unitario final (o al precio por kilo/unidad, según decidas)
-    // const roundedUnit = this.applyRounding(
-    //   offerResult.unitPriceAfterOffer,
-    //   roundingStrategy,
-    //   roundingGranularity,
-    // );
-    // const roundedTotal = this.applyRounding(
-    //   roundedUnit * quantityPackages,
-    //   roundingStrategy,
-    //   roundingGranularity,
-    // );
+    const listTotal = unitPrice * priceUnits;
+    let total = listTotal;
+    let offerType = "";
+    if (offer && priceUnits > 0) {
+      const result = this.offerService.applyOffer(unitPrice, priceUnits, offer);
+      total = result.unitAfter * priceUnits;
+      offerType = result.offerType;
+    }
 
     return {
-      unitPriceSnapshot: offerResult.unitPriceAfterOffer ?? 0, //roundedUnit,
-      totalPriceSnapshot: offerResult.totalAfterOffer ?? 0, // roundedTotal,  CAMBIAR CUANDO ESTÉ EL ROUNDING LISTO
-      discountAppliedSnapshot: Math.ceil(offerResult.discountApplied) ?? 0,
-      offerTypeSnapshot: offerResult.offerType ?? "",
-      rawUnitPriceBeforeRounding: offerResult.unitPriceAfterOffer ?? 0,
-      rawTotalBeforeRounding: offerResult.totalAfterOffer ?? 0,
+      unitPriceSnapshot: unitPrice,
+      totalPriceSnapshot: round2(total),
+      discountAppliedSnapshot: round2(Math.max(0, listTotal - total)),
+      offerTypeSnapshot: offerType,
+      priceUnits,
     };
+  }
+
+  /** Total de una línea de orden ya creada, a partir de sus snapshots. */
+  lineTotal(item: {
+    unitPriceSnapshot: number;
+    discountAppliedSnapshot?: number | null;
+    quantity: number;
+    selectedBulkOption?: number | null;
+    status?: string;
+    productVariant?: { contentMeasure?: string | null } | null;
+  }): number {
+    if (item.status === "CANCELLED" || item.status === "RETURNED") return 0;
+    const stockUnits = item.selectedBulkOption
+      ? item.quantity * item.selectedBulkOption
+      : item.quantity;
+    const priceUnits = stockUnitsToPriceUnits(stockUnits, item.productVariant?.contentMeasure);
+    return round2(
+      Math.max(0, item.unitPriceSnapshot * priceUnits - Number(item.discountAppliedSnapshot ?? 0)),
+    );
   }
 }

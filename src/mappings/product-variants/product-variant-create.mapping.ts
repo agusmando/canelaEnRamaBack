@@ -21,17 +21,9 @@ export const productVariantCreateMapping = {
 
   // Relaciones Anidadas dentro de la variante
   product: { relation: true, connectField: "id", allowCreate: false },
-  movements: { 
-    relation: true, 
-    allowCreate: true,
-    childMapping: {
-      quantity: { parseInt: true },
-      type: { field: "type" },
-    } 
+  // `movements` NO se acepta en el create: el stock inicial se registra con
+  // create_stock_movement / process_mix_production desde el servicio.
 
-    // Si movements tuviera campos complejos, definirías un mapping para él aquí:
-  },
-  
   stockThreshold: { parseInt: true },
 
   // Relaciones Mix/Componentes (según tu JSON comentado)
@@ -41,7 +33,7 @@ export const productVariantCreateMapping = {
      connectField: "id",
      childMapping: {
        productVariantId: { parseInt: true },
-       quantity: { parseInt: true },
+       quantity: { parseFloat: true },
      }
   },
 

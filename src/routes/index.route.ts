@@ -15,18 +15,23 @@ import orderRoutes from "./order.route.js";
 import orderItemRoutes from "./order-item.route.js";
 import userRoutes from "./user.route.js";
 
-router.use("/product", productRoutes);
+router.get("/health", (_req, res) => {
+  res.status(200).json({ status: "ok" });
+});
+
+// Las rutas más específicas van ANTES: si no, "/order/item" matchea "/order/:id"
 router.use("/product/variant", productVariantRoutes);
+router.use("/product", productRoutes);
 router.use("/tag", tagRoutes);
 router.use("/category", categoryRoutes);
 router.use("/supplier", supplierRoutes);
 router.use("/brand", brandRoutes);
 router.use("/movement", movementRoutes);
 router.use("/offer", offerRoutes);
-router.use("/cart", cartRoutes);
 router.use("/cart/item", cartItemRoutes);
-router.use("/order", orderRoutes)
-router.use("/order/item", orderItemRoutes)
-router.use("/user", userRoutes)
+router.use("/cart", cartRoutes);
+router.use("/order/item", orderItemRoutes);
+router.use("/order", orderRoutes);
+router.use("/user", userRoutes);
 
 export default router;

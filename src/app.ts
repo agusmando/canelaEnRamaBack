@@ -8,65 +8,28 @@ import {
   errorHandler as supertokensErrorHandler,
   middleware,
 } from "supertokens-node/framework/express";
-import { verifySession } from "supertokens-node/recipe/session/framework/express";
 
 initSupertokens();
 const app = express();
-app.use(express.json());
+app.set("trust proxy", 1); // Render/proxies: cookies secure e IP real
+app.use(express.json({ limit: "1mb" }));
+
+// CORS_ORIGINS="https://tienda.com,https://admin.tienda.com". Sin definir refleja
+// cualquier origen (comportamiento anterior): definirlo en producción.
+const allowedOrigins = (process.env.CORS_ORIGINS ?? "")
+  .split(",")
+  .map((o) => o.trim())
+  .filter(Boolean);
 
 const corsMiddleware = cors({
-  origin: true, // devuelve el Origin recibido y permite credentials
+  origin: allowedOrigins.length ? allowedOrigins : true,
   allowedHeaders: ["content-type", ...supertokens.getAllCORSHeaders()],
   credentials: true,
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
 });
 
-// app.use(
-//   cors({
-//     origin: "http://localhost:3000",
-//     allowedHeaders: ["content-type", ...supertokens.getAllCORSHeaders()],
-//     credentials: true,
-//   })
-// );
-// const corsMiddleware = cors({
-//   origin: function (origin, callback) {
-//     const allowedOrigins = [
-//       "http://localhost:3000",
-//       "https://ecommercedesignforcanelaenrama.vercel.app",
-//       "https://846e52c106c6.ngrok-free.app",
-//       //supertokens dashboard
-//       "https://localhost:8080/api/auth"
-//     ];
-
-//     if (!origin) return callback(null, true);
-//     if (allowedOrigins.includes(origin)) {
-//       return callback(null, true);
-//     }
-
-//     return callback(new Error("Not allowed by CORS"));
-//   },
-//   credentials: true,
-//   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"], 
-//   allowedHeaders: [
-//     "content-type",
-//     "ngrok-skip-browser-warning", // 🔥 ESTA ES LA CLAVE
-//     ...supertokens.getAllCORSHeaders(),
-//   ],
-// });
-
 app.use(corsMiddleware);
 
-/**
- * ⚠️ ESTO ES LO CLAVE
- * SuperTokens necesita que el mismo CORS
- * esté activo cuando él responde OPTIONS
- */
-// app.use((req, res, next) => {
-//   if (req.method === "OPTIONS") {
-//     return corsMiddleware(req, res, next);
-//   }
-//   next();
-// });
 
 app.use(middleware());
 app.use("/api", rutas);

@@ -6,14 +6,9 @@ import ThirdParty from "supertokens-node/recipe/thirdparty";
 import Dashboard from "supertokens-node/recipe/dashboard"; // Usa el paquete de backend aquí
 import UserRoles from "supertokens-node/recipe/userroles"; // Usa el paquete de backend aquí
 import UserMetadata from "supertokens-node/recipe/usermetadata";
-import Prisma from "@prisma/client";
+import { prisma } from "../prisma/client.js";
 
 dotenv.config();
-
-const { PrismaClient } = Prisma;
-const prisma = new PrismaClient({
-  log: ["query", "info", "warn", "error"],
-});
 export const initSupertokens = () =>
   supertokens.init({
     framework: "express",
@@ -27,8 +22,8 @@ export const initSupertokens = () =>
     appInfo: {
       // learn more about this on https://supertokens.com/docs/session/appinfo
       appName: "Canela en Rama",
-      apiDomain: "https://canelaenramaback.onrender.com",
-      websiteDomain: "http://localhost:5173",
+      apiDomain: process.env.API_DOMAIN ?? "https://canelaenramaback.onrender.com",
+      websiteDomain: process.env.WEBSITE_DOMAIN ?? "http://localhost:5173",
       apiBasePath: "/api/auth",
       websiteBasePath: "/auth",
     },
@@ -48,10 +43,6 @@ export const initSupertokens = () =>
                 const email = response.user.emails[0];
                 const fullName = "";
                 const avatarUrl = "";
-
-                console.log({
-                  response,
-                });
 
                 // Aquí agregas tu lógica para guardar los datos en la base de datos
                 await prisma.user.upsert({

@@ -1,34 +1,25 @@
 import express from "express";
 import { OrderController } from "../controllers/order.controller.js";
-import { isAuthenticated, requireRole, optionalSession } from "../middleware/auth.middleware.js";
-const router = express.Router();
+import {
+  attachRoles,
+  isAuthenticated,
+  requireRole,
+  STAFF_ROLES,
+} from "../middleware/auth.middleware.js";
 
+const router = express.Router();
 const orderController = new OrderController();
 
-const staff = ["ADMIN", "EMPLOYEE"];
+const user = [isAuthenticated, attachRoles];
 
 router
   .route("/")
-  .get(
-    isAuthenticated,
-    requireRole(staff),
-    orderController.findAll.bind(orderController),
-  ) // borrar
-  .post(optionalSession, orderController.create.bind(orderController));
+  .get(isAuthenticated, requireRole(STAFF_ROLES), orderController.findAll.bind(orderController))
+  .post(...user, orderController.create.bind(orderController));
+router.get("/mine", ...user, orderController.findMine.bind(orderController));
 router
   .route("/:id")
-  .get(
-    isAuthenticated,
-    requireRole(staff),
-    orderController.findOne.bind(orderController),
-  )
-  .put(orderController.update.bind(orderController));
-// router
-//   .route("/:id/products")
-//   .put(
-//     isAuthenticated,
-//     requireRole(["ADMIN"]),
-//     orderController.addBrandProducts.bind(orderController)
-//   )
+  .get(...user, orderController.findOne.bind(orderController))
+  .put(...user, orderController.update.bind(orderController));
 
 export default router;

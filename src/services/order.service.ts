@@ -2,448 +2,404 @@ import { GenericServiceImpl } from "./generic-impl.service.js";
 import { OrderDto } from "../dto/order/order.dto.js";
 import { CreateOrderDto } from "../dto/order/create-order.dto.js";
 import { UpdateOrderDto } from "../dto/order/update-order.dto.js";
-import { ValidationError } from "../errors/application/ValidationError.js";
-import { OrderRepository } from "../repository/order.repository.js";
-import { ProductVariantService } from "./product-variant.service.js";
-import { CreateOrderItemDto } from "../dto/order-item/create-order-item.dto.js";
-import { NotFoundError } from "../errors/application/NotFoundError.js";
 import { UpdateOrderItemDto } from "../dto/order-item/update-order-item.dto.js";
-import { StockMovementService } from "./stockMovement.service.js";
-import { OfferService } from "./offer.service.js";
+import { OrderRepository } from "../repository/order.repository.js";
+import { ProductVariantRepository } from "../repository/product-variant.repository.js";
+import { StockMovementRepository } from "../repository/stockMovement.repository.js";
 import { PricingService } from "./pricing.service.js";
+import { ValidationError } from "../errors/application/ValidationError.js";
+import { NotFoundError } from "../errors/application/NotFoundError.js";
+import { ConflictError } from "../errors/application/ConflictError.js";
+import { ForbidenError } from "../errors/domain/auth/ForbidenError.js";
+import type { Actor } from "../middleware/auth.middleware.js";
+import { CartService } from "./cart.service.js";
 
-export class OrderService extends GenericServiceImpl<
-  OrderDto,
-  CreateOrderDto,
-  UpdateOrderDto
-> {
-  protected orderRepository: OrderRepository;
-  private productVariantService: ProductVariantService;
-  private stockMovementService: StockMovementService;
-  private offerService: OfferService;
-  private pricingService: PricingService;
-  constructor() {
-    super("order");
-    this.orderRepository = new OrderRepository();
-    this.productVariantService = new ProductVariantService();
-    this.stockMovementService = new StockMovementService();
-    this.offerService = new OfferService();
-    this.pricingService = new PricingService();
+export const PAYMENT_TYPES = ["DEBIT", "CREDIT", "CASH", "TRANSFER", "MERCADOPAGO"];
+const ORDER_STATUSES = ["PENDING", "PROCESSING", "SHIPPED", "DELIVERED", "CANCELLED"];
+
+/**
+ * Ciclo de vida de una orden:
+ *   PENDING     recién creada; stock reservado, esperando confirmación/pago
+ *   PROCESSING  confirmada, se está preparando
+ *   SHIPPED     despachada / lista para retirar
+ *   DELIVERED   entregada (final; solo admite devoluciones de ítems)
+ *   CANCELLED   cancelada (final; el stock ya se repuso)
+ */
+export const ORDER_TRANSITIONS: Record<string, string[]> = {
+  PENDING: ["PROCESSING", "CANCELLED"],
+  PROCESSING: ["PENDING", "SHIPPED", "DELIVERED", "CANCELLED"],
+  SHIPPED: ["DELIVERED", "CANCELLED"],
+  DELIVERED: [],
+  CANCELLED: [],
+};
+
+/** El cliente solo puede cancelar mientras nadie empezó a preparar la orden. */
+const CUSTOMER_CANCELLABLE = ["PENDING"];
+const CLOSED_ITEM_STATUSES = ["CANCELLED", "RETURNED"];
+
+type Fulfillment = {
+  finalSize: number | null;
+  finalQty: number;
+  status: "FULFILLED" | "PARTIALLY_RETURNED" | "CANCELLED";
+  units: number;
+};
+
+/** Unidades de stock (g o u) que representa una línea. */
+const stockUnitsOf = (item: { quantity: number; selectedBulkOption?: number | null }) =>
+  item.selectedBulkOption ? item.quantity * item.selectedBulkOption : item.quantity;
+
+export class OrderService extends GenericServiceImpl<OrderDto, CreateOrderDto, UpdateOrderDto> {
+  constructor(
+    private readonly orderRepository = new OrderRepository(),
+    private readonly variantRepository = new ProductVariantRepository(),
+    private readonly stockRepository = new StockMovementRepository(),
+    private readonly pricingService = new PricingService(),
+    private readonly cartService = new CartService(),
+  ) {
+    super(orderRepository);
   }
 
-  async createOrder(data: CreateOrderDto, sessionId: string): Promise<any> {
-    if (data.orderItems.length == 0) {
+  /**
+   * Crea una orden para el usuario logueado.
+   *
+   * Todo ocurre en UNA transacción: se bloquean las variantes, se ajusta cada
+   * línea al stock disponible (parcial o cancelada), se descuenta el stock y se
+   * crea la orden. Si algo falla no queda nada a medias.
+   */
+  async createOrder(
+    data: CreateOrderDto & { fromCart?: boolean },
+    userId: string,
+  ): Promise<any> {
+    if (!userId) throw new ValidationError("Session id is required");
+    if (data?.fromCart) return this.createOrderFromCart(data, userId);
+    if (!Array.isArray(data?.orderItems) || data.orderItems.length === 0) {
       throw new ValidationError("Order must have at least one item");
     }
-    if (!sessionId || sessionId == "") {
-      throw new ValidationError("Session id is required");
+    for (const item of data.orderItems) {
+      if (!Number.isInteger(Number(item.productVariantId)) || !(Number(item.quantity) > 0)) {
+        throw new ValidationError("Cada ítem necesita productVariantId y quantity > 0");
+      }
+    }
+    const paymentType = this.parsePaymentType(data.paymentType);
+
+    return this.orderRepository.withTransaction((tx) => this.placeOrder(data, paymentType, userId, tx));
+  }
+
+  /**
+   * Checkout: crea la orden con las líneas del carrito del usuario (respetando
+   * la presentación elegida) y vacía el carrito, todo en la misma transacción.
+   */
+  private async createOrderFromCart(data: CreateOrderDto, userId: string) {
+    const paymentType = this.parsePaymentType(data.paymentType);
+    return this.orderRepository.withTransaction(async (tx) => {
+      const { cartId, items } = await this.cartService.itemsForCheckout(userId, tx);
+      const order = await this.placeOrder(
+        { ...data, orderItems: items as any },
+        paymentType,
+        userId,
+        tx,
+      );
+      await this.cartService.clearCart(cartId, tx);
+      return order;
+    });
+  }
+
+  private parsePaymentType(value?: string) {
+    const paymentType = value ? String(value).toUpperCase() : "DEBIT";
+    if (!PAYMENT_TYPES.includes(paymentType)) {
+      throw new ValidationError(`paymentType debe ser uno de ${PAYMENT_TYPES.join(", ")}`);
+    }
+    return paymentType;
+  }
+
+  /** Núcleo de la creación: debe correr dentro de una transacción. */
+  private async placeOrder(data: CreateOrderDto, paymentType: string, userId: string, tx: any) {
+    await this.stockRepository.lockVariants(
+      data.orderItems.map((i) => i.productVariantId),
+      tx,
+    );
+
+    const now = new Date();
+    let estimatedReadyAt: Date | undefined;
+    let totalPrice = 0;
+    const orderItems: any[] = [];
+
+    // Secuencial: cada línea ve el stock ya descontado por las anteriores
+    for (const item of data.orderItems) {
+      const variant: any = await this.variantRepository.findForSale(item.productVariantId, tx);
+      if (!variant || !variant.active || !variant.product?.active || !variant.availableWeb) {
+        throw new ValidationError(
+          `La variante ${item.productVariantId} no existe o no está disponible`,
+        );
+      }
+
+      const fulfillment = this.computeFulfillment(
+        variant,
+        Number(item.quantity),
+        item.selectedBulkOption ? Number(item.selectedBulkOption) : undefined,
+      );
+
+      let awaitingStockAt: Date | undefined;
+      const days = Number(variant.requestTime) || 0;
+      if (days > 0) {
+        awaitingStockAt = new Date(now);
+        awaitingStockAt.setDate(awaitingStockAt.getDate() + days);
+        if (!estimatedReadyAt || awaitingStockAt > estimatedReadyAt) {
+          estimatedReadyAt = awaitingStockAt;
+        }
+      }
+
+      const quote = this.pricingService.quote({
+        productVariant: variant,
+        quantity: fulfillment.finalQty,
+        selectedBulkOption: fulfillment.finalSize,
+      });
+
+      if (fulfillment.status !== "CANCELLED" && fulfillment.units > 0) {
+        await this.stockRepository.createStockMovement(variant.id, -fulfillment.units, "OUT", tx);
+        totalPrice += quote.totalPriceSnapshot;
+      }
+
+      orderItems.push({
+        productVariantId: variant.id,
+        productNameSnapshot: variant.product?.name ?? "",
+        variantNameSnapshot: variant.name,
+        quantity: fulfillment.finalQty,
+        selectedBulkOption: fulfillment.finalSize,
+        unitPriceSnapshot: quote.unitPriceSnapshot,
+        discountAppliedSnapshot: quote.discountAppliedSnapshot,
+        offerTypeSnapshot: quote.offerTypeSnapshot,
+        status: fulfillment.status,
+        awaitingStockAt,
+      });
     }
 
-    return this.orderRepository.withTransaction(async (tx) => {
-      let awaitingStockAt: Date = new Date();
-      let currentDate: Date = new Date(awaitingStockAt);
-      let totalPrice: number = 0;
-      const itemsForCreation: Promise<CreateOrderItemDto>[] =
-        data.orderItems.map(async (item) => {
-          const productVariant = await this.productVariantService.findOne(
-            item.productVariantId,
-          );
-          if (!productVariant) {
-            throw new ValidationError(
-              "Product variant with id " + item.productVariantId + " not found",
-            );
-          }
+    if (orderItems.every((i) => i.status === "CANCELLED")) {
+      throw new ConflictError("No hay stock disponible para ninguno de los productos de la orden");
+    }
 
-          // compute fulfillment for bulk/unit
-          const requestedPackages = Number(item.quantity || 0);
-          const selectedBulk = item.selectedBulkOption
-            ? Number(item.selectedBulkOption)
-            : undefined;
-          const fulfillment = this.computeFulfillment(
-            productVariant,
-            requestedPackages,
-            selectedBulk,
-          );
-
-          // apply results
-          if (fulfillment.status === "CANCELLED") {
-            item.status = "CANCELLED";
-            item.quantity = 0;
-            item.selectedBulkOption =
-              fulfillment.finalSize ?? item.selectedBulkOption;
-          } else {
-            item.status =
-              fulfillment.status === "FULFILLED"
-                ? item.status || "FULFILLED"
-                : "PARTIALLY_RETURNED";
-            item.quantity = fulfillment.finalQty;
-            if (fulfillment.finalSize != null)
-              item.selectedBulkOption = fulfillment.finalSize;
-          }
-
-          // Si hay tiempo de pedido
-          if (productVariant.requestTime !== "") {
-            const days = Number(productVariant.requestTime) || 0;
-            const awaitingDate = new Date();
-            awaitingDate.setDate(awaitingDate.getDate() + days);
-            item.awaitingStockAt = awaitingDate;
-          }
-
-          // Aplicar ofertas sobre el precio por paquete (finalPrice representa precio por paquete según tamaño)
-          const priceInfo = await this.pricingService.priceForOrderItem({
-            productVariant,
-            requestedQuantity: item.quantity,
-            selectedBulkOption: item.selectedBulkOption,
-          });
-
-          if (item.awaitingStockAt && item.awaitingStockAt > awaitingStockAt) {
-            awaitingStockAt = item.awaitingStockAt;
-          }
-
-
-          totalPrice += priceInfo.totalPriceSnapshot;
-
-          return {
-            quantity: item.quantity,
-            productVariantId: item.productVariantId,
-            productNameSnapshot: productVariant.product?.name || "",
-            variantNameSnapshot: productVariant.name,
-            selectedBulkOption: item.selectedBulkOption,
-            unitPriceSnapshot: priceInfo.unitPriceSnapshot,
-            discountAppliedSnapshot: priceInfo.discountAppliedSnapshot,
-            offerTypeSnapshot: priceInfo.offerTypeSnapshot,
-            status: item.status || "FULFILLED",
-            awaitingStockAt: item.awaitingStockAt,
-          };
-        });
-
-      const orderItems = await Promise.all(itemsForCreation);
-      await this.recalculateOrderStatus(data);
-
-      let createOrderDto: CreateOrderDto = {
-        userSuperTokensId: sessionId,
-        totalPrice,
-        totalItems: itemsForCreation.length,
-        paymentType: "DEBIT",
-        status: data.status || "PENDING",
+    return this.orderRepository.createOrder(
+      {
+        userSuperTokensId: userId,
+        totalPrice: Math.round(totalPrice * 100) / 100,
+        totalItems: orderItems.length,
+        paymentType,
+        status: "PENDING",
+        estimatedReadyAt,
         orderItems,
-        estimatedReadyAt:
-          awaitingStockAt > currentDate ? awaitingStockAt : undefined,
-      };
-
-      console.log("createOrderDto", createOrderDto);
-      const response = await this.orderRepository.create(createOrderDto);
-      if (response) {
-        let promises: Promise<any>[] = [];
-        for (const item of orderItems) {
-          if (item.status !== "CANCELLED") {
-            let quantity = item.selectedBulkOption
-              ? item.quantity * item.selectedBulkOption
-              : item.quantity;
-            promises.push(
-              this.updateItemStock(item.productVariantId, quantity, 0, tx),
-            );
-          }
-        }
-        await Promise.all(promises);
-      }
-      return response;
-    });
-  }
-
-  async getOrder(id: number, tx?: any) {
-    return await this.orderRepository.getOrder(id, tx);
-  }
-
-  async updateOrder(id: number, data: UpdateOrderDto) {
-    if (!id || id == 0) {
-      throw new NotFoundError();
-    }
-    return this.orderRepository.withTransaction(async (tx) => {
-      const currentOrder = await this.getOrder(id, tx);
-      console.log("data", data);
-
-      if (currentOrder.status === "CANCELLED") {
-        throw new ValidationError("Order is already cancelled");
-      }
-
-      if (data.status) {
-        currentOrder.status = data.status;
-        if (data.status === "CANCELLED") {
-          currentOrder.orderItems.forEach(async (item: any) => {
-            return await this.applyItemChange(
-              currentOrder,
-              {
-                productVariantId: item.productVariantId,
-                status: "CANCELLED",
-              } as UpdateOrderItemDto,
-              tx,
-            );
-          });
-          return await this.orderRepository.updateOrder(id, currentOrder, tx);
-        }
-      }
-
-      if (data.editItem && data.editItem.length > 0) {
-        for (let item of data.editItem) {
-          if (!item.productVariantId) {
-            throw new ValidationError(
-              "Product variant id is required for adding items",
-            );
-          }
-          await this.applyItemChange(currentOrder, item, tx);
-        }
-        currentOrder.totalPrice = this.calculateTotalPrice(
-          currentOrder.orderItems,
-        );
-        this.recalculateOrderStatus(currentOrder);
-      }
-
-      console.log("currentOrder", currentOrder);
-      // if data.status === confirmed (resto el stock con el servicio de StockMovement)
-      return await this.orderRepository.updateOrder(id, currentOrder, tx);
-    });
-  }
-
-  async applyItemChange(order: OrderDto, item: UpdateOrderItemDto, tx?: any) {
-    console.log("item", item);
-    let currentItem = order.orderItems.find(
-      (i) => i.productVariantId == item.productVariantId,
-    );
-
-    if (!currentItem) {
-      throw new ValidationError(
-        "Item with id " + item.productVariantId + " not found in order",
-      );
-    }
-
-    let itemData: any = {};
-
-    if (item.quantity != null) {
-      if (
-        currentItem.quantity < item.quantity ||
-        item.quantity === currentItem.quantity
-      ) {
-        return new ValidationError(
-          "Quantity must be lower than current quantity",
-        );
-      }
-
-      // obtener variant para calcular tamaños si cambia presentación
-      const productVariant = await this.productVariantService.findOne(
-        currentItem.productVariantId,
-      );
-      const packaging = (productVariant?.packagingOptions || [])
-        .map((p: any) => Number(p))
-        .filter((n: number) => !isNaN(n))
-        .sort((a: number, b: number) => a - b);
-
-      const currentSize =
-        Number(currentItem.selectedBulkOption) || packaging[0] || 1;
-      const newSize =
-        item.selectedBulkOption != null
-          ? Number(item.selectedBulkOption)
-          : currentSize;
-
-      const currentUnits = currentItem.quantity * currentSize;
-      const newUnits = Number(item.quantity) * newSize;
-      const returnedUnits = currentUnits - newUnits;
-
-      if (returnedUnits <= 0) {
-        return new ValidationError("Resulting returned units must be positive");
-      }
-
-      itemData.quantity = Number(item.quantity);
-      itemData.status = item.quantity == 0 ? "RETURNED" : "PARTIALLY_RETURNED";
-
-      // devolver stock: usamos el patrón (oldQuantity = 0, newQty = returnedUnits) para movimiento RETURN
-      await this.updateItemStock(
-        currentItem.productVariantId,
-        0,
-        returnedUnits,
-        tx,
-      );
-    }
-
-    if (item.status) {
-      itemData.status = item.status;
-    }
-    if (item.quantity != null) {
-      if (
-        currentItem.quantity < item.quantity ||
-        item.quantity === currentItem.quantity
-      ) {
-        return new ValidationError(
-          "Quantity must be lower than current quantity",
-        );
-      }
-      itemData.quantity = Number(item.quantity);
-      itemData.status = item.quantity == 0 ? "RETURNED" : "PARTIALLY_RETURNED";
-
-      let quantity = item.selectedBulkOption
-        ? item.quantity * item.selectedBulkOption
-        : item.quantity;
-      await this.updateItemStock(
-        currentItem.productVariantId,
-        quantity,
-        currentItem.quantity,
-        tx,
-      );
-    }
-    if (item.awaitingStockAt) {
-      itemData.awaitingStockAt = item.awaitingStockAt;
-      itemData.status = "AWAITING_STOCK";
-      if (
-        order.estimatedReadyAt &&
-        new Date(item.awaitingStockAt) > order.estimatedReadyAt
-      ) {
-        order.estimatedReadyAt = item.awaitingStockAt;
-      }
-    }
-    if (itemData && Object.keys(itemData).length > 0) {
-      // await this.orderItemService.updateRepository(item.id, itemData);
-      const index = order.orderItems.findIndex(
-        (i) => i.productVariantId == item.productVariantId,
-      );
-      order.orderItems[index] = {
-        ...order.orderItems[index],
-        ...itemData,
-      };
-
-      await this.orderRepository.editItemOfOrder(
-        order.orderItems[index].id,
-        order.orderItems[index],
-        tx,
-      );
-
-      console.log("order.orderItems[index]", order.orderItems[index]);
-    }
-  }
-
-  private recalculateOrderStatus(order: any) {
-    const activeItems = order.orderItems.filter(
-      (i: any) => i.status !== "CANCELLED" && i.status !== "RETURNED",
-    );
-
-    if (activeItems.length === 0) {
-      order.status = "CANCELLED";
-      return;
-    }
-
-    if (activeItems.length < order.orderItems.length) {
-      order.status = "PROCESSING";
-      return;
-    }
-
-    order.status = "PROCESSING";
-  }
-
-  private calculateTotalPrice(orderItems: any[]) {
-    return orderItems.reduce((total, item) => {
-      let quantity = item.selectedBulkOption
-        ? (item.quantity / 1000) * item.selectedBulkOption
-        : item.quantity;
-      return total + item.unitPriceSnapshot * quantity;
-    }, 0);
-  }
-
-  private async updateItemStock(
-    productVariantId: number,
-    oldQuantity: number,
-    newQty?: number,
-    tx?: any,
-  ) {
-    if (newQty == null) {
-      throw new ValidationError("New quantity is required for updating stock");
-    }
-
-    const diff = newQty - oldQuantity;
-
-    if (diff === 0) return;
-
-    await this.stockMovementService.createStockMovement(
-      productVariantId,
-      diff,
-      diff < 0 ? "OUT" : "RETURN",
+      },
       tx,
     );
   }
 
-  private computeFulfillment(
-    productVariant: any,
-    requestedPackages: number,
-    selectedBulkOption?: number,
-  ) {
-    const currentStock = Number(productVariant.currentStock || 0); // unidades (g o unidades)
-    const packaging = (productVariant.packagingOptions || [])
-      .map((p: any) => Number(p))
-      .filter((n: number) => !isNaN(n))
-      .sort((a: number, b: number) => a - b);
-
-    // Unidad/simple (no packaging)
-    if (!packaging || packaging.length === 0) {
-      if (currentStock === 0) {
-        return { finalSize: null, finalQty: 0, status: "CANCELLED", units: 0 };
-      }
-      if (currentStock >= requestedPackages) {
-        return {
-          finalSize: null,
-          finalQty: requestedPackages,
-          status: "FULFILLED",
-          units: requestedPackages,
-        };
-      }
-      return {
-        finalSize: null,
-        finalQty: currentStock,
-        status: "PARTIALLY_RETURNED",
-        units: currentStock,
-      };
+  /** Detalle de una orden. Un cliente solo puede ver las suyas. */
+  async getOrder(id: number, actor?: Actor, tx?: any) {
+    const order = await this.orderRepository.getOrder(id, tx);
+    if (!order) throw new NotFoundError();
+    if (actor && !actor.isStaff && order.userSuperTokensId !== actor.userId) {
+      throw new NotFoundError(); // no revelamos que existe
     }
-
-    // Producto a granel
-    if (currentStock === 0) {
-      return { finalSize: null, finalQty: 0, status: "CANCELLED", units: 0 };
-    }
-
-    const selectedSize = Number(selectedBulkOption) || packaging[0];
-    const requestedUnits = selectedSize * requestedPackages;
-
-    if (currentStock >= requestedUnits) {
-      return {
-        finalSize: selectedSize,
-        finalQty: requestedPackages,
-        status: "FULFILLED",
-        units: requestedUnits,
-      };
-    }
-
-    // Intenta con la misma presentación pero menos paquetes
-    const maxSame = Math.floor(currentStock / selectedSize);
-    if (maxSame >= 1) {
-      return {
-        finalSize: selectedSize,
-        finalQty: maxSame,
-        status: "PARTIALLY_RETURNED",
-        units: maxSame * selectedSize,
-      };
-    }
-
-    // Si no cabe ni una de la presentación seleccionada, buscar presentaciones más pequeñas
-    // Elegimos la presentación más pequeña que permita al menos 1 paquete (maximiza paquetes usando la más pequeña posible)
-    const possible = packaging.filter((s: number) => s <= currentStock);
-    if (possible.length === 0) {
-      return { finalSize: null, finalQty: 0, status: "CANCELLED", units: 0 };
-    }
-    const fallbackSize = possible[0]; // más pequeña que cabe
-    const fallbackQty = Math.floor(currentStock / fallbackSize);
-    return {
-      finalSize: fallbackSize,
-      finalQty: fallbackQty,
-      status: "PARTIALLY_RETURNED",
-      units: fallbackQty * fallbackSize,
-    };
+    return order;
   }
 
-  
+  async listMyOrders(userId: string, page = 1, perPage = 10) {
+    return this.orderRepository.listByUser(userId, page, Math.min(50, perPage));
+  }
+
+  /**
+   * Actualiza una orden.
+   *   - Cliente: solo puede cancelar SU orden mientras esté PENDING/PROCESSING.
+   *   - Staff:   cambia estado, devuelve ítems (parcial o total), marca espera de stock.
+   * Cancelaciones y devoluciones reponen stock con movimientos RETURN.
+   */
+  async updateOrder(id: number, data: UpdateOrderDto, actor: Actor) {
+    if (!id) throw new NotFoundError();
+    if (!data) throw new ValidationError("body vacío");
+
+    return this.orderRepository.withTransaction(async (tx) => {
+      const order = await this.getOrder(id, actor, tx);
+
+      if (order.status === "CANCELLED") {
+        throw new ConflictError("Order is already cancelled");
+      }
+      if (!actor.isStaff) {
+        const onlyCancel =
+          data.status === "CANCELLED" && !data.editItem?.length && Object.keys(data).length === 1;
+        if (!onlyCancel) throw new ForbidenError("Solo podés cancelar tu orden");
+        if (!CUSTOMER_CANCELLABLE.includes(order.status)) {
+          throw new ConflictError(
+            "La orden ya está en preparación y no se puede cancelar. Contactá a la tienda.",
+          );
+        }
+      }
+      if (data.status && !ORDER_STATUSES.includes(data.status)) {
+        throw new ValidationError(`status debe ser uno de ${ORDER_STATUSES.join(", ")}`);
+      }
+      if (data.status && data.status !== order.status) {
+        const allowed = ORDER_TRANSITIONS[order.status] ?? [];
+        if (!allowed.includes(data.status)) {
+          throw new ConflictError(
+            `No se puede pasar de ${order.status} a ${data.status}` +
+              (allowed.length ? ` (permitido: ${allowed.join(", ")})` : " (estado final)"),
+          );
+        }
+      }
+
+      const fields: Record<string, any> = {};
+
+      if (data.status === "CANCELLED") {
+        for (const item of order.orderItems) {
+          await this.closeItem(order, item, "CANCELLED", tx);
+        }
+      } else {
+        for (const change of data.editItem ?? []) {
+          await this.applyItemChange(order, change, fields, tx);
+        }
+        if (data.status) fields.status = data.status;
+      }
+
+      // Totales y estado derivados de las líneas
+      fields.totalPrice = order.orderItems.reduce(
+        (sum: number, it: any) => sum + this.pricingService.lineTotal(it),
+        0,
+      );
+      fields.totalPrice = Math.round(fields.totalPrice * 100) / 100;
+      if (order.orderItems.every((it: any) => CLOSED_ITEM_STATUSES.includes(it.status))) {
+        fields.status = "CANCELLED";
+      }
+
+      return this.orderRepository.updateOrderFields(id, fields, tx);
+    });
+  }
+
+  /** Devuelve TODO el stock de una línea y la cierra. */
+  private async closeItem(order: any, item: any, status: "CANCELLED" | "RETURNED", tx: any) {
+    if (CLOSED_ITEM_STATUSES.includes(item.status)) return;
+    const units = stockUnitsOf(item);
+    if (units > 0 && item.productVariantId) {
+      await this.stockRepository.createStockMovement(item.productVariantId, units, "RETURN", tx);
+    }
+    const updated = { status, quantity: 0, discountAppliedSnapshot: 0 };
+    await this.orderRepository.updateItem(item.id, updated, tx);
+    Object.assign(item, updated);
+  }
+
+  private async applyItemChange(
+    order: any,
+    change: UpdateOrderItemDto,
+    orderFields: Record<string, any>,
+    tx: any,
+  ) {
+    const item = order.orderItems.find((i: any) =>
+      change.id ? i.id === Number(change.id) : i.productVariantId === Number(change.productVariantId),
+    );
+    if (!item) {
+      throw new ValidationError(
+        `Item ${change.id ?? change.productVariantId} not found in order`,
+      );
+    }
+    if (CLOSED_ITEM_STATUSES.includes(item.status)) {
+      throw new ConflictError(`El ítem ${item.id} ya está ${item.status}`);
+    }
+
+    // Cierre total de la línea
+    if (change.status === "CANCELLED" || change.status === "RETURNED") {
+      await this.closeItem(order, item, change.status, tx);
+      return;
+    }
+
+    const itemData: Record<string, any> = {};
+
+    // Devolución parcial: solo se puede bajar la cantidad
+    if (change.quantity != null) {
+      const newQty = Number(change.quantity);
+      if (!Number.isFinite(newQty) || newQty < 0 || newQty >= item.quantity) {
+        throw new ValidationError("La nueva cantidad debe ser menor a la actual y >= 0");
+      }
+      if (newQty === 0) {
+        await this.closeItem(order, item, "RETURNED", tx);
+        return;
+      }
+      const returnedUnits = stockUnitsOf(item) - stockUnitsOf({ ...item, quantity: newQty });
+      await this.stockRepository.createStockMovement(
+        item.productVariantId,
+        returnedUnits,
+        "RETURN",
+        tx,
+      );
+      // El descuento se prorratea a la cantidad que queda
+      itemData.discountAppliedSnapshot =
+        Math.round(((item.discountAppliedSnapshot ?? 0) * newQty * 100) / item.quantity) / 100;
+      itemData.quantity = newQty;
+      itemData.status = "PARTIALLY_RETURNED";
+    }
+
+    if (change.awaitingStockAt) {
+      const date = new Date(change.awaitingStockAt);
+      if (Number.isNaN(date.getTime())) throw new ValidationError("awaitingStockAt inválido");
+      itemData.awaitingStockAt = date;
+      itemData.status = "AWAITING_STOCK";
+      const currentEta = orderFields.estimatedReadyAt ?? order.estimatedReadyAt;
+      if (!currentEta || date > new Date(currentEta)) orderFields.estimatedReadyAt = date;
+    } else if (change.status === "FULFILLED" || change.status === "AWAITING_STOCK") {
+      itemData.status = change.status;
+    }
+
+    if (Object.keys(itemData).length > 0) {
+      await this.orderRepository.updateItem(item.id, itemData, tx);
+      Object.assign(item, itemData);
+    }
+  }
+
+  /**
+   * Ajusta lo pedido al stock disponible.
+   *   - Sin presentaciones: `requested` son gramos (KG) o unidades.
+   *   - Con presentaciones: `requested` son paquetes de `selectedBulkOption` g/u.
+   *     Si no alcanza, prueba menos paquetes y luego presentaciones más chicas.
+   */
+  private computeFulfillment(
+    variant: any,
+    requested: number,
+    selectedBulkOption?: number,
+  ): Fulfillment {
+    const stock = Number(variant.currentStock || 0);
+    const packaging: number[] = (variant.packagingOptions || [])
+      .map(Number)
+      .filter((n: number) => n > 0)
+      .sort((a: number, b: number) => a - b);
+
+    if (stock <= 0) return { finalSize: null, finalQty: 0, status: "CANCELLED", units: 0 };
+
+    if (packaging.length === 0) {
+      const qty = Math.min(stock, requested);
+      return {
+        finalSize: null,
+        finalQty: qty,
+        status: qty === requested ? "FULFILLED" : "PARTIALLY_RETURNED",
+        units: qty,
+      };
+    }
+
+    const size =
+      selectedBulkOption && packaging.includes(selectedBulkOption)
+        ? selectedBulkOption
+        : packaging[0];
+    if (selectedBulkOption && !packaging.includes(selectedBulkOption)) {
+      throw new ValidationError(
+        `La presentación ${selectedBulkOption} no existe para "${variant.name}" (opciones: ${packaging.join(", ")})`,
+      );
+    }
+
+    if (stock >= size * requested) {
+      return { finalSize: size, finalQty: requested, status: "FULFILLED", units: size * requested };
+    }
+    const maxSame = Math.floor(stock / size);
+    if (maxSame >= 1) {
+      return { finalSize: size, finalQty: maxSame, status: "PARTIALLY_RETURNED", units: maxSame * size };
+    }
+    const fallback = packaging.find((s) => s <= stock);
+    if (!fallback) return { finalSize: null, finalQty: 0, status: "CANCELLED", units: 0 };
+    const qty = Math.floor(stock / fallback);
+    return { finalSize: fallback, finalQty: qty, status: "PARTIALLY_RETURNED", units: qty * fallback };
+  }
 }

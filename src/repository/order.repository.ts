@@ -1,104 +1,97 @@
-import { OrderItemRepository } from "./order-item.repository.js";
-import { PrismaClient } from "@prisma/client";
+import { GenericRepositoryImpl } from "./generic.repository.js";
 import { OrderDto } from "../dto/order/order.dto.js";
 import { CreateOrderDto } from "../dto/order/create-order.dto.js";
 import { UpdateOrderDto } from "../dto/order/update-order.dto.js";
-import { GenericRepositoryImpl } from "./generic.repository.js";
-import { StoreProcedureError } from "../errors/infra/StoreProcedureError.js";
-import { UpdateOrderItemDto } from "../dto/order-item/update-order-item.dto.js";
-import { DatabaseError } from "../errors/infra/DatabaseError.js";
-import { ValidationError } from "../errors/application/ValidationError.js";
-import { NotFoundError } from "../errors/application/NotFoundError.js";
+import { translatePrismaError } from "../errors/infra/translatePrismaError.js";
+
+const ORDER_INCLUDE = {
+  orderItems: {
+    orderBy: { id: "asc" as const },
+    include: {
+      productVariant: {
+        select: {
+          id: true,
+          name: true,
+          contentMeasure: true,
+          packagingOptions: true,
+          images: true,
+          product: { select: { id: true, name: true } },
+        },
+      },
+    },
+  },
+};
 
 export class OrderRepository extends GenericRepositoryImpl<
   OrderDto,
   CreateOrderDto,
   UpdateOrderDto
 > {
-  protected prisma: PrismaClient;
-  protected orderItemRepository: OrderItemRepository;
   constructor() {
-    super("order");
-    this.prisma = new PrismaClient({
-      log: ["query", "info", "warn", "error"],
-    });
-    this.orderItemRepository = new OrderItemRepository();
+    super("order", { orderBy: { id: "desc" } });
   }
 
-  async getOrder(id: number, tx?: PrismaClient): Promise<any> {
-    console.log("id", id);
+  async getOrder(id: number, tx?: any): Promise<any> {
     try {
-      const model = tx ?? this.prisma;
-      return await model.order.findFirst({
-        where: { id },
-        include: {
-          user: true,
-          orderItems: {
-            include: {
-              productVariant: {
-                include: {
-                  product: true,
-                  offers: true
-                },
-              },
-            },
-          },
-        },
+      return await (tx ?? this.prisma).order.findUnique({
+        where: { id: Number(id) },
+        include: { user: true, ...ORDER_INCLUDE },
       });
     } catch (error) {
-      throw new DatabaseError();
-    }
-  }
-  
-  async deleteOrder(id: number, tx?: PrismaClient): Promise<any> {
-    const model = tx ?? this.prisma;
-    return await model.order.deleteMany({
-      where: {
-        id,
-      },
-    });
-  }
-
-  async updateOrder(id: number, data: UpdateOrderItemDto, tx?: PrismaClient) {
-    try {
-      await super.update(id, data, tx);
-      return this.updateTimeOnOrder(id, tx);
-    } catch (error) {
-      throw new DatabaseError();
+      throw translatePrismaError(error);
     }
   }
 
-  async updateTimeOnOrder(id: number, tx?: PrismaClient) {
+  async listByUser(userSuperTokensId: string, page = 1, perPage = 10) {
+    const where = { userSuperTokensId };
+    const [totalElements, entityList] = await Promise.all([
+      this.prisma.order.count({ where }),
+      this.prisma.order.findMany({
+        where,
+        include: ORDER_INCLUDE,
+        orderBy: { id: "desc" },
+        take: perPage,
+        skip: (page - 1) * perPage,
+      }),
+    ]);
+    return { entityList, totalElements, currentPage: page, amountPerPage: perPage };
+  }
+
+  async createOrder(
+    data: Omit<CreateOrderDto, "orderItems"> & { orderItems: any[] },
+    tx?: any,
+  ) {
     try {
-      const currentOrder = await this.getOrder(id);
-      const model = tx ?? this.prisma;
-      return await model.order.update({
-        where: { id: currentOrder.id },
-        data: { updatedAt: new Date() },
-        include: {
-          orderItems: {
-            include: {
-              productVariant: {
-                include: {
-                  product: true,
-                },
-              },
-            },
-          },
-        },
+      const { orderItems, ...order } = data;
+      return await (tx ?? this.prisma).order.create({
+        data: { ...order, orderItems: { create: orderItems } },
+        include: ORDER_INCLUDE,
       });
-    } catch (error: any) {
-      throw new StoreProcedureError("update_time_on_order", error);
+    } catch (error) {
+      throw translatePrismaError(error);
     }
   }
 
-  async editItemOfOrder(id: number, data: UpdateOrderItemDto, tx?: PrismaClient) {
-    if (!id || id == 0) {
-      throw new NotFoundError();
+  async updateOrderFields(id: number, data: Record<string, any>, tx?: any) {
+    try {
+      return await (tx ?? this.prisma).order.update({
+        where: { id: Number(id) },
+        data,
+        include: ORDER_INCLUDE,
+      });
+    } catch (error) {
+      throw translatePrismaError(error);
     }
-    if (!data.productVariantId) {
-      throw new ValidationError("Product variant id is required for updating order item");
+  }
+
+  async updateItem(itemId: number, data: Record<string, any>, tx?: any) {
+    try {
+      return await (tx ?? this.prisma).orderItem.update({
+        where: { id: Number(itemId) },
+        data,
+      });
+    } catch (error) {
+      throw translatePrismaError(error);
     }
-    return await this.orderItemRepository.update(id, data, tx);
   }
 }

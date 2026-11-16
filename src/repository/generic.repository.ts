@@ -153,6 +153,59 @@ export class GenericRepositoryImpl<T, U, V>
     }
   }
 
+  /**
+   * Como `search`, pero restringido a `rankedIds` y respetando ese orden
+   * (búsqueda por relevancia). Los demás filtros se aplican igual.
+   */
+  async searchRanked(
+    filters: any,
+    rankedIds: number[],
+    paginate: boolean,
+    currentPage: number,
+    amountPerPage: number,
+    detalle: boolean,
+    tx?: any,
+  ): Promise<SearchResult<T>> {
+    const { search, post } = await this.getMappings();
+    const page = Math.max(1, Number(currentPage) || 1);
+    const perPage = Math.min(100, Math.max(1, Number(amountPerPage) || 10));
+    const empty = { entityList: [], currentPage: page, amountPerPage: perPage, totalElements: 0 };
+    if (!rankedIds.length) return empty;
+
+    const filterWhere = prismaQueryBuilder(filters, search ?? {});
+    const hasFilters = Object.keys(filterWhere ?? {}).length > 0;
+    try {
+      const model = this.model(tx);
+      // Sin otros filtros no hace falta consultar cuáles de los ids pasan
+      let ordered = rankedIds;
+      if (hasFilters) {
+        const where = { AND: [filterWhere, { id: { in: rankedIds } }] };
+        const matching = new Set(((await model.findMany({ where, select: { id: true } })) as any[]).map((r) => r.id));
+        ordered = rankedIds.filter((id) => matching.has(id));
+      }
+      const pageIds = paginate ? ordered.slice((page - 1) * perPage, page * perPage) : ordered;
+      if (!pageIds.length) return { ...empty, totalElements: ordered.length };
+
+      const query: any = { where: { id: { in: pageIds } } };
+      if (detalle && search) {
+        const include = this.includeQuery(search);
+        if (Object.keys(include).length > 0) query.include = include;
+      }
+      const position = new Map(pageIds.map((id, i) => [id, i]));
+      const rows = ((await model.findMany(query)) as any[]).sort(
+        (a, b) => position.get(a.id)! - position.get(b.id)!,
+      );
+      return {
+        entityList: rows.map((e) => this.postProcess(e, post)),
+        currentPage: page,
+        amountPerPage: perPage,
+        totalElements: ordered.length,
+      };
+    } catch (error) {
+      throw translatePrismaError(error);
+    }
+  }
+
   async getById(id: number, tx?: any): Promise<T> {
     const { search, post } = await this.getMappings();
     const include = search ? this.includeQuery(search) : undefined;

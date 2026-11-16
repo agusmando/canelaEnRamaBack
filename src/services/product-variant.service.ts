@@ -1,3 +1,4 @@
+import { catalogSearch } from "./catalog-search.service.js";
 import { CreateProductVariantDto } from "../dto/product-variant/create-product-variant.dto.js";
 import { ProductVariantDto } from "../dto/product-variant/product-variant.dto.js";
 import { UpdateProductVariantDto } from "../dto/product-variant/update-product-variant.dto.js";
@@ -34,6 +35,18 @@ export class ProductVariantService extends GenericServiceImpl<
     this.productVariantRepository = productVariantRepository;
     this.stockRepository = stockRepository;
     this.imageService = imageService;
+  }
+
+  /**
+   * Listado. Con `?q=` busca como la tienda (sin acentos, todas las palabras en
+   * cualquier orden, ordenado por relevancia); el resto de los filtros se suma.
+   */
+  async getListedElements(filters: any, paginate = false, currentPage = 1, amountPerPage = 10, detalle = false) {
+    const q = String(filters?.q ?? "").trim();
+    if (!q) return super.getListedElements(filters, paginate, currentPage, amountPerPage, detalle);
+    const { q: _q, ...rest } = filters;
+    const ids = await catalogSearch.variantIds(q);
+    return this.repository.searchRanked(rest, ids, paginate, currentPage, amountPerPage, detalle);
   }
 
   /**

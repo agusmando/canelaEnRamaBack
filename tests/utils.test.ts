@@ -64,3 +64,54 @@ describe("fecha en movimientos manuales", () => {
   });
 });
 
+
+// ---------------------------------------------------------------- Búsqueda de catálogo
+import { normalizeText, rankByText, stem } from "../src/utils/textSearch.js";
+import { CatalogSearchService } from "../src/services/catalog-search.service.js";
+
+describe("búsqueda de catálogo", () => {
+  const items = [
+    { id: 1, name: "Harina de almendras", text: "Harinas" },
+    { id: 2, name: "Almendras", text: "Frutos secos" },
+    { id: 3, name: "Nueces", text: "Frutos secos Mariposa" },
+    { id: 4, name: "Maní salado", text: "Frutos secos" },
+    { id: 5, name: "Avena", text: "Cereales Sin TACC" },
+  ];
+
+  it("normaliza acentos, mayúsculas y espacios", () => {
+    expect(normalizeText("  Maní  ÑANDÚ ")).toBe("mani nandu");
+  });
+
+  it("primero lo que empieza con lo buscado, después nombre, después el resto", () => {
+    expect(rankByText(items, "ALMENDRA")).toEqual([2, 1]);
+    expect(rankByText(items, "frutos")).toEqual([2, 4, 3]);
+  });
+
+  it("todas las palabras, en cualquier orden y en cualquier campo", () => {
+    expect(rankByText(items, "mariposa nuez")).toEqual([3]);
+    expect(rankByText(items, "sin tacc")).toEqual([5]);
+    expect(rankByText(items, "mani almendra")).toEqual([]);
+  });
+
+  it("singular / plural y palabras a medio escribir", () => {
+    expect(stem("nueces")).toBe("nuez");
+    expect(stem("almendras")).toBe("almendra");
+    expect(rankByText(items, "nuez")).toEqual([3]);
+    expect(rankByText(items, "almen")).toEqual([2, 1]);
+    expect(rankByText(items, "mani")).toEqual([4]);
+  });
+
+  it("el índice se arma una vez y se renueva al invalidar", async () => {
+    const findMany = vi.fn(async () => [
+      { id: 7, name: "Miel", description: null, isLocal: true, Category: null, Brand: { name: "Canela en Rama" }, Tags: [], variants: [{ id: 70, name: "default", isLocal: null }, { id: 71, name: "Pote", isLocal: false }] },
+    ]);
+    const svc = new CatalogSearchService({ product: { findMany } });
+    expect(await svc.productIds("productor local")).toEqual([7]);
+    expect(await svc.variantIds("miel local")).toEqual([70]);
+    expect(await svc.variantIds("miel pote")).toEqual([71]);
+    expect(findMany).toHaveBeenCalledTimes(1);
+    svc.invalidate();
+    await svc.productIds("miel");
+    expect(findMany).toHaveBeenCalledTimes(2);
+  });
+});

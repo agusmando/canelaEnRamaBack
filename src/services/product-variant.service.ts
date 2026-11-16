@@ -117,26 +117,7 @@ export class ProductVariantService extends GenericServiceImpl<
         }
 
         // 3. Stock
-        const targetStock = toNumber(data.currentStock);
-        const increment = toNumber(data.stockIncrement);
-        if (targetStock !== undefined && increment !== undefined) {
-          throw new ValidationError("Enviar currentStock o stockIncrement, no ambos");
-        }
-        if (targetStock !== undefined) {
-          await this.stockRepository.setStockLevel(id, targetStock, tx);
-        } else if (increment) {
-          const isMix = (updated.hasComponents?.length ?? 0) > 0;
-          if (increment > 0 && isMix) {
-            await this.stockRepository.processMixProduction(id, increment, tx);
-          } else {
-            await this.stockRepository.createStockMovement(
-              id,
-              increment,
-              increment < 0 ? "OUT" : "IN",
-              tx,
-            );
-          }
-        }
+        await this.applyStockChange(id, data, (updated.hasComponents?.length ?? 0) > 0, tx);
 
         // 4. Imágenes a eliminar (solo DB; Cloudinary después del commit)
         removedPublicIds = await this.imageService.removeImagesDb(data.removeImages, id, tx);
@@ -192,5 +173,40 @@ export class ProductVariantService extends GenericServiceImpl<
   /** Variante lista para vender (con producto, ofertas e imágenes). */
   async findForSale(id: number, tx?: any) {
     return this.productVariantRepository.findForSale(id, tx);
+  }
+
+  /**
+   * Ajuste de stock sin tocar el resto de la variante (PUT /product/variant/:id/stock).
+   * Lo usan quienes tienen stock.manage aunque no puedan editar el catálogo.
+   *   { currentStock }    fija el inventario (ajuste por la diferencia)
+   *   { stockIncrement }  suma o resta (en un mix, sumar = producir)
+   */
+  async adjustStock(id: number, data: { currentStock?: unknown; stockIncrement?: unknown }) {
+    if (toNumber(data?.currentStock) === undefined && !toNumber(data?.stockIncrement)) {
+      throw new ValidationError("Enviá currentStock o stockIncrement");
+    }
+    return this.productVariantRepository.withTransaction(async (tx: any) => {
+      const variant = await tx.productVariant.findUnique({ where: { id }, include: { hasComponents: true } });
+      if (!variant) throw new NotFoundError();
+      await this.applyStockChange(id, data, variant.hasComponents.length > 0, tx);
+      return this.productVariantRepository.getById(id, tx);
+    });
+  }
+
+  private async applyStockChange(id: number, data: any, isMix: boolean, tx: any) {
+    const targetStock = toNumber(data.currentStock);
+    const increment = toNumber(data.stockIncrement);
+    if (targetStock !== undefined && increment !== undefined) {
+      throw new ValidationError("Enviar currentStock o stockIncrement, no ambos");
+    }
+    if (targetStock !== undefined) {
+      await this.stockRepository.setStockLevel(id, targetStock, tx);
+    } else if (increment) {
+      if (increment > 0 && isMix) {
+        await this.stockRepository.processMixProduction(id, increment, tx);
+      } else {
+        await this.stockRepository.createStockMovement(id, increment, increment < 0 ? "OUT" : "IN", tx);
+      }
+    }
   }
 }

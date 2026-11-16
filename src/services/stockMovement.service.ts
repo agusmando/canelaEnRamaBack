@@ -7,6 +7,9 @@ import { BadRequestError } from "../errors/application/BadRequestError.js";
 
 const MANUAL_TYPES: MovementType[] = ["IN", "OUT", "ADJUSTMENT", "RETURN"];
 const MAX_BULK = 200;
+/** Hasta cuánto atrás se puede fechar un movimiento manual. */
+const MAX_BACKDATE_DAYS = 366;
+const FUTURE_TOLERANCE_MS = 5 * 60 * 1000;
 
 export class StockMovementService extends GenericServiceImpl<
   MovementDto,
@@ -43,7 +46,19 @@ export class StockMovementService extends GenericServiceImpl<
     if (type === "OUT" && quantity > 0) {
       throw new BadRequestError(`${prefix}un movimiento OUT debe tener cantidad negativa`);
     }
-    return { variantId, quantity, type };
+    let createdAt: Date | null = null;
+    if (data?.createdAt !== undefined && data?.createdAt !== null && data?.createdAt !== "") {
+      createdAt = new Date(data.createdAt);
+      if (Number.isNaN(createdAt.getTime())) throw new ValidationError(`${prefix}la fecha no es válida`);
+      const now = Date.now();
+      if (createdAt.getTime() > now + FUTURE_TOLERANCE_MS) {
+        throw new ValidationError(`${prefix}la fecha no puede ser futura`);
+      }
+      if (createdAt.getTime() < now - MAX_BACKDATE_DAYS * 86_400_000) {
+        throw new ValidationError(`${prefix}la fecha no puede tener más de un año`);
+      }
+    }
+    return { variantId, quantity, type, createdAt };
   }
 
   /**
@@ -51,9 +66,9 @@ export class StockMovementService extends GenericServiceImpl<
    * actualizar `currentStock`; ahora pasa por la función SQL.
    */
   async create(data: CreateMovementDto): Promise<any> {
-    const { variantId, quantity, type } = this.parseManual(data);
-    const currentStock = await this.stockRepository.createStockMovement(variantId, quantity, type);
-    return { productVariantId: variantId, quantity, type, currentStock };
+    const { variantId, quantity, type, createdAt } = this.parseManual(data);
+    const currentStock = await this.stockRepository.createStockMovement(variantId, quantity, type, undefined, createdAt);
+    return { productVariantId: variantId, quantity, type, createdAt: createdAt ?? new Date(), currentStock };
   }
 
   /**
@@ -69,7 +84,7 @@ export class StockMovementService extends GenericServiceImpl<
       const results = [];
       for (const [i, m] of parsed.entries()) {
         try {
-          const currentStock = await this.stockRepository.createStockMovement(m.variantId, m.quantity, m.type, tx);
+          const currentStock = await this.stockRepository.createStockMovement(m.variantId, m.quantity, m.type, tx, m.createdAt);
           results.push({ productVariantId: m.variantId, quantity: m.quantity, type: m.type, currentStock });
         } catch (error: any) {
           // El mensaje de la función SQL (p. ej. stock insuficiente) con el número de fila

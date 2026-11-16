@@ -1,4 +1,5 @@
 import { SMTPService } from "supertokens-node/recipe/emailpassword/emaildelivery";
+import { escapeHtml, smtpSettings } from "../mailer.js";
 
 /**
  * Envío del mail de "recuperar contraseña" por SMTP propio (Gmail, Brevo,
@@ -11,8 +12,6 @@ import { SMTPService } from "supertokens-node/recipe/emailpassword/emaildelivery
  * por defecto (mail genérico en inglés): sirve para probar, no para producción.
  */
 
-const escapeHtml = (text: string) =>
-  text.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 
 /** Datos de la invitación al panel: el mismo enlace de "elegir contraseña" con otro texto. */
 export type InviteContext = { invite: { roleLabel: string; dashboardUrl?: string } };
@@ -63,24 +62,23 @@ function passwordResetHtml(link: string, invite?: InviteContext["invite"]) {
 }
 
 export function passwordResetEmailDelivery() {
-  const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD, SMTP_FROM_EMAIL, SMTP_FROM_NAME } = process.env;
-  if (!SMTP_HOST || !SMTP_PASSWORD || !(SMTP_FROM_EMAIL || SMTP_USER)) {
+  const cfg = smtpSettings();
+  if (!cfg) {
     if (process.env.NODE_ENV === "production") {
       console.warn("[auth] SMTP no configurado: el mail de recuperar contraseña usa el servicio genérico de SuperTokens");
     }
     return undefined;
   }
-  const port = Number(SMTP_PORT) || 587;
 
   return {
     service: new SMTPService({
       smtpSettings: {
-        host: SMTP_HOST,
-        port,
-        secure: port === 465,
-        authUsername: SMTP_USER,
-        password: SMTP_PASSWORD,
-        from: { name: SMTP_FROM_NAME || "Canela en Rama", email: (SMTP_FROM_EMAIL || SMTP_USER)! },
+        host: cfg.host,
+        port: cfg.port,
+        secure: cfg.secure,
+        authUsername: cfg.user,
+        password: cfg.password,
+        from: { name: cfg.fromName, email: cfg.fromEmail },
       },
       override: (original) => ({
         ...original,

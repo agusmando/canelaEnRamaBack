@@ -23,6 +23,13 @@ router
   .route("/:id")
   .get(...publicView, productVariantController.findOne.bind(productVariantController))
   .put(...staffWithImages, productVariantController.update.bind(productVariantController));
+// Ajuste de stock: alcanza con stock.manage (no hace falta poder editar el catálogo)
+router.put(
+  "/:id/stock",
+  ...requirePermission("stock.manage"),
+  productVariantController.adjustStock.bind(productVariantController),
+);
+
 router
   .route("/:id/active/")
   .delete(

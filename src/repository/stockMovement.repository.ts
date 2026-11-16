@@ -17,7 +17,8 @@ export class StockMovementRepository extends GenericRepositoryImpl<
   CreateMovementDto
 > {
   constructor() {
-    super("stockMovement", { orderBy: { id: "desc" } });
+    // Por fecha del movimiento: los cargados con fecha anterior quedan en su lugar.
+    super("stockMovement", { orderBy: [{ createdAt: "desc" }, { id: "desc" }] });
   }
 
   private async callSp<R = unknown>(name: string, run: (db: any) => Promise<R>, tx?: any) {
@@ -47,11 +48,14 @@ export class StockMovementRepository extends GenericRepositoryImpl<
     delta: number,
     type: MovementType | string,
     tx?: any,
+    createdAt?: Date | null,
   ): Promise<number> {
     const rows = await this.callSp<{ stock: number }[]>(
       "create_stock_movement",
       (db) =>
-        db.$queryRaw`SELECT public.create_stock_movement(${Number(variantId)}::INT, ${Math.round(Number(delta))}::INT, ${type}::TEXT) AS stock`,
+        createdAt
+          ? db.$queryRaw`SELECT public.create_stock_movement(${Number(variantId)}::INT, ${Math.round(Number(delta))}::INT, ${type}::TEXT, ${createdAt}::TIMESTAMP(3)) AS stock`
+          : db.$queryRaw`SELECT public.create_stock_movement(${Number(variantId)}::INT, ${Math.round(Number(delta))}::INT, ${type}::TEXT) AS stock`,
       tx,
     );
     return Number(rows?.[0]?.stock);

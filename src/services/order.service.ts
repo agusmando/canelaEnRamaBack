@@ -16,6 +16,7 @@ import { CartService } from "./cart.service.js";
 import { ShipmentRepository } from "../repository/shipment.repository.js";
 import { isMercadoPagoConfigured } from "../config/mercadopago.js";
 import { streetLine, ShippingQuoteService, type ShippingQuote } from "./shipping-quote.service.js";
+import { orderMails } from "./order-mail.service.js";
 import { newTrackingCode } from "../utils/trackingCode.js";
 
 /** Envío resuelto antes de abrir la transacción (la cotización es una llamada externa). */
@@ -94,7 +95,14 @@ export class OrderService extends GenericServiceImpl<OrderDto, CreateOrderDto, U
     const paymentType = this.parsePaymentType(data.paymentType);
     const shipping = await this.resolveShipping((data as any).shippingMethod, userId);
 
-    return this.orderRepository.withTransaction((tx) => this.placeOrder(data, paymentType, userId, tx, shipping));
+    const order = await this.orderRepository.withTransaction((tx) => this.placeOrder(data, paymentType, userId, tx, shipping));
+    this.mailReceived(order);
+    return order;
+  }
+
+  /** Mail de "pedido recibido". Con Mercado Pago se manda al acreditarse el pago. */
+  private mailReceived(order: any) {
+    if (order?.id && order.paymentType !== "MERCADOPAGO") orderMails.notify("received", order.id);
   }
 
   /** PICKUP (por defecto) o DELIVERY: en ese caso exige domicilio y cotiza en el servidor. */
@@ -123,6 +131,9 @@ export class OrderService extends GenericServiceImpl<OrderDto, CreateOrderDto, U
         shipping,
       );
       await this.cartService.clearCart(cartId, tx);
+      return order;
+    }).then((order) => {
+      this.mailReceived(order);
       return order;
     });
   }
@@ -282,7 +293,8 @@ export class OrderService extends GenericServiceImpl<OrderDto, CreateOrderDto, U
     if (!id) throw new NotFoundError();
     if (!data) throw new ValidationError("body vacío");
 
-    return this.orderRepository.withTransaction(async (tx) => {
+    let cancelled = false;
+    const updated = await this.orderRepository.withTransaction(async (tx) => {
       const order = await this.getOrder(id, actor, tx);
 
       if (order.status === "CANCELLED") {
@@ -364,8 +376,11 @@ export class OrderService extends GenericServiceImpl<OrderDto, CreateOrderDto, U
         );
       }
 
+      cancelled = fields.status === "CANCELLED";
       return this.orderRepository.updateOrderFields(id, fields, tx);
     });
+    if (cancelled) orderMails.notify("cancelled", id);
+    return updated;
   }
 
   /** Devuelve TODO el stock de una línea y la cierra. */

@@ -16,7 +16,7 @@ type EntityMappings = {
 
 export type RepositoryOptions = {
   /** Orden por defecto de los listados. `null` para modelos sin `id` (ej. CartItem). */
-  orderBy?: Record<string, "asc" | "desc"> | null;
+  orderBy?: Record<string, "asc" | "desc"> | Record<string, "asc" | "desc">[] | null;
 };
 
 export type SearchResult<T> = {
@@ -39,7 +39,7 @@ export class GenericRepositoryImpl<T, U, V>
   /** Cliente compartido. Las subclases lo usan para consultas propias. */
   protected prisma: PrismaClient = sharedPrisma;
   protected readonly prismaName: string;
-  private readonly orderBy: Record<string, "asc" | "desc"> | null;
+  private readonly orderBy: Record<string, "asc" | "desc"> | Record<string, "asc" | "desc">[] | null;
   private mappingsPromise?: Promise<EntityMappings>;
 
   constructor(prismaName: string, options: RepositoryOptions = {}) {

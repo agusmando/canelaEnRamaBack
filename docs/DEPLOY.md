@@ -26,9 +26,9 @@ feature/x ──PR──▶ develop ──(se prueba en *-dev)──PR──▶ 
   desde una compu apuntando a prod. Ver "Migraciones".
 - CI (GitHub Actions) corre typecheck + tests en cada push y PR del backend.
 
-> El panel se llama `master` como rama principal (no `main`). Se puede
-> renombrar a `main` en GitHub → Settings → Branches para que los tres repos
-> sean iguales; Vercel se actualiza solo.
+> Los tres repos usan `main` como rama principal (el panel usaba `master`:
+> después de pushear `main`, cambiar la rama por defecto en GitHub →
+> Settings → Branches y borrar `master`).
 
 ---
 
@@ -65,10 +65,22 @@ feature/x ──PR──▶ develop ──(se prueba en *-dev)──PR──▶ 
 En supertokens.com crear **dos cores** (o dos "apps"): `prod` (el actual) y `dev`.
 Cada uno da `SUPERTOKENS_CONNECTION_URI` + `SUPERTOKENS_API_KEY`.
 
-- Login con Google: en Google Cloud Console → Credentials, el OAuth client de
-  prod tiene como orígenes `https://canelaenrama.com.ar`; crear otro para dev con
-  `https://dev.canelaenrama.com.ar` y `http://localhost:5173`. Cada client id/secret
-  se carga en su core.
+- Login con Google (tienda y panel): en Google Cloud Console → Credentials →
+  OAuth client, "Authorized redirect URIs":
+  - prod: `https://canelaenrama.com.ar/auth/callback/google` y
+    `https://admin.canelaenrama.com.ar/auth/callback/google`
+  - dev (otro client): `https://dev.canelaenrama.com.ar/auth/callback/google`,
+    `https://admin-dev.canelaenrama.com.ar/auth/callback/google`,
+    `http://localhost:5173/auth/callback/google` y `http://localhost:5174/auth/callback/google`
+
+  Cada client id/secret se carga en su core.
+- Sin "account linking", una misma persona con cuenta de email y cuenta de
+  Google son dos usuarios distintos: el rol se asigna a la cuenta con la que
+  va a entrar al panel (Usuarios → buscar por email).
+- Dashboard de SuperTokens (`/api/auth/dashboard`): apagado en prod
+  (`SUPERTOKENS_DASHBOARD=off`), prendido en dev. Si hace falta en prod, ponerlo
+  en `on` un rato y volver a apagarlo; `SUPERTOKENS_DASHBOARD_ADMINS` limita
+  quién puede modificar.
 - Después del primer login en dev, darse rol ADMIN desde el dashboard de
   SuperTokens del core dev (o con el script de roles), y de ahí en más se
   gestionan usuarios desde **Usuarios** en el panel.
@@ -116,6 +128,14 @@ Cloudflare → Workers & Pages → Create → Pages → conectar `canelaEnRamaWe
 |---|---|---|
 | `VITE_API_URL` | `https://api.canelaenrama.com.ar` | `https://api-dev.canelaenrama.com.ar` |
 | `VITE_WHATSAPP`, `VITE_INSTAGRAM_URL`, `VITE_FACEBOOK_URL` | los reales | los mismos |
+| `API_URL` (Functions: sitemap y vista previa de productos) | `https://api.canelaenrama.com.ar` | `https://api-dev.canelaenrama.com.ar` |
+| `SITE_URL` (dominio canónico) | `https://canelaenrama.com.ar` | `https://dev.canelaenrama.com.ar` |
+
+- `functions/` (Cloudflare Pages Functions) genera `/sitemap.xml` y agrega
+  título, descripción, imagen y datos de producto a `/producto/:id` para que
+  WhatsApp/Facebook/Google los vean sin ejecutar JavaScript. Después del primer
+  deploy, probar un link en https://developers.facebook.com/tools/debug/ y
+  cargar el sitemap en Google Search Console.
 
 - Dominios: `canelaenrama.com.ar` y `www` → producción. Para dev: Custom
   domain `dev.canelaenrama.com.ar` apuntando al alias de la rama
@@ -131,7 +151,7 @@ Cloudflare → Workers & Pages → Create → Pages → conectar `canelaEnRamaWe
 Vercel → Add New → Project → `ecommerceDashboard`. `vercel.json` ya configura
 build, rewrites de SPA y headers de seguridad (Vercel no lee `_headers`).
 
-- Production branch: `master` (o `main` si se renombra).
+- Production branch: `main`.
 - Variables (Settings → Environment Variables):
 
 | Variable | Production | Preview |
@@ -154,9 +174,9 @@ build, rewrites de SPA y headers de seguridad (Vercel no lee `_headers`).
 - [ ] Tarifas de envío cargadas y activadas en el panel.
 - [ ] `GET https://api.canelaenrama.com.ar/api/health` → `{"status":"ok"}`.
 - [ ] Compra de prueba con Mercado Pago (monto bajo) y reembolso.
-- [ ] Login al panel, invitar un usuario de prueba, recuperar contraseña (llega el mail).
-- [ ] Dashboard de SuperTokens (`/api/auth/dashboard`): crear usuario admin y
-      no compartir el acceso.
+- [ ] Login al panel (email y Google), invitar un usuario de prueba, recuperar contraseña (llega el mail).
+- [ ] Compra de prueba: llegan los mails de pedido recibido / pago acreditado / listo.
+- [ ] `GET https://api.canelaenrama.com.ar/api/auth/dashboard/` → 404 (apagado).
 
 ## 7. Backups y monitoreo
 

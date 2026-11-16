@@ -53,3 +53,14 @@ describe("carga masiva de movimientos (validación)", () => {
     await expect(svc.createBulk([{ productVariantId: 1, quantity: 1.5, type: "IN" }] as any)).rejects.toThrow(/entero/);
   });
 });
+
+describe("fecha en movimientos manuales", () => {
+  const svc = new StockMovementService();
+  const row = (createdAt: string) => [{ productVariantId: 1, quantity: 1, type: "IN", createdAt }] as any;
+  it("rechaza fechas futuras, inválidas o de hace más de un año", async () => {
+    await expect(svc.createBulk(row(new Date(Date.now() + 86_400_000).toISOString()))).rejects.toThrow(/futura/);
+    await expect(svc.createBulk(row("no-es-fecha"))).rejects.toThrow(/no es válida/);
+    await expect(svc.createBulk(row(new Date(Date.now() - 400 * 86_400_000).toISOString()))).rejects.toThrow(/un año/);
+  });
+});
+

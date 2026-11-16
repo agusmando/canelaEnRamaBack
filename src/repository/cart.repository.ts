@@ -111,6 +111,32 @@ export class CartRepository extends GenericRepositoryImpl<CartDto, CreateCartDto
     return (tx ?? this.prisma).cartItem.deleteMany({ where: { cartId } });
   }
 
+  /**
+   * Borra carritos de invitado abandonados: vacíos sin actividad en `emptyDays`
+   * días, o con productos sin actividad en `guestDays`. Los carritos de usuarios
+   * registrados nunca se borran (hay uno por usuario y la tienda lo espera).
+   */
+  async deleteStaleGuestCarts({ guestDays, emptyDays }: { guestDays: number; emptyDays: number }) {
+    const now = Date.now();
+    const guestCutoff = new Date(now - guestDays * 86_400_000);
+    const emptyCutoff = new Date(now - emptyDays * 86_400_000);
+    return this.withTransaction(async (tx: any) => {
+      const stale = await tx.cart.findMany({
+        where: {
+          userSuperTokensId: null,
+          OR: [{ updatedAt: { lt: guestCutoff } }, { updatedAt: { lt: emptyCutoff }, items: { none: {} } }],
+        },
+        select: { id: true },
+        take: 5000,
+      });
+      const ids = stale.map((c: { id: number }) => c.id);
+      if (!ids.length) return 0;
+      await tx.cartItem.deleteMany({ where: { cartId: { in: ids } } });
+      const { count } = await tx.cart.deleteMany({ where: { id: { in: ids }, userSuperTokensId: null } });
+      return count;
+    });
+  }
+
   async touch(cartId: number, tx?: any) {
     return (tx ?? this.prisma).cart.update({
       where: { id: cartId },

@@ -45,6 +45,14 @@ app.use("/api", apiLimiter);
 app.use(AUTH_LIMITED_PATHS, authLimiter);
 app.use(WRITE_LIMITED_PATHS, writeLimiter);
 
+// Dashboard de SuperTokens (/api/auth/dashboard): apagado en producción salvo
+// SUPERTOKENS_DASHBOARD=on. En desarrollo queda prendido salvo que se ponga "off".
+const stDashboardOn = process.env.SUPERTOKENS_DASHBOARD
+  ? process.env.SUPERTOKENS_DASHBOARD === "on"
+  : process.env.NODE_ENV !== "production";
+if (!stDashboardOn) {
+  app.use("/api/auth/dashboard", (_req, res) => res.status(404).json({ statusCode: 404, message: "Not found", response: {} }));
+}
 
 app.use(middleware());
 app.use("/api", rutas);

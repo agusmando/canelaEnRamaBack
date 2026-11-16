@@ -6,6 +6,7 @@ import { PricingService } from "./pricing.service.js";
 import type { Actor } from "../middleware/auth.middleware.js";
 import { BadRequestError } from "../errors/application/BadRequestError.js";
 import { ConflictError } from "../errors/application/ConflictError.js";
+import { orderMails } from "./order-mail.service.js";
 import { ExternalServiceError } from "../errors/infra/ExternalServiceError.js";
 
 /** Estados de pago de Mercado Pago → PaymentStatus de la orden. */
@@ -217,6 +218,7 @@ export class PaymentService {
     const mapped = STATUS_MAP[payment.status] ?? "PENDING";
     const paymentId = String(payment.id);
 
+    let justPaid = false;
     await this.orderRepository.withTransaction(async (tx: any) => {
       await tx.$executeRaw`SELECT 1 FROM "Order" WHERE id = ${orderId} FOR UPDATE`;
       const order = await tx.order.findUnique({ where: { id: orderId } });
@@ -257,7 +259,10 @@ export class PaymentService {
       }
 
       await tx.order.update({ where: { id: orderId }, data: fields });
+      // Primer pago aprobado de una orden activa: mail de confirmación (una sola vez)
+      justPaid = fields.paymentStatus === "APPROVED" && order.paymentStatus !== "APPROVED" && order.status !== "CANCELLED";
     });
+    if (justPaid) orderMails.notify("paid", orderId);
   }
 
   /**

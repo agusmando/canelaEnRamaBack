@@ -29,7 +29,14 @@ export const initSupertokens = () =>
       websiteBasePath: "/auth",
     },
     recipeList: [
-      Dashboard.init(),
+      // SUPERTOKENS_DASHBOARD_ADMINS="a@x.com,b@x.com": solo esos emails pueden MODIFICAR
+      // desde el dashboard de SuperTokens; el resto lo ve en solo lectura.
+      // Sin definir: cualquier usuario del dashboard puede modificar.
+      Dashboard.init({
+        admins: process.env.SUPERTOKENS_DASHBOARD_ADMINS
+          ? process.env.SUPERTOKENS_DASHBOARD_ADMINS.split(",").map((e) => e.trim()).filter(Boolean)
+          : undefined,
+      }),
       UserRoles.init(),
       UserMetadata.init(),
       EmailPassword.init({

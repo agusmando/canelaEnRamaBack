@@ -16,6 +16,7 @@ import { ORDER_TRANSITIONS } from "./order.service.js";
 import { ValidationError } from "../errors/application/ValidationError.js";
 import { NotFoundError } from "../errors/application/NotFoundError.js";
 import { ConflictError } from "../errors/application/ConflictError.js";
+import { orderMails } from "./order-mail.service.js";
 import type { Actor } from "../middleware/auth.middleware.js";
 
 export const FINAL_SHIPMENT_STATUSES: ShipmentStatus[] = ["DELIVERED", "RETURNED", "CANCELLED"];
@@ -157,7 +158,9 @@ export class ShipmentService extends GenericServiceImpl<
       throw new ValidationError(`status debe ser uno de ${SHIPMENT_STATUSES.join(", ")}`);
     }
 
-    return this.shipmentRepository.withTransaction(async (tx) => {
+    // Se completa dentro de la transacción y el mail sale después de confirmarla
+    const pending: { mail?: { kind: "ready" | "onTheWay"; orderId: number } } = {};
+    const result = await this.shipmentRepository.withTransaction(async (tx) => {
       const shipment: any = await this.shipmentRepository.getById(id, tx);
       if (!shipment) throw new NotFoundError("Envío no encontrado");
       await this.shipmentRepository.lockOrder(shipment.orderId, tx);
@@ -201,8 +204,17 @@ export class ShipmentService extends GenericServiceImpl<
         await this.orderRepository.updateOrderFields(shipment.orderId, { status: targetOrderStatus }, tx);
       }
 
+      // Aviso al cliente: listo para retirar, o en camino (una vez, al salir del local)
+      const onTheWay = ["SHIPPED", "OUT_FOR_DELIVERY"];
+      if (status === "READY_FOR_PICKUP") pending.mail = { kind: "ready", orderId: shipment.orderId };
+      else if (shipment.method === "DELIVERY" && onTheWay.includes(status) && !onTheWay.includes(shipment.status)) {
+        pending.mail = { kind: "onTheWay", orderId: shipment.orderId };
+      }
+
       return updated;
     });
+    if (pending.mail) orderMails.notify(pending.mail.kind, pending.mail.orderId);
+    return result;
   }
 
   /** Envío de una orden: el cliente solo ve el de sus propias órdenes. */

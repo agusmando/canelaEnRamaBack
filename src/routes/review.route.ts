@@ -10,7 +10,7 @@ const user = [isAuthenticated, attachRoles];
 // Público, pero el staff logueado ve todos los estados
 const publicView = [optionalSession, attachRoles];
 
-router.get("/summary", reviewController.summary.bind(reviewController));
+router.get("/summary", ...publicView, reviewController.summary.bind(reviewController));
 router.get("/stats", ...requirePermission("dashboard.access"), reviewController.stats.bind(reviewController));
 router.get("/mine", ...user, reviewController.mine.bind(reviewController));
 router.get("/eligible", ...user, reviewController.eligible.bind(reviewController));

@@ -1,4 +1,5 @@
 // prismaCreateEntityBuilder.ts
+import { parseNullableBoolean } from "./prismaUpdateEntityBuilder.js";
 
 export const prismaCreateEntityBuilder = (data: any, mapping?: any) => {
   if (!data || typeof data !== "object") return data;
@@ -14,6 +15,10 @@ export const prismaCreateEntityBuilder = (data: any, mapping?: any) => {
     if (val === undefined || val === null || !map) continue;
 
     // 2. Conversiones de Tipos Primitivos (Int, Float, Boolean)
+    if (map.parseNullableBoolean) {
+      result[key] = parseNullableBoolean(val);
+      continue;
+    }
     if (map.parseInt) {
       result[key] = parseInt(val, 10);
       continue;

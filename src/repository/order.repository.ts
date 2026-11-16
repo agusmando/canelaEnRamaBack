@@ -18,7 +18,10 @@ const ORDER_INCLUDE = {
           contentMeasure: true,
           packagingOptions: true,
           images: true,
-          product: { select: { id: true, name: true } },
+          // Para "Volver a comprar" en la tienda: solo lo que sigue a la venta en la web
+          active: true,
+          availableWeb: true,
+          product: { select: { id: true, name: true, active: true } },
         },
       },
     },

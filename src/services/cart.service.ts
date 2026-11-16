@@ -125,6 +125,11 @@ export class CartService extends GenericServiceImpl<CartDto, CreateCartDto, Upda
       if (data.clear) await this.cartRepository.clear(cart.id, tx);
       await this.addItems(token, data.addItem ?? [], tx);
 
+      // Bajar la cantidad o quitar siempre se puede; subirla, solo si sigue a la venta.
+      await this.assertSellable(
+        (data.editItem ?? []).filter((i) => Number(i.quantity) > 0),
+        tx,
+      );
       if (data.editItem?.length) {
         const packaging = await this.cartRepository.packagingOf(
           data.editItem.map((i) => i.productVariantId),
@@ -175,8 +180,22 @@ export class CartService extends GenericServiceImpl<CartDto, CreateCartDto, Upda
     await this.cartRepository.touch(cartId, tx);
   }
 
+  /**
+   * Una variante oculta en la web (o inactiva, o de un producto inactivo) no
+   * se puede agregar al carrito aunque se conozca su id. Mismo 404 que si no
+   * existiera, para no revelar que existe.
+   */
+  private async assertSellable(items: CartItemInput[], tx: any) {
+    if (!items.length) return;
+    const ok = await this.cartRepository.webSellableIds(items.map((i) => i.productVariantId), tx);
+    if (items.some((i) => !ok.has(Number(i.productVariantId)))) {
+      throw new NotFoundError("Producto no disponible");
+    }
+  }
+
   private async addItems(token: string, items: CartItemInput[], tx: any) {
     if (!items.length) return;
+    await this.assertSellable(items, tx);
     const packaging = await this.cartRepository.packagingOf(
       items.map((i) => i.productVariantId),
       tx,

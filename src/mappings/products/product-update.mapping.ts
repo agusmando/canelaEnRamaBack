@@ -2,6 +2,7 @@ export const productUpdateMapping = {
   name: { field: "name" },
   description: { field: "description" },
   active: { field: "active" },
+  isLocal: { field: "isLocal", parseBoolean: true },
   // price: { field: "price" },
   // profitMargin: { field: "profitMargin" },
 

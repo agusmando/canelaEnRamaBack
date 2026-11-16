@@ -1,3 +1,4 @@
+import { webVariantWhere } from "../utils/webVisibility.js";
 import { GenericServiceImpl } from "./generic-impl.service.js";
 import {
   CreateReviewDto,
@@ -94,6 +95,8 @@ export class ReviewService extends GenericServiceImpl<ReviewDto, CreateReviewDto
       }
     } else {
       where.status = "APPROVED";
+      // Reseñas de variantes ocultas en la web: no se muestran
+      where.productVariant = webVariantWhere;
     }
 
     const paginate = ["true", "1"].includes(String(query.paginate).toLowerCase());
@@ -110,10 +113,10 @@ export class ReviewService extends GenericServiceImpl<ReviewDto, CreateReviewDto
     return { ...result, entityList: result.entityList.map((r: any) => this.present(r, view)) };
   }
 
-  async summary(productIdRaw: unknown) {
+  async summary(productIdRaw: unknown, actor?: Actor) {
     const productId = optionalId(productIdRaw, "productId");
     if (!productId) throw new ValidationError("productId es obligatorio");
-    const { byRating, byVariant } = await this.reviewRepository.summary(productId);
+    const { byRating, byVariant } = await this.reviewRepository.summary(productId, !actor?.isStaff);
 
     const distribution: Record<1 | 2 | 3 | 4 | 5, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
     let count = 0;

@@ -1,3 +1,4 @@
+import { webVariantWhere } from "../utils/webVisibility.js";
 import { CartDto } from "../dto/cart/cart.dto.js";
 import { CreateCartDto } from "../dto/cart/create-cart.dto.js";
 import { UpdateCartDto } from "../dto/cart/update-cart.dto.js";
@@ -145,6 +146,15 @@ export class CartRepository extends GenericRepositoryImpl<CartDto, CreateCartDto
   }
 
   /** packagingOptions de varias variantes, para resolver la presentación por defecto. */
+  /** Ids (de los pedidos) que se pueden vender en la web: variante y producto activos y "Disponible en la web". */
+  async webSellableIds(variantIds: number[], tx?: any): Promise<Set<number>> {
+    const rows = await (tx ?? this.prisma).productVariant.findMany({
+      where: { id: { in: [...new Set(variantIds.map(Number))] }, ...webVariantWhere },
+      select: { id: true },
+    });
+    return new Set(rows.map((r: any) => r.id));
+  }
+
   async packagingOf(variantIds: number[], tx?: any): Promise<Map<number, number[]>> {
     const rows = await (tx ?? this.prisma).productVariant.findMany({
       where: { id: { in: [...new Set(variantIds.map(Number))] } },

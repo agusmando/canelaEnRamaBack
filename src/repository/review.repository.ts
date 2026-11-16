@@ -1,3 +1,4 @@
+import { webVariantWhere } from "../utils/webVisibility.js";
 import { GenericRepositoryImpl } from "./generic.repository.js";
 import { CreateReviewDto, ReviewDto, UpdateReviewDto } from "../dto/review/review.dto.js";
 import { translatePrismaError } from "../errors/infra/translatePrismaError.js";
@@ -94,9 +95,14 @@ export class ReviewRepository extends GenericRepositoryImpl<ReviewDto, CreateRev
   }
 
   /** Promedio y conteo por variante y por estrella (solo APROBADAS). */
-  summary(productId: number) {
+  /** @param webOnly solo reseñas de variantes visibles en la tienda */
+  summary(productId: number, webOnly = false) {
     return this.run(async () => {
-      const where = { productId, status: "APPROVED" as const };
+      const where = {
+        productId,
+        status: "APPROVED" as const,
+        ...(webOnly ? { productVariant: webVariantWhere } : {}),
+      };
       const [byRating, byVariant] = await Promise.all([
         this.prisma.review.groupBy({ by: ["rating"], where, _count: { _all: true } }),
         this.prisma.review.groupBy({

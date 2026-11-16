@@ -27,6 +27,9 @@ model Product {
 
   // Medidas (Esto define qué es físicamente)
   measure Measure  @default(KG)
+  // Producto de productores locales (sin marca comercial). En la tienda se
+  // muestra "Productor local" en lugar de la marca.
+  isLocal Boolean  @default(false)
   offers  Offer[]
   reviews Review[]
 }
@@ -66,6 +69,8 @@ model ProductVariant {
   reviews    Review[]
 
   availableWeb       Boolean @default(true)
+  // Productor local solo para esta variante. null = igual que el producto.
+  isLocal            Boolean?
 }
 
 enum Measure {

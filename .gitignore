@@ -140,3 +140,5 @@ vite.config.ts.timestamp-*
 
 /generated/prisma
 /docker-data
+# Script de imágenes (scripts/seed-images.ts)
+scripts/output/

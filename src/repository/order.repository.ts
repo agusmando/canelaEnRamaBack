@@ -75,6 +75,20 @@ export class OrderRepository extends GenericRepositoryImpl<
     }
   }
 
+  /** Órdenes de Mercado Pago sin pagar creadas antes de `before` (para vencerlas). */
+  async findUnpaidMercadoPagoOrders(before: Date) {
+    return this.prisma.order.findMany({
+      where: {
+        paymentType: "MERCADOPAGO",
+        status: "PENDING",
+        paymentStatus: { in: ["PENDING", "REJECTED", "CANCELLED"] },
+        createdAt: { lt: before },
+      },
+      select: { id: true },
+      take: 100,
+    });
+  }
+
   async updateOrderFields(id: number, data: Record<string, any>, tx?: any) {
     try {
       return await (tx ?? this.prisma).order.update({

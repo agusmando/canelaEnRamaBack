@@ -11,6 +11,11 @@ export class OrderDto {
   totalPrice: number;
   totalItems: number;
   paymentType: string;
+  paymentStatus?: string;
+  paymentStatusDetail?: string | null;
+  paymentId?: string | null;
+  paymentPreferenceId?: string | null;
+  paidAt?: Date | null;
 
   estimatedReadyAt: Date;
   status: string;

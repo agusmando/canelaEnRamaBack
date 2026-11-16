@@ -14,6 +14,7 @@ import { ForbidenError } from "../errors/domain/auth/ForbidenError.js";
 import type { Actor } from "../middleware/auth.middleware.js";
 import { CartService } from "./cart.service.js";
 import { ShipmentRepository } from "../repository/shipment.repository.js";
+import { isMercadoPagoConfigured } from "../config/mercadopago.js";
 
 export const PAYMENT_TYPES = ["DEBIT", "CREDIT", "CASH", "TRANSFER", "MERCADOPAGO"];
 const ORDER_STATUSES = ["PENDING", "PROCESSING", "SHIPPED", "DELIVERED", "CANCELLED"];
@@ -110,6 +111,9 @@ export class OrderService extends GenericServiceImpl<OrderDto, CreateOrderDto, U
     const paymentType = value ? String(value).toUpperCase() : "DEBIT";
     if (!PAYMENT_TYPES.includes(paymentType)) {
       throw new ValidationError(`paymentType debe ser uno de ${PAYMENT_TYPES.join(", ")}`);
+    }
+    if (paymentType === "MERCADOPAGO" && !isMercadoPagoConfigured()) {
+      throw new ValidationError("El pago con Mercado Pago no está disponible en este momento. Elegí otra forma de pago.");
     }
     return paymentType;
   }
@@ -231,6 +235,11 @@ export class OrderService extends GenericServiceImpl<OrderDto, CreateOrderDto, U
         if (!CUSTOMER_CANCELLABLE.includes(order.status)) {
           throw new ConflictError(
             "La orden ya está en preparación y no se puede cancelar. Contactá a la tienda.",
+          );
+        }
+        if (["APPROVED", "IN_PROCESS"].includes(order.paymentStatus)) {
+          throw new ConflictError(
+            "El pedido ya tiene un pago aprobado o en revisión. Contactá a la tienda para cancelarlo.",
           );
         }
       }

@@ -351,6 +351,26 @@ model Order {
   status           OrderStatus @default(PENDING)
   orderItems       OrderItem[]
   shipment         Shipment?
+
+  // Cobro online (Mercado Pago). Para efectivo/transferencia/etc. queda en PENDING
+  // y el staff gestiona el cobro a mano.
+  paymentStatus       PaymentStatus @default(PENDING)
+  paymentStatusDetail String? // detalle de Mercado Pago, p. ej. "cc_rejected_insufficient_amount"
+  paymentId           String? // id del pago en Mercado Pago
+  paymentPreferenceId String? // última preferencia (checkout) creada
+  paidAt              DateTime?
+
+  @@index([paymentType, paymentStatus, status])
+}
+
+enum PaymentStatus {
+  PENDING // todavía no pagó (o pago offline a gestionar por el staff)
+  IN_PROCESS // Mercado Pago lo está revisando
+  APPROVED
+  REJECTED
+  CANCELLED
+  REFUNDED
+  CHARGED_BACK
 }
 
 enum OrderStatus {

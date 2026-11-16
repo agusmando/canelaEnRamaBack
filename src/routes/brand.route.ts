@@ -1,50 +1,47 @@
 import express from "express";
 import { BrandController } from "../controllers/brand.controller.js";
-import { isAuthenticated, requireRole, STAFF_ROLES } from "../middleware/auth.middleware.js";
+import { attachRoles, optionalSession, requirePermission } from "../middleware/auth.middleware.js";
+import { hideCostForPublic } from "../middleware/publicView.js";
+
+// Sin sesión de staff no se exponen proveedores ni costos de los productos incluidos.
+const publicView = [optionalSession, attachRoles, hideCostForPublic];
 const router = express.Router();
 
 const brandController = new BrandController();
 
-const staff = STAFF_ROLES;
 
 router
   .route("/")
-  .get(brandController.findAll.bind(brandController))
+  .get(...publicView, brandController.findAll.bind(brandController))
   .post(
-    isAuthenticated,
-    requireRole(staff),
+    ...requirePermission("masters.edit"),
     brandController.create.bind(brandController)
   );
 router
   .route("/:id")
-  .get(brandController.findOne.bind(brandController))
+  .get(...publicView, brandController.findOne.bind(brandController))
   .put(
-    isAuthenticated,
-    requireRole(staff),
+    ...requirePermission("masters.edit"),
     brandController.update.bind(brandController)
   );
 router
   .route("/:id/products")
   .put(
-    isAuthenticated,
-    requireRole(["ADMIN"]),
+    ...requirePermission("catalog.delete"),
     brandController.addBrandProducts.bind(brandController)
   )
   .delete(
-    isAuthenticated,
-    requireRole(["ADMIN"]),
+    ...requirePermission("catalog.delete"),
     brandController.removeBrandProducts.bind(brandController)
   )
 router
   .route("/:id/active/")
   .delete(
-    isAuthenticated,
-    requireRole(staff),
+    ...requirePermission("masters.edit"),
     brandController.deactivate.bind(brandController)
   )
   .put(
-    isAuthenticated,
-    requireRole(staff),
+    ...requirePermission("masters.edit"),
     brandController.activate.bind(brandController)
   );
 

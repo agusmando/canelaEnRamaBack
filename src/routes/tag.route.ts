@@ -1,38 +1,37 @@
 import express from "express";
 import { TagController } from "../controllers/tag.controller.js";
-import { isAuthenticated, requireRole, STAFF_ROLES } from "../middleware/auth.middleware.js";
+import { attachRoles, optionalSession, requirePermission } from "../middleware/auth.middleware.js";
+import { hideCostForPublic } from "../middleware/publicView.js";
+
+// Sin sesión de staff no se exponen proveedores ni costos de los productos incluidos.
+const publicView = [optionalSession, attachRoles, hideCostForPublic];
 const router = express.Router();
 
 const tagsController = new TagController();
 
-const staff = STAFF_ROLES;
 
 router
   .route("/")
-  .get(tagsController.findAll.bind(tagsController))
+  .get(...publicView, tagsController.findAll.bind(tagsController))
   .post(
-    isAuthenticated,
-    requireRole(staff),
+    ...requirePermission("masters.edit"),
     tagsController.create.bind(tagsController)
   );
 router
   .route("/:id")
-  .get(tagsController.findOne.bind(tagsController))
+  .get(...publicView, tagsController.findOne.bind(tagsController))
   .put(
-    isAuthenticated,
-    requireRole(staff),
+    ...requirePermission("masters.edit"),
     tagsController.update.bind(tagsController)
   );
 router
   .route("/:id/active/")
   .delete(
-    isAuthenticated,
-    requireRole(staff),
+    ...requirePermission("masters.edit"),
     tagsController.deactivate.bind(tagsController)
   )
   .put(
-    isAuthenticated,
-    requireRole(staff),
+    ...requirePermission("masters.edit"),
     tagsController.activate.bind(tagsController)
   );
 

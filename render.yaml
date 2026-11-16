@@ -56,6 +56,32 @@ services:
         sync: false
       - key: MP_WEBHOOK_SECRET
         sync: false
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: SMTP_FROM_EMAIL
+        sync: false
+      - key: SMTP_FROM_NAME
+        value: Canela en Rama
+      - key: DASHBOARD_URL
+        sync: false
+      - key: SHIPPING_PICKUP_STREET
+        value: Colombia 1268
+      - key: SHIPPING_PICKUP_CITY
+        value: Godoy Cruz
+      - key: SHIPPING_PICKUP_PHONE
+        sync: false
+      - key: UBER_DIRECT_CUSTOMER_ID
+        sync: false
+      - key: UBER_DIRECT_CLIENT_ID
+        sync: false
+      - key: UBER_DIRECT_CLIENT_SECRET
+        sync: false
       - key: WEB_URL
         value: https://canelaenrama.com.ar
       - key: API_PUBLIC_URL

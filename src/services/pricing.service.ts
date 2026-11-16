@@ -14,7 +14,15 @@ export type PriceQuote = {
   offerTypeSnapshot: string;
   /** Cantidad expresada en unidades de precio (kg o unidades). */
   priceUnits: number;
+  /**
+   * Oferta por cantidad vigente que todavía no se alcanza (ej. 3x2 con 2 en el
+   * carrito): `missing` está en la misma unidad que cuenta la oferta.
+   */
+  offerHint?: { label: string; missing: number; unit: "pack" | "unit" | "kg" } | null;
 };
+
+/** Ofertas cuyo descuento depende de la cantidad llevada. */
+const QUANTITY_OFFERS = ["BUY_ONE_GET_MORE", "BUY_MORE_GET_MORE", "BUY_MORE_GET_DISCOUNT", "BUY_MORE_GET_FIXED_DISCOUNT"];
 
 /** Oferta vigente de una variante, resumida para mostrar en catálogo y dashboard. */
 export type ActiveOfferInfo = {
@@ -103,13 +111,28 @@ export class PricingService {
       Number(productVariant.stockThreshold ?? 0),
     );
 
+    // Las ofertas por cantidad ("3x2", "desde 3") cuentan lo que el cliente
+    // elige: paquetes si hay presentación, si no kg o unidades. Antes se
+    // contaban kg también para paquetes (3 × 250 g = 0,75 kg) y nunca aplicaban.
+    const offerCount = selectedBulkOption ? quantity : priceUnits;
     const listTotal = unitPrice * priceUnits;
     let total = listTotal;
     let offerType = "";
+    let offerHint: PriceQuote["offerHint"] = null;
     if (offer && priceUnits > 0) {
-      const result = this.offerService.applyOffer(unitPrice, priceUnits, offer);
+      // applyOffer devuelve un precio por unidad de precio: el factor de
+      // descuento es el mismo cuente paquetes o kg.
+      const result = this.offerService.applyOffer(unitPrice, offerCount, offer);
       total = result.unitAfter * priceUnits;
       offerType = result.offerType;
+      const required = Number(offer.discountQuantity) || 0;
+      if (QUANTITY_OFFERS.includes(offer.discountType) && required > offerCount) {
+        offerHint = {
+          label: offerLabel(offer),
+          missing: round2(required - offerCount),
+          unit: selectedBulkOption ? "pack" : productVariant.contentMeasure === "KG" ? "kg" : "unit",
+        };
+      }
     }
 
     return {
@@ -118,6 +141,7 @@ export class PricingService {
       discountAppliedSnapshot: round2(Math.max(0, listTotal - total)),
       offerTypeSnapshot: offerType,
       priceUnits,
+      offerHint,
     };
   }
 

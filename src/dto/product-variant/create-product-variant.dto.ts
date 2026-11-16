@@ -6,7 +6,6 @@ export class CreateProductVariantDto {
   currentStock: number;
   active: boolean;
   availableWeb: boolean;
-  availablePedidosYa: boolean;
   contentMeasure: string;
   roundingOption: number;
   packagingOptions?: number[];
@@ -23,7 +22,6 @@ export class CreateProductVariantDto {
     active: boolean,
     contentMeasure: string,
     availableWeb: boolean,
-    availablePedidosYa: boolean,
     stockThreshold: number,
     roundingOption: number,
     packagingOptions?: number[],
@@ -44,7 +42,6 @@ export class CreateProductVariantDto {
     this.roundingOption = roundingOption;
     this.stockThreshold = stockThreshold;
     this.availableWeb = availableWeb;
-    this.availablePedidosYa = availablePedidosYa;
     this.images = images;
   }
 }

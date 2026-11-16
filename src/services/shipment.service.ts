@@ -1,4 +1,4 @@
-import { randomInt } from "node:crypto";
+import { newTrackingCode } from "../utils/trackingCode.js";
 import { GenericServiceImpl } from "./generic-impl.service.js";
 import {
   CreateShipmentDto,
@@ -47,7 +47,7 @@ export const SHIPMENT_TRANSITIONS: Record<ShipmentMethod, Partial<Record<Shipmen
 };
 
 /** Descripción por defecto de cada evento (la ve el cliente). */
-const DEFAULT_EVENT_TEXT: Record<ShipmentStatus, string> = {
+export const DEFAULT_EVENT_TEXT: Record<ShipmentStatus, string> = {
   PENDING: "Recibimos tu pedido",
   PREPARING: "Estamos preparando tu pedido",
   READY_FOR_PICKUP: "Tu pedido está listo para retirar",
@@ -59,10 +59,6 @@ const DEFAULT_EVENT_TEXT: Record<ShipmentStatus, string> = {
   CANCELLED: "Envío cancelado",
 };
 
-// Sin caracteres ambiguos (0/O, 1/I/L)
-const CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
-const newTrackingCode = () =>
-  "CER-" + Array.from({ length: 8 }, () => CODE_ALPHABET[randomInt(CODE_ALPHABET.length)]).join("");
 
 const TEXT_FIELDS = [
   "carrier",

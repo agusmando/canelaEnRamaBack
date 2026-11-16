@@ -6,6 +6,8 @@ import { StoreProcedureError } from "../errors/infra/StoreProcedureError.js";
 import { translatePrismaError } from "../errors/infra/translatePrismaError.js";
 
 const CART_INCLUDE = {
+  // Para identificar al dueño en el dashboard (un cliente solo ve su propio carrito)
+  user: { select: { email: true, name: true } },
   items: {
     orderBy: [{ createdAt: "asc" as const }, { selectedBulkOption: "asc" as const }],
     include: {

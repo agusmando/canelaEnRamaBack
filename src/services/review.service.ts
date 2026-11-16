@@ -234,7 +234,7 @@ export class ReviewService extends GenericServiceImpl<ReviewDto, CreateReviewDto
 
   async remove(id: number, actor: Actor) {
     const review: any = await this.reviewRepository.findFull(id);
-    if (!review || (!actor.isStaff && review.userSuperTokensId !== actor.userId)) {
+    if (!review || (!actor.permissions.includes("content.edit") && review.userSuperTokensId !== actor.userId)) {
       throw new NotFoundError();
     }
     await this.reviewRepository.deleteReview(id);

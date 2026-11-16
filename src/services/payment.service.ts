@@ -24,7 +24,7 @@ const STATUS_MAP: Record<string, string> = {
 /** Mientras el pago esté en alguno de estos estados no se puede volver a pagar ni cancelar como cliente. */
 export const PAYMENT_LOCKED = ["APPROVED", "IN_PROCESS"];
 
-const SYSTEM_ACTOR: Actor = { userId: "system:mercadopago", roles: ["ADMIN"], isStaff: true };
+const SYSTEM_ACTOR: Actor = { userId: "system:mercadopago", roles: ["ADMIN"], permissions: [], isStaff: true };
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
 /**
@@ -41,6 +41,9 @@ const round2 = (n: number) => Math.round(n * 100) / 100;
  *  4. Pago aprobado → paymentStatus APPROVED y la orden pasa a PROCESSING.
  *  5. Si nadie paga en MP_ORDER_TTL_HOURS, la orden se cancela y el stock vuelve.
  */
+/** Lo que paga el cliente: productos + envío. */
+const chargeTotal = (order: any) => round2(Number(order.totalPrice || 0) + Number(order.shippingCost || 0));
+
 export class PaymentService {
   constructor(
     private readonly orderRepository = new OrderRepository(),
@@ -76,7 +79,7 @@ export class PaymentService {
         order.paymentStatus === "APPROVED" ? "El pedido ya está pagado" : "Tenés un pago en revisión para este pedido",
       );
     }
-    const total = round2(Number(order.totalPrice));
+    const total = chargeTotal(order);
     if (!(total > 0)) throw new ConflictError("El pedido no tiene importe a cobrar");
 
     const cfg = mpConfig();
@@ -142,10 +145,11 @@ export class PaymentService {
     const lines = (order.orderItems ?? [])
       .map((it: any) => ({ it, amount: this.pricingService.lineTotal(it) }))
       .filter((l: any) => l.amount > 0);
+    const shipping = round2(Number(order.shippingCost) || 0);
 
-    const sum = round2(lines.reduce((s: number, l: any) => s + l.amount, 0));
+    const sum = round2(lines.reduce((s: number, l: any) => s + l.amount, 0) + shipping);
     if (lines.length && sum === total) {
-      return lines.map(({ it, amount }: any) => ({
+      const items = lines.map(({ it, amount }: any) => ({
         id: String(it.productVariantId ?? it.id),
         title: `${it.productNameSnapshot}${it.variantNameSnapshot ? ` - ${it.variantNameSnapshot}` : ""}`.slice(0, 250),
         description: it.selectedBulkOption ? `${it.quantity} x ${it.selectedBulkOption}` : `Cantidad: ${it.quantity}`,
@@ -153,6 +157,17 @@ export class PaymentService {
         currency_id: "ARS",
         unit_price: round2(amount),
       }));
+      if (shipping > 0) {
+        items.push({
+          id: `shipping-${order.id}`,
+          title: "Envío a domicilio",
+          description: order.shippingZone ? `Envío a ${order.shippingZone}` : "Envío",
+          quantity: 1,
+          currency_id: "ARS",
+          unit_price: shipping,
+        });
+      }
+      return items;
     }
     return [{ id: `order-${order.id}`, title: `Pedido #${order.id} - Canela en Rama`, quantity: 1, currency_id: "ARS", unit_price: total }];
   }
@@ -226,9 +241,9 @@ export class PaymentService {
 
       if (mapped === "APPROVED") {
         const paid = Number(payment.transaction_amount);
-        if (payment.currency_id !== "ARS" || !(paid + 0.01 >= Number(order.totalPrice))) {
+        if (payment.currency_id !== "ARS" || !(paid + 0.01 >= chargeTotal(order))) {
           // No debería pasar (el importe lo fija la preferencia): lo dejamos para revisión manual
-          console.error(`[payment] orden ${orderId}: pago ${paymentId} por ${payment.currency_id} ${paid} ≠ total ${order.totalPrice}`);
+          console.error(`[payment] orden ${orderId}: pago ${paymentId} por ${payment.currency_id} ${paid} ≠ total ${chargeTotal(order)}`);
           fields.paymentStatus = "IN_PROCESS";
           fields.paymentStatusDetail = "amount_mismatch";
         } else {

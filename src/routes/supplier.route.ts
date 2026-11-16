@@ -1,14 +1,14 @@
 import express from "express";
 import { SupplierController } from "../controllers/supplier.controller.js";
-import { isAuthenticated, requireRole, STAFF_ROLES } from "../middleware/auth.middleware.js";
+import { requirePermission, requirePermissionToWrite } from "../middleware/auth.middleware.js";
 const router = express.Router();
 
 const supplierController = new SupplierController();
 
-const staff = STAFF_ROLES;
 
-router.use(isAuthenticated);
-router.use(requireRole(staff));
+// Ver: cualquier staff. Modificar: masters.edit.
+router.use(requirePermission("dashboard.access"));
+router.use(requirePermissionToWrite("masters.edit"));
 
 router
   .route("/")

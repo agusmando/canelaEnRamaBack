@@ -99,7 +99,7 @@ export class ProductVariantRepository extends GenericRepositoryImpl<
         // Una variante con ventas/movimientos no se puede borrar: se desactiva.
         await model.updateMany({
           where: { id: { in: removeVariants.map(Number) }, productId },
-          data: { active: false, availableWeb: false, availablePedidosYa: false },
+          data: { active: false, availableWeb: false },
         });
       }
       return created;

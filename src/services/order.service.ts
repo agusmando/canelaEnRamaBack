@@ -15,6 +15,13 @@ import type { Actor } from "../middleware/auth.middleware.js";
 import { CartService } from "./cart.service.js";
 import { ShipmentRepository } from "../repository/shipment.repository.js";
 import { isMercadoPagoConfigured } from "../config/mercadopago.js";
+import { streetLine, ShippingQuoteService, type ShippingQuote } from "./shipping-quote.service.js";
+import { newTrackingCode } from "../utils/trackingCode.js";
+
+/** Envío resuelto antes de abrir la transacción (la cotización es una llamada externa). */
+type ShippingChoice =
+  | { method: "PICKUP" }
+  | { method: "DELIVERY"; quote: ShippingQuote; address: any };
 
 export const PAYMENT_TYPES = ["DEBIT", "CREDIT", "CASH", "TRANSFER", "MERCADOPAGO"];
 const ORDER_STATUSES = ["PENDING", "PROCESSING", "SHIPPED", "DELIVERED", "CANCELLED"];
@@ -58,6 +65,7 @@ export class OrderService extends GenericServiceImpl<OrderDto, CreateOrderDto, U
     private readonly pricingService = new PricingService(),
     private readonly cartService = new CartService(),
     private readonly shipmentRepository = new ShipmentRepository(),
+    private readonly shippingQuotes = new ShippingQuoteService(),
   ) {
     super(orderRepository);
   }
@@ -79,13 +87,23 @@ export class OrderService extends GenericServiceImpl<OrderDto, CreateOrderDto, U
       throw new ValidationError("Order must have at least one item");
     }
     for (const item of data.orderItems) {
-      if (!Number.isInteger(Number(item.productVariantId)) || !(Number(item.quantity) > 0)) {
-        throw new ValidationError("Cada ítem necesita productVariantId y quantity > 0");
+      if (!Number.isInteger(Number(item.productVariantId)) || !Number.isInteger(Number(item.quantity)) || !(Number(item.quantity) > 0)) {
+        throw new ValidationError("Cada ítem necesita productVariantId y quantity entera > 0");
       }
     }
     const paymentType = this.parsePaymentType(data.paymentType);
+    const shipping = await this.resolveShipping((data as any).shippingMethod, userId);
 
-    return this.orderRepository.withTransaction((tx) => this.placeOrder(data, paymentType, userId, tx));
+    return this.orderRepository.withTransaction((tx) => this.placeOrder(data, paymentType, userId, tx, shipping));
+  }
+
+  /** PICKUP (por defecto) o DELIVERY: en ese caso exige domicilio y cotiza en el servidor. */
+  private async resolveShipping(method: unknown, userId: string): Promise<ShippingChoice> {
+    const value = String(method ?? "PICKUP").toUpperCase();
+    if (value === "PICKUP") return { method: "PICKUP" };
+    if (value !== "DELIVERY") throw new ValidationError("shippingMethod debe ser PICKUP o DELIVERY");
+    const { quote, address } = await this.shippingQuotes.requireQuote(userId);
+    return { method: "DELIVERY", quote, address };
   }
 
   /**
@@ -94,6 +112,7 @@ export class OrderService extends GenericServiceImpl<OrderDto, CreateOrderDto, U
    */
   private async createOrderFromCart(data: CreateOrderDto, userId: string) {
     const paymentType = this.parsePaymentType(data.paymentType);
+    const shipping = await this.resolveShipping((data as any).shippingMethod, userId);
     return this.orderRepository.withTransaction(async (tx) => {
       const { cartId, items } = await this.cartService.itemsForCheckout(userId, tx);
       const order = await this.placeOrder(
@@ -101,6 +120,7 @@ export class OrderService extends GenericServiceImpl<OrderDto, CreateOrderDto, U
         paymentType,
         userId,
         tx,
+        shipping,
       );
       await this.cartService.clearCart(cartId, tx);
       return order;
@@ -119,7 +139,13 @@ export class OrderService extends GenericServiceImpl<OrderDto, CreateOrderDto, U
   }
 
   /** Núcleo de la creación: debe correr dentro de una transacción. */
-  private async placeOrder(data: CreateOrderDto, paymentType: string, userId: string, tx: any) {
+  private async placeOrder(
+    data: CreateOrderDto,
+    paymentType: string,
+    userId: string,
+    tx: any,
+    shipping: ShippingChoice = { method: "PICKUP" },
+  ) {
     await this.stockRepository.lockVariants(
       data.orderItems.map((i) => i.productVariantId),
       tx,
@@ -184,7 +210,8 @@ export class OrderService extends GenericServiceImpl<OrderDto, CreateOrderDto, U
       throw new ConflictError("No hay stock disponible para ninguno de los productos de la orden");
     }
 
-    return this.orderRepository.createOrder(
+    const delivery = shipping.method === "DELIVERY" ? shipping : null;
+    const order = await this.orderRepository.createOrder(
       {
         userSuperTokensId: userId,
         totalPrice: Math.round(totalPrice * 100) / 100,
@@ -193,9 +220,42 @@ export class OrderService extends GenericServiceImpl<OrderDto, CreateOrderDto, U
         status: "PENDING",
         estimatedReadyAt,
         orderItems,
-      },
+        shippingMethod: shipping.method,
+        shippingCost: delivery ? delivery.quote.price : 0,
+        shippingProvider: delivery?.quote.provider ?? null,
+        shippingZone: delivery?.quote.zone ?? null,
+      } as any,
       tx,
     );
+    if (!delivery) return order;
+
+    // Envío a domicilio: el envío se crea ya con los datos del domicilio y el costo cobrado
+    let trackingCode = newTrackingCode();
+    while (await this.shipmentRepository.trackingCodeExists(trackingCode, tx)) trackingCode = newTrackingCode();
+    const a = delivery.address;
+    await this.shipmentRepository.createShipment(
+      {
+        orderId: order.id,
+        trackingCode,
+        method: "DELIVERY",
+        status: "PENDING",
+        recipientName: a.recipientName,
+        phone: a.phone,
+        address: streetLine(a),
+        // Localidad/barrio si la cargó; si no, el departamento (no se repite con address)
+        city: a.city ? `${a.city}, ${a.zone}` : a.zone,
+        province: a.province,
+        postalCode: a.postalCode,
+        notes: a.notes,
+        zone: a.zone,
+        cost: delivery.quote.price,
+        provider: delivery.quote.provider,
+        carrier: delivery.quote.provider === "uber" ? "Uber Direct" : null,
+      },
+      { status: "PENDING", description: "Recibimos tu pedido" },
+      tx,
+    );
+    return this.orderRepository.getOrder(order.id, tx);
   }
 
   /** Detalle de una orden. Un cliente solo puede ver las suyas. */
@@ -267,6 +327,16 @@ export class OrderService extends GenericServiceImpl<OrderDto, CreateOrderDto, U
           await this.applyItemChange(order, change, fields, tx);
         }
         if (data.status) fields.status = data.status;
+      }
+
+      // Entrega estimada = la fecha más lejana de las líneas abiertas que siguen esperando
+      // (si ninguna espera, se limpia). Se recalcula para poder adelantarla o quitarla.
+      const pendingDates = order.orderItems
+        .filter((it: any) => !CLOSED_ITEM_STATUSES.includes(it.status) && it.awaitingStockAt)
+        .map((it: any) => new Date(it.awaitingStockAt).getTime());
+      const eta = pendingDates.length ? new Date(Math.max(...pendingDates)) : null;
+      if (String(eta?.getTime() ?? null) !== String(order.estimatedReadyAt ? new Date(order.estimatedReadyAt).getTime() : null)) {
+        fields.estimatedReadyAt = eta;
       }
 
       // Totales y estado derivados de las líneas
@@ -363,11 +433,16 @@ export class OrderService extends GenericServiceImpl<OrderDto, CreateOrderDto, U
     if (change.awaitingStockAt) {
       const date = new Date(change.awaitingStockAt);
       if (Number.isNaN(date.getTime())) throw new ValidationError("awaitingStockAt inválido");
+      if (date.getTime() < Date.now() - 60_000) {
+        throw new ValidationError("La fecha estimada de reposición tiene que ser posterior a ahora");
+      }
       itemData.awaitingStockAt = date;
       itemData.status = "AWAITING_STOCK";
-      const currentEta = orderFields.estimatedReadyAt ?? order.estimatedReadyAt;
-      if (!currentEta || date > new Date(currentEta)) orderFields.estimatedReadyAt = date;
-    } else if (change.status === "FULFILLED" || change.status === "AWAITING_STOCK") {
+    } else if (change.status === "FULFILLED") {
+      // Llegó el stock: la línea deja de esperar
+      itemData.status = "FULFILLED";
+      itemData.awaitingStockAt = null;
+    } else if (change.status === "AWAITING_STOCK") {
       itemData.status = change.status;
     }
 

@@ -224,6 +224,7 @@ export class CartService extends GenericServiceImpl<CartDto, CreateCartDto, Upda
           total: quote.totalPriceSnapshot,
           discount: quote.discountAppliedSnapshot,
           offerType: quote.offerTypeSnapshot,
+          offerHint: quote.offerHint ?? null,
         },
       };
     });

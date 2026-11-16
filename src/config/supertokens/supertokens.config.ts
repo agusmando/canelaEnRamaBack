@@ -7,6 +7,7 @@ import Dashboard from "supertokens-node/recipe/dashboard"; // Usa el paquete de 
 import UserRoles from "supertokens-node/recipe/userroles"; // Usa el paquete de backend aquí
 import UserMetadata from "supertokens-node/recipe/usermetadata";
 import { prisma } from "../prisma/client.js";
+import { passwordResetEmailDelivery } from "./email.js";
 
 dotenv.config();
 export const initSupertokens = () =>
@@ -32,7 +33,8 @@ export const initSupertokens = () =>
       UserRoles.init(),
       UserMetadata.init(),
       EmailPassword.init({
-        // ... otras configuraciones ...
+        // Mail de recuperar contraseña (SMTP propio, en español). Ver email.ts.
+        emailDelivery: passwordResetEmailDelivery(),
         override: {
           functions: (original) => ({
             ...original,
@@ -114,7 +116,10 @@ export const initSupertokens = () =>
         },
       }),
       Session.init({
-        exposeAccessTokenToFrontendInCookieBasedAuth: true,
-      }), // initializes session features
+        // Solo tokens en header (Authorization: Bearer). Al no aceptar cookies de
+        // sesión, un sitio ajeno no puede hacer requests autenticadas en nombre
+        // del usuario: CSRF queda descartado por diseño.
+        getTokenTransferMethod: () => "header",
+      }),
     ],
   });

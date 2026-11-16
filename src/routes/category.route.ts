@@ -1,38 +1,37 @@
 import express from "express";
 import { CategoryController } from "../controllers/category.controller.js";
-import { isAuthenticated, requireRole, STAFF_ROLES } from "../middleware/auth.middleware.js";
+import { attachRoles, optionalSession, requirePermission } from "../middleware/auth.middleware.js";
+import { hideCostForPublic } from "../middleware/publicView.js";
+
+// Sin sesión de staff no se exponen proveedores ni costos de los productos incluidos.
+const publicView = [optionalSession, attachRoles, hideCostForPublic];
 const router = express.Router();
 
 const categoryController = new CategoryController();
 
-const staff = STAFF_ROLES;
 
 router
   .route("/")
-  .get(categoryController.findAll.bind(categoryController))
+  .get(...publicView, categoryController.findAll.bind(categoryController))
   .post(
-    isAuthenticated,
-    requireRole(staff),
+    ...requirePermission("masters.edit"),
     categoryController.create.bind(categoryController)
   );
 router
   .route("/:id")
-  .get(categoryController.findOne.bind(categoryController))
+  .get(...publicView, categoryController.findOne.bind(categoryController))
   .put(
-    isAuthenticated,
-    requireRole(staff),
+    ...requirePermission("masters.edit"),
     categoryController.update.bind(categoryController)
   );
 router
   .route("/:id/active/")
   .delete(
-    isAuthenticated,
-    requireRole(staff),
+    ...requirePermission("masters.edit"),
     categoryController.deactivate.bind(categoryController)
   )
   .put(
-    isAuthenticated,
-    requireRole(staff),
+    ...requirePermission("masters.edit"),
     categoryController.activate.bind(categoryController)
   );
 

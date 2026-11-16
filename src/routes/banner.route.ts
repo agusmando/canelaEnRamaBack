@@ -1,7 +1,7 @@
 import express from "express";
 import Multer from "multer";
 import { BannerController } from "../controllers/banner.controller.js";
-import { isAuthenticated, requireRole, STAFF_ROLES } from "../middleware/auth.middleware.js";
+import { requirePermission } from "../middleware/auth.middleware.js";
 import { cloudinaryUpload } from "../middleware/fileUploader.js";
 import { BadRequestError } from "../errors/application/BadRequestError.js";
 
@@ -35,7 +35,7 @@ const parseImages = (req: any, res: any, next: any) =>
     next(err);
   });
 
-const staff = [isAuthenticated, requireRole(STAFF_ROLES)];
+const staff = requirePermission("content.edit");
 // Orden: auth -> rol -> multer (parsea) -> cloudinary (sube)
 const staffWithImages = [...staff, parseImages, cloudinaryUpload("banners")];
 

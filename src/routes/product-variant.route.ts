@@ -1,23 +1,16 @@
 import express from "express";
 import { ProductVariantController } from "../controllers/product-variant.controller.js";
-import {
-  attachRoles,
-  isAuthenticated,
-  optionalSession,
-  requireRole,
-  STAFF_ROLES,
-} from "../middleware/auth.middleware.js";
+import { attachRoles, optionalSession, requirePermission } from "../middleware/auth.middleware.js";
 import { cloudinaryUpload, upload } from "../middleware/fileUploader.js";
-import { hideCostForPublic } from "../middleware/publicView.js";
+import { hideCostForPublic, webOnlyForPublic } from "../middleware/publicView.js";
 
 const router = express.Router();
 const productVariantController = new ProductVariantController();
 
-const publicView = [optionalSession, attachRoles, hideCostForPublic];
+const publicView = [optionalSession, attachRoles, hideCostForPublic, webOnlyForPublic("variant")];
 // Orden: auth -> rol -> multer (parsea) -> cloudinary (sube)
 const staffWithImages = [
-  isAuthenticated,
-  requireRole(STAFF_ROLES),
+  ...requirePermission("catalog.edit"),
   upload.array("image", 7),
   cloudinaryUpload("products"),
 ];
@@ -33,13 +26,11 @@ router
 router
   .route("/:id/active/")
   .delete(
-    isAuthenticated,
-    requireRole(STAFF_ROLES),
+    ...requirePermission("catalog.edit"),
     productVariantController.deactivate.bind(productVariantController),
   )
   .put(
-    isAuthenticated,
-    requireRole(STAFF_ROLES),
+    ...requirePermission("catalog.edit"),
     productVariantController.activate.bind(productVariantController),
   );
 

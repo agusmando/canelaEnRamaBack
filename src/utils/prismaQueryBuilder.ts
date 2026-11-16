@@ -68,6 +68,23 @@ export const prismaQueryBuilder = (receivedDto: any, mappingRules: any = {}) => 
         if (config.operator === "containsAll") where[config.field] = { hasEvery: [].concat(value) };
         break;
 
+      case "textSearch": {
+        // ?search=nuez mariposa -> cada palabra en alguno de los paths (AND de ORs)
+        const words = String(value).trim().split(/\s+/).filter(Boolean).slice(0, 8);
+        const paths: string[][] = config.paths ?? [];
+        for (const word of words) {
+          and.push({
+            OR: paths.map((path) =>
+              path.reduceRight<any>(
+                (inner, key) => ({ [key]: inner }),
+                { contains: word, mode: "insensitive" },
+              ),
+            ),
+          });
+        }
+        break;
+      }
+
       case "relationArray": {
         // ?tags=a&tags=b -> debe tener AMBOS tags
         const values: string[] = Array.isArray(value) ? value : [value];

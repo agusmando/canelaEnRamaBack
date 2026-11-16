@@ -1,16 +1,11 @@
 import express from "express";
 import { ShipmentController } from "../controllers/shipment.controller.js";
-import {
-  attachRoles,
-  isAuthenticated,
-  requireRole,
-  STAFF_ROLES,
-} from "../middleware/auth.middleware.js";
+import { attachRoles, isAuthenticated, requirePermission } from "../middleware/auth.middleware.js";
 
 const router = express.Router();
 const shipmentController = new ShipmentController();
 
-const staff = [isAuthenticated, requireRole(STAFF_ROLES)];
+const staff = requirePermission("orders.manage");
 const user = [isAuthenticated, attachRoles];
 
 // Rutas fijas antes de "/:id"

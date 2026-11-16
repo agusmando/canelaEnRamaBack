@@ -19,6 +19,7 @@ import reviewRoutes from "./review.route.js";
 import googleReviewRoutes from "./google-review.route.js";
 import bannerRoutes from "./banner.route.js";
 import paymentRoutes from "./payment.route.js";
+import shippingRoutes from "./shipping.route.js";
 
 router.get("/health", (_req, res) => {
   res.status(200).json({ status: "ok" });
@@ -43,5 +44,6 @@ router.use("/review", reviewRoutes);
 router.use("/google-review", googleReviewRoutes);
 router.use("/banner", bannerRoutes);
 router.use("/payment", paymentRoutes);
+router.use("/shipping", shippingRoutes);
 
 export default router;

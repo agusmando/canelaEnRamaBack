@@ -1,10 +1,10 @@
 import express from "express";
 import { GoogleReviewController } from "../controllers/google-review.controller.js";
-import { isAuthenticated, requireRole, STAFF_ROLES } from "../middleware/auth.middleware.js";
+import { requirePermission } from "../middleware/auth.middleware.js";
 
 const router = express.Router();
 const controller = new GoogleReviewController();
-const staff = [isAuthenticated, requireRole(STAFF_ROLES)];
+const staff = requirePermission("content.edit");
 
 router.get("/", controller.getPublic.bind(controller));
 router.get("/all", ...staff, controller.getAll.bind(controller));

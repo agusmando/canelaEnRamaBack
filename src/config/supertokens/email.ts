@@ -1,5 +1,6 @@
 import { SMTPService } from "supertokens-node/recipe/emailpassword/emaildelivery";
-import { escapeHtml, smtpSettings } from "../mailer.js";
+import { SMTPService as VerificationSMTPService } from "supertokens-node/recipe/emailverification/emaildelivery";
+import { emailLayout, escapeHtml, smtpSettings } from "../mailer.js";
 
 /**
  * Envío del mail de "recuperar contraseña" por SMTP propio (Gmail, Brevo,
@@ -14,20 +15,26 @@ import { escapeHtml, smtpSettings } from "../mailer.js";
 
 
 /** Datos de la invitación al panel: el mismo enlace de "elegir contraseña" con otro texto. */
-export type InviteContext = { invite: { roleLabel: string; dashboardUrl?: string } };
+export type InviteContext = { invite: { roleLabel: string; dashboardUrl?: string; /** ya puede entrar con Google */ google?: boolean } };
 
 function passwordResetHtml(link: string, invite?: InviteContext["invite"]) {
   const href = escapeHtml(link);
   const title = invite ? "Te invitamos al panel" : "Recuperá tu contraseña";
   const intro = invite
-    ? `Te dieron acceso al panel de administración de Canela en Rama como <strong>${escapeHtml(invite.roleLabel)}</strong>.
+    ? invite.google
+      ? `Te dieron acceso al panel de administración de Canela en Rama como <strong>${escapeHtml(invite.roleLabel)}</strong>.
+              Podés entrar con <strong>Google</strong> con este mismo email. Si además querés entrar con contraseña,
+              tocá el botón para elegirla (el enlace vence en 1 hora).`
+      : `Te dieron acceso al panel de administración de Canela en Rama como <strong>${escapeHtml(invite.roleLabel)}</strong>.
               Tocá el botón para elegir tu contraseña. El enlace vence en 1 hora; si venció, pedí uno nuevo con
               "¿Olvidaste tu contraseña?".`
     : `Recibimos un pedido para cambiar la contraseña de tu cuenta. Tocá el botón para elegir una nueva.
               El enlace vence en 1 hora y se puede usar una sola vez.`;
   const button = invite ? "Elegir contraseña" : "Cambiar contraseña";
   const footer = invite
-    ? invite.dashboardUrl
+    ? invite.google
+      ? `Entrá al panel${invite.dashboardUrl ? ` en <a href="${escapeHtml(invite.dashboardUrl)}" style="color:#cc3b1d">${escapeHtml(invite.dashboardUrl)}</a>` : ""} con «Continuar con Google» o con tu email y contraseña.`
+      : invite.dashboardUrl
       ? `Después entrá al panel en <a href="${escapeHtml(invite.dashboardUrl)}" style="color:#cc3b1d">${escapeHtml(invite.dashboardUrl)}</a> con tu email y la contraseña nueva.`
       : "Después entrá al panel con tu email y la contraseña nueva."
     : "Si no fuiste vos, ignorá este mail: tu contraseña no cambia.";
@@ -91,6 +98,40 @@ export function passwordResetEmailDelivery() {
             body: passwordResetHtml(input.passwordResetLink, invite),
           };
         },
+      }),
+    }),
+  };
+}
+
+/** Mail de "confirmá tu email" (verificación), mismo SMTP y misma estética. */
+export function emailVerificationEmailDelivery() {
+  const cfg = smtpSettings();
+  if (!cfg) return undefined;
+  return {
+    service: new VerificationSMTPService({
+      smtpSettings: {
+        host: cfg.host,
+        port: cfg.port,
+        secure: cfg.secure,
+        authUsername: cfg.user,
+        password: cfg.password,
+        from: { name: cfg.fromName, email: cfg.fromEmail },
+      },
+      override: (original) => ({
+        ...original,
+        getContent: async (input) => ({
+          toEmail: input.user.email,
+          subject: "Confirmá tu email · Canela en Rama",
+          isHtml: true,
+          body: emailLayout({
+            title: "Confirmá tu email",
+            body: `<p style="margin:0 0 16px;font-size:15px;line-height:1.5">Tocá el botón para confirmar que este email es tuyo. Así podés entrar a tu cuenta también con Google y recuperarla si te olvidás la contraseña.</p>
+            <p style="margin:0 0 8px;font-size:13px;color:#666">Si el botón no funciona, copiá este enlace en el navegador:</p>
+            <p style="margin:0;font-size:13px;word-break:break-all"><a href="${escapeHtml(input.emailVerifyLink)}" style="color:#cc3b1d">${escapeHtml(input.emailVerifyLink)}</a></p>`,
+            button: { label: "Confirmar email", href: input.emailVerifyLink },
+            footer: "Si no creaste una cuenta en Canela en Rama, ignorá este mail.",
+          }),
+        }),
       }),
     }),
   };

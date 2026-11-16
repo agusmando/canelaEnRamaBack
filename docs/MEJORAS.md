@@ -1,6 +1,6 @@
 # Cosas a mejorar
 
-Estado al 17/11/2026. Ordenado por prioridad: primero lo que bloquea salir a
+Estado al 16/11/2026. Ordenado por prioridad: primero lo que bloquea salir a
 producción, después lo que más impacto tiene en la operación.
 
 ## Resumen
@@ -13,7 +13,7 @@ producción, después lo que más impacto tiene en la operación.
 | 4 | Backups de la base | Infra | 2 h | Alta |
 | 5 | Más tests (órdenes y pagos con base de prueba) | Código | 2 días | Media |
 | 6 | Monitoreo de errores (Sentry) y uptime | Infra | 2 h | Media |
-| 7 | Una sola cuenta por persona (email + Google) | Código | 3 h | Baja |
+| 7 | Activar "una sola cuenta por persona" (account linking) | Configuración | 15 min | Media |
 
 ---
 
@@ -24,6 +24,10 @@ prueba, script o migración toca datos de clientes. La estrategia completa está
 en [`DEPLOY.md`](./DEPLOY.md): dos proyectos de Supabase, dos cores de
 SuperTokens, dos servicios en Render, tienda en Cloudflare Pages y panel en
 Vercel, con ramas `develop` → dev y `main` → prod.
+
+Ojo: el core de SuperTokens que usa hoy la app es una **instancia de
+desarrollo** (`st-dev-…`, 3 usuarios). Para producción conviene crear el core
+de producción en supertokens.com y dejar este como dev.
 
 ## 2. Mercado Pago (ya programado, falta configurar)
 
@@ -80,8 +84,9 @@ backup en dev al menos una vez.
 
 ## 5. Más tests
 
-Hay 62 tests (`npm test`, sin base de datos) para precios, ofertas, roles y
-permisos, vistas públicas, rate limit, carga masiva y fechas de movimientos,
+Hay 78 tests (`npm test`, sin base de datos) para precios, ofertas, roles y
+permisos, vistas públicas (variantes ocultas, productor local), búsqueda de
+catálogo, account linking, rate limit, carga masiva y fechas de movimientos,
 mails de pedido, limpieza de carritos y la app (health, dashboard de
 SuperTokens apagado en prod), con CI en GitHub Actions. Lo que falta cubrir
 necesita una base de prueba (Postgres como servicio en el CI, migraciones con
@@ -96,13 +101,29 @@ necesita una base de prueba (Postgres como servicio en el CI, migraciones con
 Sentry (free) en backend y frontends para ver errores reales de clientes;
 UptimeRobot sobre `/api/health`, tienda y panel; alertas de Render por mail.
 
-## 7. Una sola cuenta por persona
+## 7. Una sola cuenta por persona (ya programado, falta activar)
 
-Sin "account linking", si alguien se registra con email y después entra con
-Google (mismo email), quedan dos usuarios distintos: pedidos, carrito y rol
-separados. Se puede unificar con el AccountLinking de SuperTokens (pago en el
-core administrado) o con un override de `signInUp` que, si el email ya existe
-y está verificado, use esa cuenta.
+Email + contraseña y Google con el mismo email pasan a ser el mismo usuario
+(pedidos, carrito, direcciones y rol), con el AccountLinking de SuperTokens
+(`config/supertokens/account-linking.ts`). Solo se vinculan emails
+**verificados**, para que nadie pueda registrarse con el email de otra persona
+y quedarse con su cuenta (o su rol en el panel):
+- Google ya viene verificado.
+- Las cuentas con contraseña reciben el mail "Confirmá tu email" al
+  registrarse; se puede reenviar desde Mi cuenta, y recuperar la contraseña
+  también confirma el email.
+- Quien solo tiene Google y quiere contraseña usa "¿Olvidaste tu contraseña?":
+  se agrega a la misma cuenta.
+- Invitar al panel a alguien que ya entra con Google le da el rol a esa cuenta.
+
+**No anda todavía porque el core no tiene la función**: hoy el core solo tiene
+`multi_tenancy`. Pasos (ver `DEPLOY.md` → SuperTokens):
+1. supertokens.com → el core → Add-ons / Features → **Account Linking**
+   (gratis en cores de desarrollo; pago en producción).
+2. `ACCOUNT_LINKING=on` en el API de ese entorno. Antes del paso 1 no: con el
+   core sin la función, los logins fallan.
+3. Probar: registro con contraseña → confirmar email → entrar con Google con
+   el mismo email → mismos pedidos.
 
 ## Notas
 

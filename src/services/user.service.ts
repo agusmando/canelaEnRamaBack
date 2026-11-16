@@ -6,6 +6,8 @@ import UserRoles from "supertokens-node/recipe/userroles";
 import { prisma as sharedPrisma } from "../config/prisma/client.js";
 import { isStaffRole, permissionsFor, primaryRole, ROLES, STAFF_ROLES, type StaffRole } from "../config/rbac.js";
 import type { InviteContext } from "../config/supertokens/email.js";
+import type { SignUpContext } from "../config/supertokens/supertokens.config.js";
+import { accountLinkingEnabled } from "../config/supertokens/account-linking.js";
 import { UserRepository } from "../repository/user.repository.js";
 import { ConflictError } from "../errors/application/ConflictError.js";
 import { NotFoundError } from "../errors/application/NotFoundError.js";
@@ -222,12 +224,14 @@ export class UserService {
     const role = this.parseRole(input.role);
     if (!role) throw new ValidationError("Elegí el rol que va a tener en el panel");
 
-    // El panel se usa con email y contraseña: si el email solo tiene cuenta de Google,
-    // se crea una cuenta de email aparte (la de Google sigue siendo la de cliente).
     const existing = await supertokens.listUsersByAccountInfo(TENANT, { email });
     const withPassword = existing.find((u) => u.loginMethods.some((m) => m.recipeId === "emailpassword"));
-    if (withPassword) {
-      const id = withPassword.id;
+    // Con account linking la cuenta de Google ES la persona: el rol va ahí (si no,
+    // al vincularse quedaría en una cuenta secundaria). Sin linking, el panel
+    // necesita una cuenta de email aparte.
+    const target = withPassword ?? (accountLinkingEnabled() ? existing[0] : undefined);
+    if (target) {
+      const id = target.id;
       // La cuenta existe en SuperTokens pero quizás no en la base (cuentas viejas).
       await this.prisma.user.upsert({
         where: { supertokensId: id },
@@ -235,29 +239,40 @@ export class UserService {
         create: { supertokensId: id, email, name },
       });
       const user = await this.setRole(actor, id, role);
-      return { user, created: false, emailSent: false, inviteLink: null };
+      if (withPassword) return { user, created: false, emailSent: false, inviteLink: null };
+      // Solo Google: puede entrar con Google ya mismo; el enlace le agrega una contraseña.
+      const recipeUserId = target.loginMethods[0].recipeUserId;
+      const { inviteLink, emailSent } = await this.sendInvite(id, recipeUserId, email, role, true);
+      return { user, created: false, emailSent, inviteLink };
     }
 
     const password = randomBytes(24).toString("base64url") + "aA1!";
-    const signUp = await EmailPassword.signUp(TENANT, email, password);
+    const ctx: SignUpContext = { skipVerificationEmail: true }; // la invitación ya verifica el email
+    const signUp = await EmailPassword.signUp(TENANT, email, password, undefined, ctx);
     if (signUp.status !== "OK") throw new ConflictError(`No se pudo crear la cuenta (${signUp.status})`);
     const id = signUp.user.id;
     if (name) await this.prisma.user.update({ where: { supertokensId: id }, data: { name } });
     await UserRoles.addRoleToUser(TENANT, id, role);
     await this.prisma.user.update({ where: { supertokensId: id }, data: { role } });
 
+    const { inviteLink, emailSent } = await this.sendInvite(id, signUp.recipeUserId, email, role, false);
+    return { user: await this.detail(id), created: true, emailSent, inviteLink };
+  }
+
+  /** Enlace de "elegir contraseña" + mail de invitación. `google`: ya puede entrar con Google. */
+  private async sendInvite(id: string, recipeUserId: any, email: string, role: StaffRole, google: boolean) {
     const link = await EmailPassword.createResetPasswordLink(TENANT, id, email);
     const inviteLink = link.status === "OK" ? link.link : null;
     let emailSent = false;
     if (inviteLink) {
       const ctx: InviteContext = {
-        invite: { roleLabel: ROLES[role].label, dashboardUrl: process.env.DASHBOARD_URL || undefined },
+        invite: { roleLabel: ROLES[role].label, dashboardUrl: process.env.DASHBOARD_URL || undefined, google },
       };
       try {
         await EmailPassword.sendEmail({
           type: "PASSWORD_RESET",
           passwordResetLink: inviteLink,
-          user: { id, recipeUserId: signUp.recipeUserId, email },
+          user: { id, recipeUserId, email },
           tenantId: TENANT,
           userContext: ctx,
         });
@@ -266,6 +281,6 @@ export class UserService {
         console.warn("[users] no se pudo mandar la invitación:", err.message);
       }
     }
-    return { user: await this.detail(id), created: true, emailSent, inviteLink };
+    return { inviteLink, emailSent };
   }
 }

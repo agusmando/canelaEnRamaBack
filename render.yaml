@@ -76,6 +76,10 @@ services:
       # Emails que pueden modificar en ese dashboard (el resto, solo lectura)
       - key: SUPERTOKENS_DASHBOARD_ADMINS
         sync: false
+      # Una sola cuenta por persona (email + Google). Activar antes en el core
+      # de SuperTokens (Account Linking, función paga) y recién ahí poner "on".
+      - key: ACCOUNT_LINKING
+        value: "off"
       # Limpieza de carritos de invitado abandonados (días)
       - key: CART_GUEST_TTL_DAYS
         value: "30"
@@ -141,6 +145,10 @@ services:
         value: https://admin-dev.canelaenrama.com.ar
       - key: SUPERTOKENS_DASHBOARD
         value: "on"
+      # En el core dev las funciones pagas se activan gratis: activar Account
+      # Linking ahí y después pasar a "on" (antes, rompe los logins)
+      - key: ACCOUNT_LINKING
+        value: "off"
       - key: WEB_URL
         value: https://dev.canelaenrama.com.ar
       - key: API_PUBLIC_URL

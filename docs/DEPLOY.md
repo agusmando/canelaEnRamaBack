@@ -74,9 +74,21 @@ Cada uno da `SUPERTOKENS_CONNECTION_URI` + `SUPERTOKENS_API_KEY`.
     `http://localhost:5173/auth/callback/google` y `http://localhost:5174/auth/callback/google`
 
   Cada client id/secret se carga en su core.
-- Sin "account linking", una misma persona con cuenta de email y cuenta de
-  Google son dos usuarios distintos: el rol se asigna a la cuenta con la que
-  va a entrar al panel (Usuarios → buscar por email).
+- **Una sola cuenta por persona (account linking)**: con `ACCOUNT_LINKING=on`,
+  email+contraseña y Google con el mismo email son el mismo usuario (pedidos,
+  carrito y rol). Solo se vinculan emails verificados (Google ya lo está; las
+  cuentas con contraseña se confirman con el mail "Confirmá tu email" o al
+  recuperar la contraseña). Pasos:
+  1. supertokens.com → el core → **Add-ons / Features → Account Linking**
+     (gratis en el core dev; en prod es pago).
+  2. Recién ahí `ACCOUNT_LINKING=on` en ese servicio de Render (con el core sin
+     la función, prenderla hace fallar los logins).
+  3. Si ya hay personas con dos cuentas separadas (mismo email), se unen a mano:
+     mover sus pedidos/carrito/direcciones a una y vincular con
+     `AccountLinking.linkAccounts` (hoy no hay ninguna).
+
+  Sin account linking, cuenta de email y de Google son usuarios distintos: el
+  rol se asigna a la cuenta con la que va a entrar al panel.
 - Dashboard de SuperTokens (`/api/auth/dashboard`): apagado en prod
   (`SUPERTOKENS_DASHBOARD=off`), prendido en dev. Si hace falta en prod, ponerlo
   en `on` un rato y volver a apagarlo; `SUPERTOKENS_DASHBOARD_ADMINS` limita
@@ -177,6 +189,9 @@ build, rewrites de SPA y headers de seguridad (Vercel no lee `_headers`).
 - [ ] Login al panel (email y Google), invitar un usuario de prueba, recuperar contraseña (llega el mail).
 - [ ] Compra de prueba: llegan los mails de pedido recibido / pago acreditado / listo.
 - [ ] `GET https://api.canelaenrama.com.ar/api/auth/dashboard/` → 404 (apagado).
+- [ ] Account linking: activado en el core y `ACCOUNT_LINKING=on`; registrarse con
+      contraseña, confirmar el email (llega el mail), salir y entrar con Google
+      con el mismo email → mismo usuario (mismos pedidos).
 
 ## 7. Backups y monitoreo
 

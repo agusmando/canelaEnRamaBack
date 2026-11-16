@@ -92,3 +92,73 @@ services:
         value: "48"
       - key: MP_ALLOW_CASH
         value: "false"
+
+  # ------------------------------------------------------------------ DEV
+  # Rama `develop` → https://api-dev.canelaenrama.com.ar, con su propia base
+  # (Supabase "canela-dev") y su propio core de SuperTokens. Plan free: se
+  # duerme sin tráfico y no tiene pre-deploy, así que las migraciones corren
+  # al arrancar el contenedor.
+  - type: web
+    name: canela-en-rama-api-dev
+    runtime: docker
+    plan: free
+    region: virginia
+    branch: develop
+    autoDeploy: true
+    dockerfilePath: ./Dockerfile
+    dockerCommand: sh -c "npx prisma migrate deploy --schema=src/config/prisma/schema.prisma && node dist/server.js"
+    healthCheckPath: /api/health
+    numInstances: 1
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: DIRECT_URL
+        sync: false
+      - key: SUPERTOKENS_CONNECTION_URI
+        sync: false
+      - key: SUPERTOKENS_API_KEY
+        sync: false
+      - key: API_DOMAIN
+        value: https://api-dev.canelaenrama.com.ar
+      - key: WEBSITE_DOMAIN
+        value: https://dev.canelaenrama.com.ar
+      - key: CORS_ORIGINS
+        value: https://dev.canelaenrama.com.ar,https://admin-dev.canelaenrama.com.ar,http://localhost:5173,http://localhost:5174
+      - key: DASHBOARD_URL
+        value: https://admin-dev.canelaenrama.com.ar
+      - key: WEB_URL
+        value: https://dev.canelaenrama.com.ar
+      - key: API_PUBLIC_URL
+        value: https://api-dev.canelaenrama.com.ar
+      # Cloudinary: misma cuenta, otra carpeta conviene (o una cuenta free aparte)
+      - key: CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
+      # Mercado Pago: credenciales de PRUEBA (TEST-...) y usuarios de prueba
+      - key: MP_ACCESS_TOKEN
+        sync: false
+      - key: MP_WEBHOOK_SECRET
+        sync: false
+      - key: MP_ORDER_TTL_HOURS
+        value: "2"
+      - key: GOOGLE_PLACES_API_KEY
+        sync: false
+      - key: GOOGLE_PLACE_QUERY
+        value: Canela en Rama, Colombia 1268, Godoy Cruz, Mendoza
+      - key: GOOGLE_PLACES_LANGUAGE
+        value: es
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: SMTP_FROM_NAME
+        value: Canela en Rama (DEV)

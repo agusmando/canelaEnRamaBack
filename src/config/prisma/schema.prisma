@@ -1,141 +1,515 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+// ./src/config/prisma/schema.prisma
 
 generator client {
   provider = "prisma-client-js"
+  // Si tienes previewFeatures raros, quítalos por ahora
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL") // Puerto 6543 (Pooler)
+  directUrl = env("DIRECT_URL") // Puerto 5432 (Directo)
 }
 
 model Product {
-  id          Int           @id @default(autoincrement())
+  id          Int     @id @default(autoincrement())
   name        String
   description String?
-  price       Float
-  Category    Category     @relation(fields: [categoryId], references: [id])
-  categoryId  Int
-  // Review      Review[]
-  Inventory   Inventory[]
-  Supplier    Supplier     @relation(fields: [supplierId], references: [id])
-  supplierId  Int
-  // CartItem    CartItem[]
-  Tags        Tag[]
-  OrderDetail OrderDetail[]
-  active      Boolean       @default(true)
+  active      Boolean @default(true)
+
+  Category   Category @relation(fields: [categoryId], references: [id])
+  categoryId Int
+  Brand      Brand    @relation(fields: [brandId], references: [id])
+  brandId    Int
+  Tags       Tag[]
+
+  variants ProductVariant[]
+
+  // Medidas (Esto define qué es físicamente)
+  measure Measure  @default(KG)
+  offers  Offer[]
+  reviews Review[]
 }
 
-model Order {
-  id          Int           @id @default(autoincrement())
-  productId   Int
-  quantity    Int
-  totalPrice  Float
-  createdAt   DateTime      @default(now())
-  orderDetail OrderDetail[]
-  // Shipment    Shipment[]
-}
-
-model OrderDetail {
-  id        Int     @id @default(autoincrement())
+model ProductVariant {
+  id        Int @id @default(autoincrement())
   productId Int
-  Product   Product @relation(fields: [productId], references: [id])
-  Order     Order?  @relation(fields: [orderId], references: [id])
-  orderId   Int?
+
+  // Atributos
+  name             String  @default("default")
+  price            Float
+  profitMargin     Float   @default(0)
+  currentStock     Int     @default(0)
+  active           Boolean @default(true) // Apaga solo esta presentación
+  contentMeasure   Measure @default(KG)
+  contentAmount    Int? // Por ejemplo un frasco de 60cc, 150ml, 360g, etc
+  packagingOptions Float[]
+  requestTime      String  @default("")
+  stockThreshold   Int     @default(0)
+  roundingOption   Int     @default(10)
+
+  // Relación con el padre
+  product       Product      @relation(fields: [productId], references: [id])
+  // Soy componente de:
+  isComponentOf Dependency[] @relation("ComponentVariant")
+
+  // Tengo componentes (si soy un Mix):
+  hasComponents Dependency[] @relation("MixVariant")
+
+  movements StockMovement[]
+
+  offers Offer[]
+  images Image[]
+
+  CartItem   CartItem[]
+  orderItems OrderItem[]
+  reviews    Review[]
+
+  availableWeb       Boolean @default(true)
 }
 
-// model User {
-//   id        Int      @id @default(autoincrement())
-//   email     String   @unique
-//   name      String?
-//   password  String
-//   createdAt DateTime @default(now())
-//   updatedAt DateTime @updatedAt
-//   Review    Review[]
-//   cart      cart[]
-// }
+enum Measure {
+  KG
+  U
+  L
+  ML
+  G
+}
+
+model Dependency {
+  mixVariantId     Int
+  productVariantId Int
+  quantity         Float // Cantidad de cada componente por mix
+  active           Boolean @default(true)
+
+  // El producto que es el Mix/Combo
+  mixVariant       ProductVariant @relation("MixVariant", fields: [mixVariantId], references: [id])
+  // El producto que es el Componente
+  componentProduct ProductVariant @relation("ComponentVariant", fields: [productVariantId], references: [id])
+
+  @@id([mixVariantId, productVariantId])
+}
+
+model Brand {
+  id          Int     @id @default(autoincrement())
+  name        String
+  description String?
+
+  // Many-to-many: suppliers <-> brands
+  suppliers Supplier[]
+
+  // One-to-many: brand -> products
+  products Product[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  active    Boolean  @default(true)
+}
 
 model Category {
+  id          Int       @id @default(autoincrement())
+  name        String    @unique
+  description String?
+  products    Product[]
+  active      Boolean   @default(true)
+}
+
+model Tag {
   id       Int       @id @default(autoincrement())
   name     String    @unique
-  description String?
   products Product[]
   active   Boolean   @default(true)
 }
 
-model Tag {
-  id      Int       @id @default(autoincrement())
-  name    String    @unique
-  Product Product[]
-  active  Boolean   @default(true)
+model StockMovement {
+  id               Int             @id @default(autoincrement())
+  productVariantId Int
+  // Cantidad que se movió (ej: +10 o -5)
+  quantity         Int
+  priceAtTime      Float           @default(0)
+  // Útil para saber por qué cambió (Venta, Reabastecimiento, Merma, Devolución)
+  type             MovementType
+  createdAt        DateTime        @default(now())
+  productVariant   ProductVariant? @relation(fields: [productVariantId], references: [id])
 }
 
-// model Review {
-//   id        Int      @id @default(autoincrement())
-//   productId Int
-//   userId    Int
-//   rating    Int
-//   comment   String?
-//   createdAt DateTime @default(now())
-//   updatedAt DateTime @updatedAt
-
-//   product Product @relation(fields: [productId], references: [id])
-//   user    User    @relation(fields: [userId], references: [id])
-// }
-
-model Inventory {
-  id        Int      @id @default(autoincrement())
-  productId Int
-  quantity  Int
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  product Product @relation(fields: [productId], references: [id])
+// Enum para categorizar los movimientos
+enum MovementType {
+  IN // Entrada de proveedor
+  OUT // Venta
+  ADJUSTMENT // Corrección de inventario
+  RETURN // Devolución de cliente
+  PRODUCTION // Reabastecimiento
 }
 
 model Supplier {
-  id        Int       @id @default(autoincrement())
-  name      String
-  contact   String?
+  id          Int      @id @default(autoincrement())
+  name        String
+  contact     String?
   description String?
-  createdAt DateTime  @default(now())
-  products  Product[]
-  active    Boolean   @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  active      Boolean  @default(true)
+  brands      Brand[]
 }
 
-// model Shipment {
-//   id        Int       @id @default(autoincrement())
-//   orderId   Int
-//   status    String
-//   shippedAt DateTime?
-//   createdAt DateTime  @default(now())
-//   updatedAt DateTime  @updatedAt
+model Offer {
+  id               Int             @id @default(autoincrement())
+  productVariantId Int?
+  ProductVariant   ProductVariant? @relation(fields: [productVariantId], references: [id])
+  productId        Int?
+  Product          Product?        @relation(fields: [productId], references: [id])
+  startTime        DateTime
+  finishTime       DateTime
+  discountValue    Float? // (El porcentaje o el valor del descuento)
+  discountType     DiscountType
+  discountQuantity Int? // (La cantidad de productos que tienen que comprar para obtener el descuento)
+  quantityToGet    Int? // (la cantidad total de items que se lleva el cliente, o la cantidad gratis)
+  stockThreshold   Int? // (La cantidad mínima de stock necesaria para que la oferta sea válida)
+  active           Boolean         @default(true)
+}
 
-//   order Order @relation(fields: [orderId], references: [id])
-// }
+enum DiscountType {
+  PERCENTAGE // Descuento porcentual (0.1 = 10%)
+  FIXED // Descuento fijo (10 = -$10)
+  BUY_ONE_GET_MORE // Compra un producto y obtienes otro gratis (usa discountQuantity para saber la cantidad mínima que tiene que comprar para obtenerlo)
+  BUY_MORE_GET_MORE // Compra muchos producto y obtienes una cantidad gratis (usa discountQuantity para saber la cantidad mínima que tiene que comprar para obtenerlo, quantityToGet te diría cuántos gratis)
+  BUY_MORE_GET_DISCOUNT // Compra un producto y obtienes un descuento (usa discountQuantity igual, pero usa discountValue para saber el porcentaje de descuento)
+  BUY_MORE_GET_FIXED_DISCOUNT // Compra un producto y obtienes un descuento fijo (usa discountQuantity igual, pero usa discountValue para saber el descuento fijo)
+}
 
-// model cart {
-//   id        Int      @id @default(autoincrement())
-//   userId    Int
-//   createdAt DateTime @default(now())
-//   updatedAt DateTime @updatedAt
+// Opinión de un comprador sobre una variante. Se publica cuando el staff la aprueba.
+model Review {
+  id                Int          @id @default(autoincrement())
+  productId         Int // desnormalizado para listar/promediar por producto
+  productVariantId  Int
+  userSuperTokensId String
+  orderId           Int? // pedido ENTREGADO que acredita la compra
+  rating            Int // 1..5
+  title             String?
+  comment           String?
+  status            ReviewStatus @default(PENDING)
+  rejectionReason   String?
+  reply             String? // respuesta pública de la tienda
+  repliedAt         DateTime?
+  moderatedAt       DateTime?
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
 
-//   user  User       @relation(fields: [userId], references: [id])
-//   items CartItem[]
-// }
+  product        Product        @relation(fields: [productId], references: [id])
+  productVariant ProductVariant @relation(fields: [productVariantId], references: [id])
+  user           User           @relation(fields: [userSuperTokensId], references: [supertokensId])
 
-// model CartItem {
-//   id        Int      @id @default(autoincrement())
-//   cartId    Int
-//   productId Int
-//   quantity  Int
-//   createdAt DateTime @default(now())
-//   updatedAt DateTime @updatedAt
+  @@unique([userSuperTokensId, productVariantId])
+  @@index([productId, status])
+  @@index([status])
+}
 
-//   cart    cart    @relation(fields: [cartId], references: [id])
-//   product Product @relation(fields: [productId], references: [id])
-// }
+enum ReviewStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+// Reseñas traídas de Google Places (caché local; Google devuelve hasta 5 por consulta)
+model GoogleReview {
+  id             Int       @id @default(autoincrement())
+  googleId       String    @unique // "places/{placeId}/reviews/{reviewId}"
+  authorName     String
+  authorPhotoUrl String?
+  authorUrl      String?
+  rating         Int
+  text           String?
+  language       String?
+  relativeTime   String?
+  publishedAt    DateTime?
+  featured       Boolean   @default(false) // se muestra en la web
+  active         Boolean   @default(true)
+  fetchedAt      DateTime  @default(now())
+}
+
+// Resumen del local en Google (una fila por placeId)
+model GooglePlace {
+  placeId         String    @id
+  name            String?
+  rating          Float?
+  userRatingCount Int?
+  googleMapsUri   String?
+  lastSyncAt      DateTime?
+  lastError       String?
+}
+
+model Banner {
+  id                   Int             @id @default(autoincrement())
+  placement            BannerPlacement
+  name                 String // nombre interno y alt de la imagen
+  eyebrow              String?
+  headline             String?
+  text                 String?
+  ctaLabel             String?
+  linkUrl              String?
+  size                 BannerSize? // solo HOME_RECOMMENDATION
+  desktopImageUrl      String?
+  desktopImagePublicId String?
+  mobileImageUrl       String?
+  mobileImagePublicId  String?
+  backgroundColor      String?
+  textColor            String?
+  position             Int             @default(0)
+  startsAt             DateTime?
+  endsAt               DateTime?
+  active               Boolean         @default(true)
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime        @updatedAt
+
+  @@index([placement, active, position])
+}
+
+enum BannerPlacement {
+  HOME_HERO
+  HOME_RECOMMENDATION
+  CATALOG_STRIP
+  ANNOUNCEMENT_BAR
+}
+
+enum BannerSize {
+  SQUARE
+  WIDE
+}
+
+model Image {
+  id               Int            @id @default(autoincrement())
+  productVariantId Int
+  public_id        String // El ID de Cloudinary (para borrar/editar).
+  secure_url       String // La URL para mostrar la imagen en el frontend.
+  ProductVariant   ProductVariant @relation(fields: [productVariantId], references: [id])
+}
+
+model User {
+  id            Int          @id @default(autoincrement())
+  supertokensId String       @unique // vínculo con SuperTokens
+  email         String?
+  name          String?
+  avatarUrl     String?
+  role          UserRole     @default(CONSUMER)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  cart          Cart?
+  orders        Order[]
+  reviews       Review[]
+  address       UserAddress?
+
+  // Ejemplo: si después quieres órdenes:
+}
+
+enum UserRole {
+  ADMIN
+  EDITOR
+  EMPLOYEE
+  CONSUMER
+}
+
+model Cart {
+  id                Int        @id @default(autoincrement())
+  userSuperTokensId String?    @unique
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+  sessionId         String?    @unique // identificador de sesión para guests
+  user              User?      @relation(fields: [userSuperTokensId], references: [supertokensId])
+  items             CartItem[]
+}
+
+model CartItem {
+  cartId             Int
+  productVariantId   Int
+  // Tamaño del paquete elegido (g o u, uno de ProductVariant.packagingOptions).
+  // 0 = venta suelta: `quantity` está en gramos (KG) o unidades.
+  // > 0 = `quantity` es la cantidad de paquetes de ese tamaño.
+  selectedBulkOption Float    @default(0)
+  quantity           Int
+  createdAt          DateTime @default(now())
+
+  cart           Cart           @relation(fields: [cartId], references: [id])
+  productVariant ProductVariant @relation(fields: [productVariantId], references: [id])
+
+  // La misma variante puede estar en varias presentaciones (2x250g + 1x500g)
+  @@id([cartId, productVariantId, selectedBulkOption])
+}
+
+model Order {
+  id                Int      @id @default(autoincrement())
+  userSuperTokensId String
+  user              User?    @relation(fields: [userSuperTokensId], references: [supertokensId])
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  totalPrice  Float
+  totalItems  Int
+  paymentType String
+
+  estimatedReadyAt DateTime? // Fecha estimada de entrega/retiro
+  // PENDING (recién creada, esperando confirmación/pago) -> PROCESSING -> SHIPPED -> DELIVERED
+  status           OrderStatus @default(PENDING)
+  orderItems       OrderItem[]
+  shipment         Shipment?
+
+  // Envío elegido en el checkout. `totalPrice` es solo productos: lo cobrado es
+  // totalPrice + shippingCost (así las estadísticas separan ventas de envíos).
+  shippingMethod   ShipmentMethod @default(PICKUP)
+  shippingCost     Float          @default(0)
+  shippingProvider String? // "own" (tarifa por zona) | "uber" | ...
+  shippingZone     String? // departamento usado para cotizar
+
+  // Cobro online (Mercado Pago). Para efectivo/transferencia/etc. queda en PENDING
+  // y el staff gestiona el cobro a mano.
+  paymentStatus       PaymentStatus @default(PENDING)
+  paymentStatusDetail String? // detalle de Mercado Pago, p. ej. "cc_rejected_insufficient_amount"
+  paymentId           String? // id del pago en Mercado Pago
+  paymentPreferenceId String? // última preferencia (checkout) creada
+  paidAt              DateTime?
+
+  @@index([paymentType, paymentStatus, status])
+}
+
+enum PaymentStatus {
+  PENDING // todavía no pagó (o pago offline a gestionar por el staff)
+  IN_PROCESS // Mercado Pago lo está revisando
+  APPROVED
+  REJECTED
+  CANCELLED
+  REFUNDED
+  CHARGED_BACK
+}
+
+enum OrderStatus {
+  PENDING
+  PROCESSING
+  SHIPPED
+  DELIVERED
+  CANCELLED
+}
+
+model OrderItem {
+  id               Int  @id @default(autoincrement())
+  orderId          Int
+  productVariantId Int?
+
+  productNameSnapshot     String // Ej: "Yogurt"
+  variantNameSnapshot     String // Ej: "Vainilla"
+  unitPriceSnapshot       Float // El precio al que se vendió EXACTAMENTE ese día
+  discountAppliedSnapshot Float  @default(0) // El descuento que se aplicó EXACTAMENTE ese dia
+  offerTypeSnapshot       String @default("") // Ej: "BUY_ONE_GET_MORE"
+
+  quantity           Int
+  status             OrderItemStatus @default(FULFILLED)
+  awaitingStockAt    DateTime?
+  selectedBulkOption Float?
+
+  Order          Order           @relation(fields: [orderId], references: [id])
+  productVariant ProductVariant? @relation(fields: [productVariantId], references: [id])
+}
+
+enum OrderItemStatus {
+  FULFILLED // Disponible y asignado
+  AWAITING_STOCK // Sin stock, esperando reposición
+  PARTIALLY_RETURNED // Parcialmente regresado
+  CANCELLED // El cliente o el local lo quitaron
+  RETURNED // El cliente lo regresa
+}
+
+// Envío o retiro de una orden (1:1). Sin integración con transportistas: el
+// staff carga transportista/código externo y va avanzando el estado.
+model Shipment {
+  id                  Int            @id @default(autoincrement())
+  orderId             Int            @unique
+  trackingCode        String         @unique // código público de seguimiento
+  method              ShipmentMethod @default(DELIVERY)
+  status              ShipmentStatus @default(PENDING)
+  carrier             String?
+  carrierTrackingCode String?
+  carrierTrackingUrl  String?
+  recipientName       String?
+  phone               String?
+  address             String?
+  city                String?
+  province            String?
+  postalCode          String?
+  notes               String?
+  cost                Float          @default(0)
+  provider            String? // "own" | "uber" | ...
+  providerDeliveryId  String? // id del envío en el proveedor (p. ej. Uber Direct)
+  providerStatus      String? // último estado informado por el proveedor
+  zone                String? // departamento de destino
+  estimatedDeliveryAt DateTime?
+  shippedAt           DateTime?
+  deliveredAt         DateTime?
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+
+  order  Order           @relation(fields: [orderId], references: [id])
+  events ShipmentEvent[]
+
+  @@index([status])
+}
+
+model ShipmentEvent {
+  id          Int            @id @default(autoincrement())
+  shipmentId  Int
+  status      ShipmentStatus
+  description String?
+  location    String?
+  createdAt   DateTime       @default(now())
+
+  shipment Shipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+
+  @@index([shipmentId])
+}
+
+enum ShipmentMethod {
+  DELIVERY
+  PICKUP
+}
+
+enum ShipmentStatus {
+  PENDING
+  PREPARING
+  READY_FOR_PICKUP
+  SHIPPED
+  OUT_FOR_DELIVERY
+  FAILED_ATTEMPT
+  DELIVERED
+  RETURNED
+  CANCELLED
+}
+
+/// Domicilio de entrega del cliente (uno por usuario).
+model UserAddress {
+  id                Int      @id @default(autoincrement())
+  userSuperTokensId String   @unique
+  recipientName     String
+  phone             String
+  street            String
+  number            String
+  apartment         String?
+  zone              String // departamento (clave de ShippingZone.name)
+  city              String?
+  province          String   @default("Mendoza")
+  postalCode        String?
+  notes             String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  user User @relation(fields: [userSuperTokensId], references: [supertokensId])
+}
+
+/// Tarifa propia de envío por departamento (editable desde el dashboard).
+model ShippingZone {
+  id         Int      @id @default(autoincrement())
+  name       String   @unique // "Godoy Cruz", "Capital", ...
+  price      Float
+  etaMinutes Int? // demora estimada de entrega
+  active     Boolean  @default(true)
+  sortOrder  Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}

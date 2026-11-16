@@ -1,0 +1,20 @@
+-- Las funciones de base de datos ahora están versionadas como migración de Prisma:
+--
+--   src/config/prisma/migrations/20261113150000_stock_pricing_functions/migration.sql
+--   src/config/prisma/migrations/20261113160000_cart_item_bulk_option/migration.sql
+--
+-- Se aplican con:
+--   npx prisma migrate deploy --schema=./src/config/prisma/schema.prisma
+--
+-- Funciones disponibles:
+--   create_stock_movement(variant_id INT, delta INT, type TEXT) -> INT (stock final)
+--   set_stock_level(variant_id INT, target INT)                 -> INT (stock final)
+--   process_mix_production(mix_variant_id INT, amount INT)
+--   recalculate_mix_price(mix_variant_id INT)
+--   recalculate_all_mixes_from_product(component_variant_id INT)
+--   add_component_to_variant(component_variant_id INT, mix_variant_id INT, quantity FLOAT8)
+--   add_item_to_cart(cart_token VARCHAR, variant_id INT, quantity INT, bulk_option FLOAT8 = 0)
+--   merge_session_cart_to_user_cart(session_id VARCHAR, user_supertokens_id VARCHAR)
+--
+-- Para cambiar una función, crear una NUEVA migración con CREATE OR REPLACE
+-- (no editar este archivo ni la migración ya aplicada).

@@ -16,16 +16,16 @@ export class PaginatedResponse<T> extends BaseResponse<T> {
     statusCode: number,
     message: string,
     content: T[],
-    pagina: number,
-    cantidadPorPagina: number,
-    totalElementos: number
+    page: number,
+    amountPerPage: number,
+    totalAmount: number
   ) {
     super(statusCode, message, {
       content,
       pagination: {
-        pagina: pagina || 1,
-        cantidadPorPagina: cantidadPorPagina || 10,
-        totalElementos: totalElementos || content.length,
+        page: page || 1,
+        amountPerPage: amountPerPage || 10,
+        totalAmount: totalAmount || content.length,
       },
     });
   }

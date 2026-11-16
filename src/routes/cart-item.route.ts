@@ -1,0 +1,15 @@
+import express from "express";
+import { CartItemController } from "../controllers/cart-item.controller.js";
+import { requirePermission } from "../middleware/auth.middleware.js";
+
+const router = express.Router();
+const cartItemController = new CartItemController();
+
+// Solo lectura para staff. Los ítems se gestionan con PUT /cart/:token.
+router.get(
+  "/",
+  ...requirePermission("orders.manage"),
+  cartItemController.findAll.bind(cartItemController),
+);
+
+export default router;

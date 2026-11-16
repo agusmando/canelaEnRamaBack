@@ -1,0 +1,3973 @@
+{
+  "info": {
+    "_postman_id": "648d9fc6-4bd2-4af6-8326-39b9337ae052",
+    "name": "Canela en Rama API",
+    "description": "API del e-commerce Canela en Rama.\n\n**Formato de respuesta**: `{ statusCode, message, response }`. Listados paginados: `response.content` + `response.pagination`.\n\n**Errores**: 400 validación · 401 sin sesión · 403 sin rol · 404 no existe · 409 regla de negocio (stock insuficiente, oferta inválida, etc.) · 500 error interno.\n\n**Unidades**: productos KG → precio por kg, stock y cantidades en gramos. Otros → unidades.\n\n**Flujo sugerido**: Auth › Sign in (staff) → Categorías/Marcas › Crear → Productos › Crear → Variantes › Crear MIX → Ofertas › Crear → carpeta **11 · Checkout y ciclo de la orden**.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{accessToken}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080/api"
+    },
+    {
+      "key": "email",
+      "value": "cliente@example.com"
+    },
+    {
+      "key": "password",
+      "value": "ClaveSegura123"
+    },
+    {
+      "key": "adminEmail",
+      "value": "admin@example.com"
+    },
+    {
+      "key": "adminPassword",
+      "value": "ClaveSegura123"
+    },
+    {
+      "key": "accessToken",
+      "value": ""
+    },
+    {
+      "key": "refreshToken",
+      "value": ""
+    },
+    {
+      "key": "supertokensId",
+      "value": ""
+    },
+    {
+      "key": "categoryId",
+      "value": "1"
+    },
+    {
+      "key": "tagId",
+      "value": "1"
+    },
+    {
+      "key": "brandId",
+      "value": "1"
+    },
+    {
+      "key": "supplierId",
+      "value": "1"
+    },
+    {
+      "key": "productId",
+      "value": "1"
+    },
+    {
+      "key": "variantId",
+      "value": "1"
+    },
+    {
+      "key": "componentVariantId",
+      "value": "2"
+    },
+    {
+      "key": "mixVariantId",
+      "value": "3"
+    },
+    {
+      "key": "offerId",
+      "value": "1"
+    },
+    {
+      "key": "movementId",
+      "value": "1"
+    },
+    {
+      "key": "cartToken",
+      "value": ""
+    },
+    {
+      "key": "orderId",
+      "value": "1"
+    }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "description": "",
+      "item": [
+        {
+          "name": "Health check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "health"
+              ]
+            },
+            "description": "Para el health check de Render / monitoreo.",
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "00 · Auth (SuperTokens)",
+      "description": "Autenticación con SuperTokens en **modo header** (`st-auth-mode: header`).\n\n1. Ejecutá *Sign in* → guarda `accessToken`.\n2. La colección envía `Authorization: Bearer {{accessToken}}`.\n3. Si recibís 401 *try refresh token*, ejecutá *Refresh session*.\n\nEl front web usa cookies; ambos modos están habilitados.",
+      "item": [
+        {
+          "name": "Sign up (cliente)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "st-auth-mode",
+                "value": "header",
+                "description": "Pide los tokens en headers en vez de cookies"
+              },
+              {
+                "key": "rid",
+                "value": "emailpassword"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/signup",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "signup"
+              ]
+            },
+            "description": "Crea un usuario con email/contraseña. El backend crea el `User` en la base con rol CONSUMER.\n\nGuarda `accessToken`, `refreshToken` y `supertokensId` en variables de la colección.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"formFields\": [\n    {\n      \"id\": \"email\",\n      \"value\": \"{{email}}\"\n    },\n    {\n      \"id\": \"password\",\n      \"value\": \"{{password}}\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const access = pm.response.headers.get('st-access-token');",
+                  "const refresh = pm.response.headers.get('st-refresh-token');",
+                  "if (access) pm.collectionVariables.set('accessToken', access);",
+                  "if (refresh) pm.collectionVariables.set('refreshToken', refresh);",
+                  "const body = pm.response.json();",
+                  "if (body.user && body.user.id) pm.collectionVariables.set('supertokensId', body.user.id);",
+                  "pm.test('status OK', () => pm.expect(body.status).to.eql('OK'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Sign in (cliente)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "st-auth-mode",
+                "value": "header",
+                "description": "Pide los tokens en headers en vez de cookies"
+              },
+              {
+                "key": "rid",
+                "value": "emailpassword"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/signin",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "signin"
+              ]
+            },
+            "description": "Login con email/contraseña. Guarda los tokens en variables de la colección; todas las requests usan `Bearer {{accessToken}}`.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"formFields\": [\n    {\n      \"id\": \"email\",\n      \"value\": \"{{email}}\"\n    },\n    {\n      \"id\": \"password\",\n      \"value\": \"{{password}}\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const access = pm.response.headers.get('st-access-token');",
+                  "const refresh = pm.response.headers.get('st-refresh-token');",
+                  "if (access) pm.collectionVariables.set('accessToken', access);",
+                  "if (refresh) pm.collectionVariables.set('refreshToken', refresh);",
+                  "const body = pm.response.json();",
+                  "if (body.user && body.user.id) pm.collectionVariables.set('supertokensId', body.user.id);",
+                  "pm.test('status OK', () => pm.expect(body.status).to.eql('OK'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Sign in (staff/admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "st-auth-mode",
+                "value": "header",
+                "description": "Pide los tokens en headers en vez de cookies"
+              },
+              {
+                "key": "rid",
+                "value": "emailpassword"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/signin",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "signin"
+              ]
+            },
+            "description": "Login con un usuario que tiene rol ADMIN o EMPLOYEE (asignado desde el dashboard de SuperTokens). Pisa `accessToken`: usalo antes de los endpoints de staff.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"formFields\": [\n    {\n      \"id\": \"email\",\n      \"value\": \"{{adminEmail}}\"\n    },\n    {\n      \"id\": \"password\",\n      \"value\": \"{{adminPassword}}\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const access = pm.response.headers.get('st-access-token');",
+                  "const refresh = pm.response.headers.get('st-refresh-token');",
+                  "if (access) pm.collectionVariables.set('accessToken', access);",
+                  "if (refresh) pm.collectionVariables.set('refreshToken', refresh);",
+                  "const body = pm.response.json();",
+                  "if (body.user && body.user.id) pm.collectionVariables.set('supertokensId', body.user.id);",
+                  "pm.test('status OK', () => pm.expect(body.status).to.eql('OK'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Refresh session",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "st-auth-mode",
+                "value": "header"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{refreshToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/session/refresh",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "session",
+                "refresh"
+              ]
+            },
+            "description": "Renueva el access token cuando vence (respuesta 401 `try refresh token`).",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const access = pm.response.headers.get('st-access-token');",
+                  "const refresh = pm.response.headers.get('st-refresh-token');",
+                  "if (access) pm.collectionVariables.set('accessToken', access);",
+                  "if (refresh) pm.collectionVariables.set('refreshToken', refresh);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Sign out",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/auth/signout",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "signout"
+              ]
+            },
+            "description": "Revoca la sesión actual."
+          }
+        },
+        {
+          "name": "Usuario actual",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/user/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "user",
+                "me"
+              ]
+            },
+            "description": "Datos del usuario logueado + sus roles."
+          }
+        },
+        {
+          "name": "Usuario por supertokensId",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/user/{{supertokensId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "user",
+                "{{supertokensId}}"
+              ]
+            },
+            "description": "Solo el propio usuario o staff. Para otro usuario responde 404."
+          }
+        }
+      ]
+    },
+    {
+      "name": "03 · Categorías",
+      "description": "",
+      "item": [
+        {
+          "name": "Listar categorías",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/category",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "category"
+              ],
+              "query": [
+                {
+                  "key": "name",
+                  "value": "frutos",
+                  "disabled": true,
+                  "description": ""
+                },
+                {
+                  "key": "active",
+                  "value": "true",
+                  "disabled": true,
+                  "description": ""
+                },
+                {
+                  "key": "products",
+                  "value": "",
+                  "disabled": true,
+                  "description": "nombre de producto"
+                },
+                {
+                  "key": "paginate",
+                  "value": "false",
+                  "disabled": true,
+                  "description": ""
+                },
+                {
+                  "key": "currentPage",
+                  "value": "1",
+                  "disabled": true,
+                  "description": ""
+                },
+                {
+                  "key": "amountPerPage",
+                  "value": "10",
+                  "disabled": true,
+                  "description": ""
+                }
+              ]
+            },
+            "description": "Público.",
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Obtener categoría",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/category/{{categoryId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "category",
+                "{{categoryId}}"
+              ]
+            },
+            "description": "Público.",
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Crear",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/category",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "category"
+              ]
+            },
+            "description": "Staff.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Frutos secos\",\n  \"description\": \"Almendras, nueces y más\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "const value = body.response && body.response.id;",
+                  "if (value !== undefined && value !== null) { pm.collectionVariables.set('categoryId', value); console.log('categoryId =', value); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Actualizar",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/category/{{categoryId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "category",
+                "{{categoryId}}"
+              ]
+            },
+            "description": "Staff.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"description\": \"Frutos secos seleccionados\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Desactivar",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/category/{{categoryId}}/active",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "category",
+                "{{categoryId}}",
+                "active"
+              ]
+            },
+            "description": "Staff. 204."
+          }
+        },
+        {
+          "name": "Activar",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/category/{{categoryId}}/active",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "category",
+                "{{categoryId}}",
+                "active"
+              ]
+            },
+            "description": "Staff. 204."
+          }
+        }
+      ]
+    },
+    {
+      "name": "04 · Tags",
+      "description": "",
+      "item": [
+        {
+          "name": "Listar tags",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/tag",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "tag"
+              ],
+              "query": [
+                {
+                  "key": "name",
+                  "value": "",
+                  "disabled": true,
+                  "description": ""
+                },
+                {
+                  "key": "active",
+                  "value": "true",
+                  "disabled": true,
+                  "description": ""
+                },
+                {
+                  "key": "paginate",
+                  "value": "false",
+                  "disabled": true,
+                  "description": ""
+                },
+                {
+                  "key": "currentPage",
+                  "value": "1",
+                  "disabled": true,
+                  "description": ""
+                },
+                {
+                  "key": "amountPerPage",
+                  "value": "10",
+                  "disabled": true,
+                  "description": ""
+                }
+              ]
+            },
+            "description": "Público.",
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Obtener tag",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/tag/{{tagId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "tag",
+                "{{tagId}}"
+              ]
+            },
+            "description": "Público.",
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Crear",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/tag",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "tag"
+              ]
+            },
+            "description": "Staff.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Sin TACC\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "const value = body.response && body.response.id;",
+                  "if (value !== undefined && value !== null) { pm.collectionVariables.set('tagId', value); console.log('tagId =', value); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Actualizar",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/tag/{{tagId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "tag",
+                "{{tagId}}"
+              ]
+            },
+            "description": "Staff.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Sin TACC certificado\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Desactivar",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/tag/{{tagId}}/active",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "tag",
+                "{{tagId}}",
+                "active"
+              ]
+            },
+            "description": "Staff. 204."
+          }
+        },
+        {
+          "name": "Activar",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/tag/{{tagId}}/active",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "tag",
+                "{{tagId}}",
+                "active"
+              ]
+            },
+            "description": "Staff. 204."
+          }
+        }
+      ]
+    },
+    {
+      "name": "05 · Marcas",
+      "description": "",
+      "item": [
+        {
+          "name": "Listar marcas",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/brand",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "brand"
+              ],
+              "query": [
+                {
+                  "key": "name",
+                  "value": "",
+                  "disabled": true,
+                  "description": ""
+                },
+                {
+                  "key": "active",
+                  "value": "true",
+                  "disabled": true,
+                  "description": ""
+                },
+                {
+                  "key": "suppliers",
+                  "value": "",
+                  "disabled": true,
+                  "description": "nombre de proveedor"
+                },
+                {
+                  "key": "paginate",
+                  "value": "false",
+                  "disabled": true,
+                  "description": ""
+                },
+                {
+                  "key": "currentPage",
+                  "value": "1",
+                  "disabled": true,
+                  "description": ""
+                },
+                {
+                  "key": "amountPerPage",
+                  "value": "10",
+                  "disabled": true,
+                  "description": ""
+                }
+              ]
+            },
+            "description": "Público.",
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Obtener marca",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/brand/{{brandId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "brand",
+                "{{brandId}}"
+              ]
+            },
+            "description": "Público.",
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Crear",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/brand",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "brand"
+              ]
+            },
+            "description": "Staff.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Canela en Rama\",\n  \"description\": \"Marca propia\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "const value = body.response && body.response.id;",
+                  "if (value !== undefined && value !== null) { pm.collectionVariables.set('brandId', value); console.log('brandId =', value); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Actualizar",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/brand/{{brandId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "brand",
+                "{{brandId}}"
+              ]
+            },
+            "description": "Staff.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"description\": \"Marca propia de la tienda\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Asociar productos",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/brand/{{brandId}}/products",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "brand",
+                "{{brandId}}",
+                "products"
+              ]
+            },
+            "description": "Admin.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"productsId\": [\n    {\n      \"id\": \"{{productId}}\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Desasociar productos",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/brand/{{brandId}}/products",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "brand",
+                "{{brandId}}",
+                "products"
+              ]
+            },
+            "description": "Admin.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"productsId\": [\n    {\n      \"id\": \"{{productId}}\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Desactivar",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/brand/{{brandId}}/active",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "brand",
+                "{{brandId}}",
+                "active"
+              ]
+            },
+            "description": "Staff. 204."
+          }
+        },
+        {
+          "name": "Activar",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/brand/{{brandId}}/active",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "brand",
+                "{{brandId}}",
+                "active"
+              ]
+            },
+            "description": "Staff. 204."
+          }
+        }
+      ]
+    },
+    {
+      "name": "06 · Proveedores",
+      "description": "",
+      "item": [
+        {
+          "name": "Listar proveedores",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/supplier",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "supplier"
+              ],
+              "query": [
+                {
+                  "key": "name",
+                  "value": "",
+                  "disabled": true,
+                  "description": ""
+                },
+                {
+                  "key": "contact",
+                  "value": "",
+                  "disabled": true,
+                  "description": ""
+                },
+                {
+                  "key": "active",
+                  "value": "true",
+                  "disabled": true,
+                  "description": ""
+                },
+                {
+                  "key": "brands",
+                  "value": "",
+                  "disabled": true,
+                  "description": "nombre de marca"
+                },
+                {
+                  "key": "paginate",
+                  "value": "false",
+                  "disabled": true,
+                  "description": ""
+                },
+                {
+                  "key": "currentPage",
+                  "value": "1",
+                  "disabled": true,
+                  "description": ""
+                },
+                {
+                  "key": "amountPerPage",
+                  "value": "10",
+                  "disabled": true,
+                  "description": ""
+                }
+              ]
+            },
+            "description": "Staff."
+          }
+        },
+        {
+          "name": "Obtener proveedore",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/supplier/{{supplierId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "supplier",
+                "{{supplierId}}"
+              ]
+            },
+            "description": "Staff."
+          }
+        },
+        {
+          "name": "Crear",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/supplier",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "supplier"
+              ]
+            },
+            "description": "Staff.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Distribuidora Norte\",\n  \"contact\": \"ventas@norte.com / 11-5555-5555\",\n  \"description\": \"Frutos secos a granel\",\n  \"brands\": [\n    {\n      \"id\": \"{{brandId}}\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "const value = body.response && body.response.id;",
+                  "if (value !== undefined && value !== null) { pm.collectionVariables.set('supplierId', value); console.log('supplierId =', value); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Actualizar",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/supplier/{{supplierId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "supplier",
+                "{{supplierId}}"
+              ]
+            },
+            "description": "Staff.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"contact\": \"compras@norte.com\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Asociar marcas",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/supplier/{{supplierId}}/brands",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "supplier",
+                "{{supplierId}}",
+                "brands"
+              ]
+            },
+            "description": "Staff.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"brandsId\": [\n    {\n      \"id\": \"{{brandId}}\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Desasociar marcas",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/supplier/{{supplierId}}/brands",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "supplier",
+                "{{supplierId}}",
+                "brands"
+              ]
+            },
+            "description": "Staff.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"brandsId\": [\n    {\n      \"id\": \"{{brandId}}\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Desactivar",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/supplier/{{supplierId}}/active",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "supplier",
+                "{{supplierId}}",
+                "active"
+              ]
+            },
+            "description": "Staff. 204."
+          }
+        },
+        {
+          "name": "Activar",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/supplier/{{supplierId}}/active",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "supplier",
+                "{{supplierId}}",
+                "active"
+              ]
+            },
+            "description": "Staff. 204."
+          }
+        }
+      ]
+    },
+    {
+      "name": "01 · Productos",
+      "description": "Catálogo. `price` = costo (por kg si `contentMeasure` = KG), `profitMargin` = fracción (0.5 = 50%).\n\n`finalPrice = ceil(price × (1 + profitMargin) / roundingOption) × roundingOption`.",
+      "item": [
+        {
+          "name": "Listar productos (catálogo)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/product?active=true&detalle=true&paginate=true&currentPage=1&amountPerPage=12",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "product"
+              ],
+              "query": [
+                {
+                  "key": "name",
+                  "value": "almendra",
+                  "disabled": true,
+                  "description": "contiene (case-insensitive)"
+                },
+                {
+                  "key": "description",
+                  "value": "",
+                  "disabled": true,
+                  "description": "contiene"
+                },
+                {
+                  "key": "category",
+                  "value": "frutos",
+                  "disabled": true,
+                  "description": "nombre de la categoría (contiene)"
+                },
+                {
+                  "key": "brand",
+                  "value": "",
+                  "disabled": true,
+                  "description": "nombre de la marca (contiene)"
+                },
+                {
+                  "key": "tags",
+                  "value": "sin tacc",
+                  "disabled": true,
+                  "description": "nombre de tag; repetir el parámetro para exigir varios"
+                },
+                {
+                  "key": "variants",
+                  "value": "",
+                  "disabled": true,
+                  "description": "nombre de variante (contiene)"
+                },
+                {
+                  "key": "active",
+                  "value": "true",
+                  "disabled": false,
+                  "description": "true|false"
+                },
+                {
+                  "key": "detalle",
+                  "value": "true",
+                  "disabled": false,
+                  "description": "incluye variantes, categoría, marca, tags, ofertas e imágenes"
+                },
+                {
+                  "key": "paginate",
+                  "value": "true",
+                  "disabled": false,
+                  "description": "true|false"
+                },
+                {
+                  "key": "currentPage",
+                  "value": "1",
+                  "disabled": false,
+                  "description": ""
+                },
+                {
+                  "key": "amountPerPage",
+                  "value": "12",
+                  "disabled": false,
+                  "description": "máx. 100"
+                }
+              ]
+            },
+            "description": "Público. Para invitados/clientes se ocultan `price` (costo) y `profitMargin`; el precio de venta está en `variants[].finalPrice`.\n\nRespuesta paginada: `response.content[]` + `response.pagination`. Sin paginar: `response` es un array (vacío = 200 `[]`).",
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Obtener producto",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/product/{{productId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "product",
+                "{{productId}}"
+              ]
+            },
+            "description": "Público. Incluye variantes con `finalPrice`, componentes de mixes, ofertas e imágenes.",
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Crear producto (multipart con imágenes)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/product",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "product"
+              ]
+            },
+            "description": "Staff. `multipart/form-data`: `variants` y `Tags` van como JSON string.\n\nEl stock inicial NO se escribe directo: se crea en 0 y se registra un `StockMovement` IN (o una producción si la variante es un mix).",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "name",
+                  "value": "Almendra",
+                  "type": "text"
+                },
+                {
+                  "key": "description",
+                  "value": "Almendra pelada premium",
+                  "type": "text"
+                },
+                {
+                  "key": "measure",
+                  "value": "KG",
+                  "type": "text",
+                  "description": "KG | U | L | ML | G"
+                },
+                {
+                  "key": "categoryId",
+                  "value": "{{categoryId}}",
+                  "type": "text"
+                },
+                {
+                  "key": "brandId",
+                  "value": "{{brandId}}",
+                  "type": "text"
+                },
+                {
+                  "key": "Tags",
+                  "value": "[{\"id\": 1}]",
+                  "type": "text",
+                  "description": "JSON string",
+                  "disabled": true
+                },
+                {
+                  "key": "variants",
+                  "value": "[{\"name\": \"Almendra natural\", \"price\": 10000, \"profitMargin\": 0.5, \"roundingOption\": 10, \"contentMeasure\": \"KG\", \"packagingOptions\": [250, 500, 1000], \"currentStock\": 5000, \"stockThreshold\": 500, \"requestTime\": \"\", \"availableWeb\": true, \"availablePedidosYa\": true}]",
+                  "type": "text",
+                  "description": "JSON string. currentStock = stock inicial (g si KG) y se registra como movimiento IN."
+                },
+                {
+                  "key": "image",
+                  "type": "file",
+                  "src": [],
+                  "description": "Hasta 7 imágenes. Se asignan a la primera variante."
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "const value = body.response && body.response.id;",
+                  "if (value !== undefined && value !== null) { pm.collectionVariables.set('productId', value); console.log('productId =', value); }",
+                  "const body = pm.response.json();",
+                  "const value = body.response && body.response.variants && body.response.variants[0] && body.response.variants[0].id;",
+                  "if (value !== undefined && value !== null) { pm.collectionVariables.set('variantId', value); console.log('variantId =', value); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Crear producto (JSON, sin imágenes)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/product",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "product"
+              ]
+            },
+            "description": "Staff. Mismo endpoint enviando JSON.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Nuez mariposa\",\n  \"description\": \"Nuez Chandler\",\n  \"measure\": \"KG\",\n  \"categoryId\": \"{{categoryId}}\",\n  \"brandId\": \"{{brandId}}\",\n  \"Tags\": [\n    {\n      \"id\": 1\n    }\n  ],\n  \"variants\": [\n    {\n      \"name\": \"Nuez mariposa\",\n      \"price\": 8000,\n      \"profitMargin\": 0.25,\n      \"roundingOption\": 100,\n      \"contentMeasure\": \"KG\",\n      \"packagingOptions\": [\n        250,\n        500\n      ],\n      \"currentStock\": 3000\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "const value = body.response && body.response.variants && body.response.variants[0] && body.response.variants[0].id;",
+                  "if (value !== undefined && value !== null) { pm.collectionVariables.set('componentVariantId', value); console.log('componentVariantId =', value); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Actualizar producto",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/product/{{productId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "product",
+                "{{productId}}"
+              ]
+            },
+            "description": "Staff. Datos generales. Precio y stock se cambian por variante (`PUT /product/variant/:id`).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Almendra pelada\",\n  \"description\": \"Almendra pelada premium\",\n  \"measure\": \"KG\",\n  \"categoryId\": \"{{categoryId}}\",\n  \"brandId\": \"{{brandId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Actualizar producto · gestionar variantes en lote",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/product/{{productId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "product",
+                "{{productId}}"
+              ]
+            },
+            "description": "Staff. `removeVariants` desactiva (soft delete): una variante con ventas o movimientos no se puede borrar.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"addVariants\": [\n    {\n      \"name\": \"Almendra tostada\",\n      \"price\": 11000,\n      \"profitMargin\": 0.45,\n      \"contentMeasure\": \"KG\",\n      \"packagingOptions\": [\n        250,\n        500\n      ],\n      \"currentStock\": 2000\n    }\n  ],\n  \"activateVariants\": [],\n  \"deactivateVariants\": [],\n  \"removeVariants\": []\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Agregar tags",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/product/{{productId}}/tags",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "product",
+                "{{productId}}",
+                "tags"
+              ]
+            },
+            "description": "Staff.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tagsId\": [\n    {\n      \"id\": 1\n    },\n    {\n      \"id\": 2\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Quitar tags",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/product/{{productId}}/tags",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "product",
+                "{{productId}}",
+                "tags"
+              ]
+            },
+            "description": "Staff.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tagsId\": [\n    {\n      \"id\": 2\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Desactivar producto",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/product/{{productId}}/active",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "product",
+                "{{productId}}",
+                "active"
+              ]
+            },
+            "description": "Admin. 204."
+          }
+        },
+        {
+          "name": "Activar producto",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/product/{{productId}}/active",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "product",
+                "{{productId}}",
+                "active"
+              ]
+            },
+            "description": "Admin. 204."
+          }
+        }
+      ]
+    },
+    {
+      "name": "02 · Variantes, precios y stock",
+      "description": "Todo cambio de stock pasa por funciones SQL que bloquean la fila y dejan un `StockMovement`. Errores de negocio (stock insuficiente, receta inválida) → **409** con el mensaje.",
+      "item": [
+        {
+          "name": "Listar variantes",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/product/variant?active=true&availableWeb=true&detalle=true&paginate=true&currentPage=1&amountPerPage=20",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "product",
+                "variant"
+              ],
+              "query": [
+                {
+                  "key": "name",
+                  "value": "",
+                  "disabled": true,
+                  "description": "contiene"
+                },
+                {
+                  "key": "minPrice",
+                  "value": "5000",
+                  "disabled": true,
+                  "description": "costo >= (staff)"
+                },
+                {
+                  "key": "maxPrice",
+                  "value": "20000",
+                  "disabled": true,
+                  "description": "costo <="
+                },
+                {
+                  "key": "active",
+                  "value": "true",
+                  "disabled": false,
+                  "description": ""
+                },
+                {
+                  "key": "availableWeb",
+                  "value": "true",
+                  "disabled": false,
+                  "description": ""
+                },
+                {
+                  "key": "maxStock",
+                  "value": "1000",
+                  "disabled": true,
+                  "description": "stock <= (reposición)"
+                },
+                {
+                  "key": "detalle",
+                  "value": "true",
+                  "disabled": false,
+                  "description": ""
+                },
+                {
+                  "key": "paginate",
+                  "value": "true",
+                  "disabled": false,
+                  "description": ""
+                },
+                {
+                  "key": "currentPage",
+                  "value": "1",
+                  "disabled": false,
+                  "description": ""
+                },
+                {
+                  "key": "amountPerPage",
+                  "value": "20",
+                  "disabled": false,
+                  "description": ""
+                }
+              ]
+            },
+            "description": "Público (costo oculto para no-staff).",
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Obtener variante",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/product/variant/{{variantId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "product",
+                "variant",
+                "{{variantId}}"
+              ]
+            },
+            "description": "Público.",
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Crear variante simple",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/product/variant",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "product",
+                "variant"
+              ]
+            },
+            "description": "Staff. Acepta JSON o multipart (campo `image` para fotos).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"productId\": \"{{productId}}\",\n  \"name\": \"Almendra 1kg\",\n  \"price\": 10000,\n  \"profitMargin\": 0.5,\n  \"roundingOption\": 10,\n  \"contentMeasure\": \"KG\",\n  \"packagingOptions\": [\n    250,\n    500,\n    1000\n  ],\n  \"currentStock\": 5000,\n  \"stockThreshold\": 500,\n  \"requestTime\": \"\",\n  \"availableWeb\": true,\n  \"availablePedidosYa\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "const value = body.response && body.response.id;",
+                  "if (value !== undefined && value !== null) { pm.collectionVariables.set('variantId', value); console.log('variantId =', value); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Crear variante MIX (con receta)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/product/variant",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "product",
+                "variant"
+              ]
+            },
+            "description": "Staff. `hasComponents[].quantity` en g (componentes KG) o unidades.\n\nEl precio del mix se calcula solo (suma del precio de venta de los componentes × cantidad) y su margen queda en 0. `currentStock` produce el mix consumiendo componentes en proporción a la receta; si no alcanza → 409.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"productId\": \"{{productId}}\",\n  \"name\": \"Mix energía\",\n  \"price\": 0,\n  \"roundingOption\": 10,\n  \"contentMeasure\": \"KG\",\n  \"packagingOptions\": [\n    250,\n    500\n  ],\n  \"hasComponents\": [\n    {\n      \"productVariantId\": \"{{variantId}}\",\n      \"quantity\": 600\n    },\n    {\n      \"productVariantId\": \"{{componentVariantId}}\",\n      \"quantity\": 400\n    }\n  ],\n  \"currentStock\": 1000\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "const value = body.response && body.response.id;",
+                  "if (value !== undefined && value !== null) { pm.collectionVariables.set('mixVariantId', value); console.log('mixVariantId =', value); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Actualizar precio / margen",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/product/variant/{{variantId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "product",
+                "variant",
+                "{{variantId}}"
+              ]
+            },
+            "description": "Staff. Recalcula en cascada el precio de todos los mixes que usan esta variante.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"price\": 12000,\n  \"profitMargin\": 0.45,\n  \"roundingOption\": 100\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Fijar stock (inventario)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/product/variant/{{variantId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "product",
+                "variant",
+                "{{variantId}}"
+              ]
+            },
+            "description": "Staff. `currentStock` es ABSOLUTO: deja el stock en 4200 y registra un ADJUSTMENT por la diferencia.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"currentStock\": 4200\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Sumar / restar stock",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/product/variant/{{variantId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "product",
+                "variant",
+                "{{variantId}}"
+              ]
+            },
+            "description": "Staff. Delta: positivo = IN, negativo = OUT. No enviar junto con `currentStock`. Sin stock suficiente → 409.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"stockIncrement\": 1000\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Producir mix",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/product/variant/{{mixVariantId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "product",
+                "variant",
+                "{{mixVariantId}}"
+              ]
+            },
+            "description": "Staff. En un mix, `stockIncrement` positivo produce: descuenta los componentes (movimientos PRODUCTION) y suma al mix.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"stockIncrement\": 500\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Editar receta del mix",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/product/variant/{{mixVariantId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "product",
+                "variant",
+                "{{mixVariantId}}"
+              ]
+            },
+            "description": "Staff. Recalcula el precio del mix (y de los mixes que lo usen).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"addComponents\": [\n    {\n      \"productVariantId\": 3,\n      \"quantity\": 100\n    }\n  ],\n  \"editComponents\": [\n    {\n      \"productVariantId\": \"{{variantId}}\",\n      \"quantity\": 500\n    }\n  ],\n  \"removeComponents\": [\n    {\n      \"productVariantId\": 4\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Disponibilidad y presentaciones",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/product/variant/{{variantId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "product",
+                "variant",
+                "{{variantId}}"
+              ]
+            },
+            "description": "Staff. `requestTime` = días de demora (setea fecha estimada en la orden). `stockThreshold`: por debajo de este stock no aplican ofertas.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"availableWeb\": true,\n  \"availablePedidosYa\": false,\n  \"packagingOptions\": [\n    100,\n    250,\n    500\n  ],\n  \"stockThreshold\": 300,\n  \"requestTime\": \"3\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Subir / quitar imágenes",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/product/variant/{{variantId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "product",
+                "variant",
+                "{{variantId}}"
+              ]
+            },
+            "description": "Staff. Multipart. Las imágenes quitadas se borran de Cloudinary recién después de confirmar la transacción.",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "image",
+                  "type": "file",
+                  "src": []
+                },
+                {
+                  "key": "removeImages[0][id]",
+                  "value": "1",
+                  "type": "text",
+                  "disabled": true
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Desactivar variante",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/product/variant/{{variantId}}/active",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "product",
+                "variant",
+                "{{variantId}}",
+                "active"
+              ]
+            },
+            "description": "Staff. 204."
+          }
+        },
+        {
+          "name": "Activar variante",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/product/variant/{{variantId}}/active",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "product",
+                "variant",
+                "{{variantId}}",
+                "active"
+              ]
+            },
+            "description": "Staff. 204."
+          }
+        }
+      ]
+    },
+    {
+      "name": "07 · Ofertas",
+      "description": "Si hay varias vigentes se usa la más reciente, primero las de la variante y después las del producto. Las vencidas, inactivas o por debajo del umbral de stock se ignoran.",
+      "item": [
+        {
+          "name": "Listar ofertas",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/offer?active=true&detalle=true",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "offer"
+              ],
+              "query": [
+                {
+                  "key": "active",
+                  "value": "true",
+                  "disabled": false,
+                  "description": ""
+                },
+                {
+                  "key": "product",
+                  "value": "",
+                  "disabled": true,
+                  "description": "nombre de producto"
+                },
+                {
+                  "key": "variants",
+                  "value": "",
+                  "disabled": true,
+                  "description": "nombre de variante"
+                },
+                {
+                  "key": "from",
+                  "value": "2026-11-13T00:00:00.000Z",
+                  "disabled": true,
+                  "description": "startTime >="
+                },
+                {
+                  "key": "to",
+                  "value": "2026-12-31T23:59:59.000Z",
+                  "disabled": true,
+                  "description": "finishTime <="
+                },
+                {
+                  "key": "detalle",
+                  "value": "true",
+                  "disabled": false,
+                  "description": ""
+                },
+                {
+                  "key": "paginate",
+                  "value": "false",
+                  "disabled": true,
+                  "description": ""
+                },
+                {
+                  "key": "currentPage",
+                  "value": "1",
+                  "disabled": true,
+                  "description": ""
+                },
+                {
+                  "key": "amountPerPage",
+                  "value": "10",
+                  "disabled": true,
+                  "description": ""
+                }
+              ]
+            },
+            "description": "Staff."
+          }
+        },
+        {
+          "name": "Obtener oferta",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/offer/{{offerId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "offer",
+                "{{offerId}}"
+              ]
+            },
+            "description": "Staff."
+          }
+        },
+        {
+          "name": "Crear · % de descuento",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/offer",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "offer"
+              ]
+            },
+            "description": "Staff. 15% off. Aplica a `productVariantId` **o** `productId` (no ambos).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"productVariantId\": \"{{variantId}}\",\n  \"discountType\": \"PERCENTAGE\",\n  \"discountValue\": 15,\n  \"startTime\": \"2026-11-13T00:00:00.000Z\",\n  \"finishTime\": \"2026-12-31T23:59:59.000Z\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "const value = body.response && body.response.id;",
+                  "if (value !== undefined && value !== null) { pm.collectionVariables.set('offerId', value); console.log('offerId =', value); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Crear · monto fijo",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/offer",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "offer"
+              ]
+            },
+            "description": "Staff. -$500 por unidad de precio (kg o unidad), aplicado a todas las variantes del producto sin oferta propia.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"productId\": \"{{productId}}\",\n  \"discountType\": \"FIXED\",\n  \"discountValue\": 500,\n  \"startTime\": \"2026-11-13T00:00:00.000Z\",\n  \"finishTime\": \"2026-12-31T23:59:59.000Z\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Crear · 3x2",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/offer",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "offer"
+              ]
+            },
+            "description": "Staff. Lleva `discountQuantity`, paga `quantityToGet`.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"productVariantId\": \"{{variantId}}\",\n  \"discountType\": \"BUY_MORE_GET_MORE\",\n  \"discountQuantity\": 3,\n  \"quantityToGet\": 2,\n  \"startTime\": \"2026-11-13T00:00:00.000Z\",\n  \"finishTime\": \"2026-12-31T23:59:59.000Z\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Crear · % desde N unidades",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/offer",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "offer"
+              ]
+            },
+            "description": "Staff. Desde 2 (kg/u), 10% off. `stockThreshold`: con menos stock la oferta no aplica.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"productVariantId\": \"{{variantId}}\",\n  \"discountType\": \"BUY_MORE_GET_DISCOUNT\",\n  \"discountQuantity\": 2,\n  \"discountValue\": 10,\n  \"stockThreshold\": 1000,\n  \"startTime\": \"2026-11-13T00:00:00.000Z\",\n  \"finishTime\": \"2026-12-31T23:59:59.000Z\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Crear · $ fijo desde N unidades",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/offer",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "offer"
+              ]
+            },
+            "description": "Staff.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"productVariantId\": \"{{variantId}}\",\n  \"discountType\": \"BUY_MORE_GET_FIXED_DISCOUNT\",\n  \"discountQuantity\": 5,\n  \"discountValue\": 300,\n  \"startTime\": \"2026-11-13T00:00:00.000Z\",\n  \"finishTime\": \"2026-12-31T23:59:59.000Z\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Actualizar oferta",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/offer/{{offerId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "offer",
+                "{{offerId}}"
+              ]
+            },
+            "description": "Staff. Se revalida la oferta completa.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"discountValue\": 20,\n  \"finishTime\": \"2026-12-31T23:59:59.000Z\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Desactivar oferta",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/offer/{{offerId}}/active",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "offer",
+                "{{offerId}}",
+                "active"
+              ]
+            },
+            "description": "Staff. 204."
+          }
+        },
+        {
+          "name": "Activar oferta",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/offer/{{offerId}}/active",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "offer",
+                "{{offerId}}",
+                "active"
+              ]
+            },
+            "description": "Staff. 204."
+          }
+        }
+      ]
+    },
+    {
+      "name": "08 · Movimientos de stock",
+      "description": "Historial de stock. PRODUCTION solo lo genera la producción de mixes.",
+      "item": [
+        {
+          "name": "Listar movimientos",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/movement?productVariantId={{variantId}}&paginate=true&currentPage=1&amountPerPage=50",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "movement"
+              ],
+              "query": [
+                {
+                  "key": "productVariantId",
+                  "value": "{{variantId}}",
+                  "disabled": false,
+                  "description": ""
+                },
+                {
+                  "key": "type",
+                  "value": "IN",
+                  "disabled": true,
+                  "description": "IN|OUT|ADJUSTMENT|RETURN|PRODUCTION"
+                },
+                {
+                  "key": "from",
+                  "value": "2026-11-01",
+                  "disabled": true,
+                  "description": ""
+                },
+                {
+                  "key": "to",
+                  "value": "2026-11-30",
+                  "disabled": true,
+                  "description": ""
+                },
+                {
+                  "key": "day",
+                  "value": "2026-11-13",
+                  "disabled": true,
+                  "description": "un día puntual"
+                },
+                {
+                  "key": "paginate",
+                  "value": "true",
+                  "disabled": false,
+                  "description": ""
+                },
+                {
+                  "key": "currentPage",
+                  "value": "1",
+                  "disabled": false,
+                  "description": ""
+                },
+                {
+                  "key": "amountPerPage",
+                  "value": "50",
+                  "disabled": false,
+                  "description": ""
+                }
+              ]
+            },
+            "description": "Staff. Orden: más recientes primero."
+          }
+        },
+        {
+          "name": "Obtener movimiento",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/movement/{{movementId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "movement",
+                "{{movementId}}"
+              ]
+            },
+            "description": "Staff."
+          }
+        },
+        {
+          "name": "Ingreso de mercadería (IN)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/movement",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "movement"
+              ]
+            },
+            "description": "Staff. `quantity` positiva. Actualiza `currentStock` y devuelve el stock final.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"productVariantId\": \"{{variantId}}\",\n  \"quantity\": 5000,\n  \"type\": \"IN\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Salida / merma (OUT)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/movement",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "movement"
+              ]
+            },
+            "description": "Staff. `quantity` negativa. Sin stock → 409.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"productVariantId\": \"{{variantId}}\",\n  \"quantity\": -250,\n  \"type\": \"OUT\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Ajuste (ADJUSTMENT)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/movement",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "movement"
+              ]
+            },
+            "description": "Staff. Delta de corrección. Para fijar un valor absoluto usar `PUT /product/variant/:id {currentStock}`.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"productVariantId\": \"{{variantId}}\",\n  \"quantity\": -30,\n  \"type\": \"ADJUSTMENT\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Devolución manual (RETURN)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/movement",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "movement"
+              ]
+            },
+            "description": "Staff. Las devoluciones de órdenes se generan solas al editar/cancelar la orden.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"productVariantId\": \"{{variantId}}\",\n  \"quantity\": 500,\n  \"type\": \"RETURN\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "09 · Carrito",
+      "description": "",
+      "item": [
+        {
+          "name": "Crear carrito (invitado o logueado)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/cart",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "cart"
+              ]
+            },
+            "description": "Sin sesión: crea carrito de invitado, devuelve `sessionId` y setea cookie `guest_cart_id`.\nCon sesión: crea (o reutiliza y suma) el carrito del usuario.\n\n**Presentaciones** (`selectedBulkOption`, tamaño del paquete en g/u):\n- Variante con `packagingOptions`: `quantity` = cantidad de paquetes. Si no se indica la presentación se usa la más chica. Una presentación que no existe → 409.\n- Variante sin presentaciones (venta suelta): `quantity` = gramos (KG) o unidades.\n- La misma variante puede estar en varias presentaciones (cada una es una línea).\n\nLa respuesta trae `items[].quote`, `items[].enoughStock` y `summary` {subtotal, discount, total}.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [\n    {\n      \"productVariantId\": \"{{variantId}}\",\n      \"quantity\": 2,\n      \"selectedBulkOption\": 250\n    },\n    {\n      \"productVariantId\": \"{{variantId}}\",\n      \"quantity\": 1,\n      \"selectedBulkOption\": 500\n    },\n    {\n      \"productVariantId\": \"{{mixVariantId}}\",\n      \"quantity\": 1\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "const value = body.response && (body.response.sessionId || body.response.userSuperTokensId);",
+                  "if (value !== undefined && value !== null) { pm.collectionVariables.set('cartToken', value); console.log('cartToken =', value); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Mi carrito",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/cart/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "cart",
+                "me"
+              ]
+            },
+            "description": "Usuario logueado → su carrito. Invitado → usa la cookie `guest_cart_id`."
+          }
+        },
+        {
+          "name": "Obtener carrito por token",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/cart/{{cartToken}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "cart",
+                "{{cartToken}}"
+              ]
+            },
+            "description": "Token = `sessionId` (invitado) o `supertokensId` (usuario; solo el dueño o staff).",
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Agregar ítems",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/cart/{{cartToken}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "cart",
+                "{{cartToken}}"
+              ]
+            },
+            "description": "Suma paquetes a la línea (variante + presentación). La variante debe estar activa y disponible en web, y la presentación debe existir (si no → 409).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"addItem\": [\n    {\n      \"productVariantId\": \"{{variantId}}\",\n      \"quantity\": 1,\n      \"selectedBulkOption\": 500\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Editar cantidades",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/cart/{{cartToken}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "cart",
+                "{{cartToken}}"
+              ]
+            },
+            "description": "Fija la cantidad de una línea (variante + presentación). `quantity: 0` la quita.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"editItem\": [\n    {\n      \"productVariantId\": \"{{variantId}}\",\n      \"selectedBulkOption\": 250,\n      \"quantity\": 4\n    },\n    {\n      \"productVariantId\": \"{{mixVariantId}}\",\n      \"quantity\": 0\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Quitar ítems",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/cart/{{cartToken}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "cart",
+                "{{cartToken}}"
+              ]
+            },
+            "description": "Con `selectedBulkOption` quita solo esa presentación; sin ella quita la variante en todas sus presentaciones.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"removeItem\": [\n    {\n      \"productVariantId\": \"{{variantId}}\",\n      \"selectedBulkOption\": 500\n    },\n    {\n      \"productVariantId\": \"{{mixVariantId}}\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Vaciar carrito",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/cart/{{cartToken}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "cart",
+                "{{cartToken}}"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"clear\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Fusionar carrito de invitado al loguearse",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/cart/{{cartToken}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "cart",
+                "{{cartToken}}"
+              ]
+            },
+            "description": "Requiere sesión. `{{cartToken}}` = sessionId del invitado. Los ítems pasan al carrito del usuario de la SESIÓN (nunca al que venga en el body) y se borra la cookie.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"mergeGuestCart\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Listar carritos (staff)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/cart?paginate=true&detalle=true",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "cart"
+              ],
+              "query": [
+                {
+                  "key": "paginate",
+                  "value": "true",
+                  "disabled": false,
+                  "description": ""
+                },
+                {
+                  "key": "detalle",
+                  "value": "true",
+                  "disabled": false,
+                  "description": ""
+                }
+              ]
+            },
+            "description": "Staff."
+          }
+        },
+        {
+          "name": "Listar ítems de carritos (staff)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/cart/item",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "cart",
+                "item"
+              ],
+              "query": [
+                {
+                  "key": "cartId",
+                  "value": "",
+                  "disabled": true,
+                  "description": ""
+                },
+                {
+                  "key": "productVariantId",
+                  "value": "",
+                  "disabled": true,
+                  "description": ""
+                },
+                {
+                  "key": "paginate",
+                  "value": "false",
+                  "disabled": true,
+                  "description": ""
+                },
+                {
+                  "key": "currentPage",
+                  "value": "1",
+                  "disabled": true,
+                  "description": ""
+                },
+                {
+                  "key": "amountPerPage",
+                  "value": "10",
+                  "disabled": true,
+                  "description": ""
+                }
+              ]
+            },
+            "description": "Staff. Solo lectura."
+          }
+        }
+      ]
+    },
+    {
+      "name": "10 · Órdenes",
+      "description": "",
+      "item": [
+        {
+          "name": "Crear orden",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/order",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "order"
+              ]
+            },
+            "description": "Requiere sesión. La orden nace en **PENDING** (stock reservado, esperando confirmación/pago). Para comprar lo que hay en el carrito usar *Checkout desde el carrito* (carpeta 11).\n\n`paymentType`: DEBIT | CREDIT | CASH | TRANSFER | MERCADOPAGO.\n\n- Con `selectedBulkOption`: `quantity` = cantidad de paquetes de ese tamaño (g/u).\n- Sin presentación: `quantity` = g (KG) o unidades.\n\nTodo ocurre en una transacción con bloqueo de stock. Si no alcanza, la línea se ajusta (PARTIALLY_RETURNED) o se cancela. Si no hay stock para ninguna → 409 y no se crea la orden.\n\nLos precios y ofertas se calculan en el servidor; los que mande el cliente se ignoran.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"paymentType\": \"TRANSFER\",\n  \"orderItems\": [\n    {\n      \"productVariantId\": \"{{variantId}}\",\n      \"quantity\": 2,\n      \"selectedBulkOption\": 500\n    },\n    {\n      \"productVariantId\": \"{{componentVariantId}}\",\n      \"quantity\": 300\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "const value = body.response && body.response.id;",
+                  "if (value !== undefined && value !== null) { pm.collectionVariables.set('orderId', value); console.log('orderId =', value); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Mis órdenes",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/order/mine?currentPage=1&amountPerPage=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "order",
+                "mine"
+              ],
+              "query": [
+                {
+                  "key": "currentPage",
+                  "value": "1",
+                  "disabled": false,
+                  "description": ""
+                },
+                {
+                  "key": "amountPerPage",
+                  "value": "10",
+                  "disabled": false,
+                  "description": ""
+                }
+              ]
+            },
+            "description": "Órdenes del usuario logueado, las más recientes primero."
+          }
+        },
+        {
+          "name": "Obtener orden",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/order/{{orderId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "order",
+                "{{orderId}}"
+              ]
+            },
+            "description": "El dueño o staff (para otro usuario → 404)."
+          }
+        },
+        {
+          "name": "Cancelar orden (cliente)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/order/{{orderId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "order",
+                "{{orderId}}"
+              ]
+            },
+            "description": "Dueño: solo mientras está **PENDING** (una vez en preparación → 409). Staff: desde PENDING, PROCESSING o SHIPPED. Repone TODO el stock (movimientos RETURN).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"CANCELLED\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Cambiar estado (staff)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/order/{{orderId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "order",
+                "{{orderId}}"
+              ]
+            },
+            "description": "Staff. Transiciones válidas (otra → 409):\n- PENDING → PROCESSING, CANCELLED\n- PROCESSING → PENDING, SHIPPED, DELIVERED, CANCELLED\n- SHIPPED → DELIVERED, CANCELLED\n- DELIVERED y CANCELLED son finales (en DELIVERED se pueden devolver ítems).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"PROCESSING\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Devolución parcial de un ítem (staff)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/order/{{orderId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "order",
+                "{{orderId}}"
+              ]
+            },
+            "description": "Staff. Solo se puede BAJAR la cantidad. Repone la diferencia una vez, prorratea el descuento y recalcula el total.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"editItem\": [\n    {\n      \"productVariantId\": \"{{componentVariantId}}\",\n      \"quantity\": 100\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Devolver / cancelar un ítem completo (staff)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/order/{{orderId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "order",
+                "{{orderId}}"
+              ]
+            },
+            "description": "Staff. `status`: RETURNED | CANCELLED. Identificar el ítem por `id` o `productVariantId`. Si todas las líneas quedan cerradas, la orden pasa a CANCELLED.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"editItem\": [\n    {\n      \"id\": 1,\n      \"status\": \"RETURNED\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Marcar ítem esperando stock (staff)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/order/{{orderId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "order",
+                "{{orderId}}"
+              ]
+            },
+            "description": "Staff. Pasa el ítem a AWAITING_STOCK y corre `estimatedReadyAt` si es posterior.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"editItem\": [\n    {\n      \"productVariantId\": \"{{variantId}}\",\n      \"awaitingStockAt\": \"2026-11-20T12:00:00.000Z\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Listar órdenes (staff)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/order?detalle=true&paginate=true&currentPage=1&amountPerPage=20",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "order"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "PROCESSING",
+                  "disabled": true,
+                  "description": "PENDING|PROCESSING|SHIPPED|DELIVERED|CANCELLED"
+                },
+                {
+                  "key": "userSuperTokensId",
+                  "value": "",
+                  "disabled": true,
+                  "description": ""
+                },
+                {
+                  "key": "paymentType",
+                  "value": "",
+                  "disabled": true,
+                  "description": "contiene"
+                },
+                {
+                  "key": "createdAt",
+                  "value": "2026-11-01",
+                  "disabled": true,
+                  "description": "creadas desde"
+                },
+                {
+                  "key": "detalle",
+                  "value": "true",
+                  "disabled": false,
+                  "description": "incluye ítems"
+                },
+                {
+                  "key": "paginate",
+                  "value": "true",
+                  "disabled": false,
+                  "description": ""
+                },
+                {
+                  "key": "currentPage",
+                  "value": "1",
+                  "disabled": false,
+                  "description": ""
+                },
+                {
+                  "key": "amountPerPage",
+                  "value": "20",
+                  "disabled": false,
+                  "description": ""
+                }
+              ]
+            },
+            "description": "Staff. Las más recientes primero."
+          }
+        },
+        {
+          "name": "Listar ítems de órdenes (staff)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/order/item?paginate=true",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "order",
+                "item"
+              ],
+              "query": [
+                {
+                  "key": "orderId",
+                  "value": "",
+                  "disabled": true,
+                  "description": ""
+                },
+                {
+                  "key": "productVariantId",
+                  "value": "",
+                  "disabled": true,
+                  "description": ""
+                },
+                {
+                  "key": "status",
+                  "value": "AWAITING_STOCK",
+                  "disabled": true,
+                  "description": ""
+                },
+                {
+                  "key": "paginate",
+                  "value": "true",
+                  "disabled": false,
+                  "description": ""
+                }
+              ]
+            },
+            "description": "Staff. Solo lectura (útil para reposición: ítems AWAITING_STOCK)."
+          }
+        },
+        {
+          "name": "Obtener ítem de orden (staff)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/order/item/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "order",
+                "item",
+                "1"
+              ]
+            },
+            "description": "Staff."
+          }
+        }
+      ]
+    },
+    {
+      "name": "11 · Checkout y ciclo de la orden (nuevo)",
+      "description": "Flujo completo de compra con las reglas nuevas:\n\n- **Carrito con presentaciones**: cada línea es variante + `selectedBulkOption` (tamaño del paquete). Sin indicarla se usa la presentación más chica; variantes sin presentaciones se venden sueltas (g/u).\n- **Checkout** (`POST /order {fromCart:true}`): convierte el carrito en orden y lo vacía en una sola transacción.\n- **Ciclo de la orden**: PENDING → PROCESSING → SHIPPED → DELIVERED. El cliente solo cancela en PENDING; staff cancela hasta SHIPPED.\n\nEjecutar en orden (Runner).",
+      "item": [
+        {
+          "name": "1. Sign in (cliente)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "st-auth-mode",
+                "value": "header",
+                "description": "Pide los tokens en headers en vez de cookies"
+              },
+              {
+                "key": "rid",
+                "value": "emailpassword"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/signin",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "signin"
+              ]
+            },
+            "description": "Login del cliente.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"formFields\": [\n    {\n      \"id\": \"email\",\n      \"value\": \"{{email}}\"\n    },\n    {\n      \"id\": \"password\",\n      \"value\": \"{{password}}\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const access = pm.response.headers.get('st-access-token');",
+                  "const refresh = pm.response.headers.get('st-refresh-token');",
+                  "if (access) pm.collectionVariables.set('accessToken', access);",
+                  "if (refresh) pm.collectionVariables.set('refreshToken', refresh);",
+                  "const body = pm.response.json();",
+                  "if (body.user && body.user.id) pm.collectionVariables.set('supertokensId', body.user.id);",
+                  "pm.test('status OK', () => pm.expect(body.status).to.eql('OK'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "2. Fusionar carrito de invitado (si compró sin loguearse)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/cart/{{cartToken}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "cart",
+                "{{cartToken}}"
+              ]
+            },
+            "description": "Opcional. `{{cartToken}}` = sessionId del carrito de invitado. Lo pasa al carrito del usuario.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"mergeGuestCart\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "const value = body.response && body.response.userSuperTokensId;",
+                  "if (value !== undefined && value !== null) { pm.collectionVariables.set('cartToken', value); console.log('cartToken =', value); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "3. Armar carrito con presentaciones",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/cart/{{supertokensId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "cart",
+                "{{supertokensId}}"
+              ]
+            },
+            "description": "Carrito del usuario (token = `supertokensId`). Revisar `summary.total` e `items[].enoughStock` antes de confirmar.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"clear\": true,\n  \"addItem\": [\n    {\n      \"productVariantId\": \"{{variantId}}\",\n      \"quantity\": 2,\n      \"selectedBulkOption\": 250\n    },\n    {\n      \"productVariantId\": \"{{variantId}}\",\n      \"quantity\": 1,\n      \"selectedBulkOption\": 500\n    },\n    {\n      \"productVariantId\": \"{{mixVariantId}}\",\n      \"quantity\": 1\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "4. Ver mi carrito",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/cart/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "cart",
+                "me"
+              ]
+            },
+            "description": "Mismo total que tendrá la orden (salvo cambios de stock/ofertas en el medio)."
+          }
+        },
+        {
+          "name": "5. Checkout desde el carrito",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/order",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "order"
+              ]
+            },
+            "description": "Crea la orden con las líneas del carrito (respetando cada presentación) y **vacía el carrito**, todo en una transacción: si falla (ej. sin stock → 409) el carrito queda intacto.\n\nLa orden nace en **PENDING**.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fromCart\": true,\n  \"paymentType\": \"MERCADOPAGO\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "const value = body.response && body.response.id;",
+                  "if (value !== undefined && value !== null) { pm.collectionVariables.set('orderId', value); console.log('orderId =', value); }",
+                  "pm.test('nace PENDING', () => pm.expect(body.response.status).to.eql('PENDING'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "6. Cliente: ver la orden",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/order/{{orderId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "order",
+                "{{orderId}}"
+              ]
+            },
+            "description": "Dueño o staff."
+          }
+        },
+        {
+          "name": "7. Cliente: cancelar (solo en PENDING)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/order/{{orderId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "order",
+                "{{orderId}}"
+              ]
+            },
+            "description": "Repone el stock. Si la orden ya está en PROCESSING o más → 409 'ya está en preparación'.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"CANCELLED\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "8. Staff: Sign in",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "st-auth-mode",
+                "value": "header",
+                "description": "Pide los tokens en headers en vez de cookies"
+              },
+              {
+                "key": "rid",
+                "value": "emailpassword"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/signin",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "signin"
+              ]
+            },
+            "description": "Login de staff para el resto del ciclo.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"formFields\": [\n    {\n      \"id\": \"email\",\n      \"value\": \"{{adminEmail}}\"\n    },\n    {\n      \"id\": \"password\",\n      \"value\": \"{{adminPassword}}\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const access = pm.response.headers.get('st-access-token');",
+                  "const refresh = pm.response.headers.get('st-refresh-token');",
+                  "if (access) pm.collectionVariables.set('accessToken', access);",
+                  "if (refresh) pm.collectionVariables.set('refreshToken', refresh);",
+                  "const body = pm.response.json();",
+                  "if (body.user && body.user.id) pm.collectionVariables.set('supertokensId', body.user.id);",
+                  "pm.test('status OK', () => pm.expect(body.status).to.eql('OK'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "9. Staff: confirmar → PROCESSING",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/order/{{orderId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "order",
+                "{{orderId}}"
+              ]
+            },
+            "description": "PENDING → PROCESSING (pago confirmado / se empieza a preparar).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"PROCESSING\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "10. Staff: despachar → SHIPPED",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/order/{{orderId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "order",
+                "{{orderId}}"
+              ]
+            },
+            "description": "PROCESSING → SHIPPED.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"SHIPPED\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "11. Staff: entregar → DELIVERED",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/order/{{orderId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "order",
+                "{{orderId}}"
+              ]
+            },
+            "description": "SHIPPED → DELIVERED. Estado final: solo admite devoluciones de ítems.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"DELIVERED\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "12. Staff: devolución post-entrega",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/order/{{orderId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "order",
+                "{{orderId}}"
+              ]
+            },
+            "description": "Baja la cantidad de una línea entregada: repone stock y recalcula el total. La orden sigue DELIVERED.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"editItem\": [\n    {\n      \"productVariantId\": \"{{variantId}}\",\n      \"quantity\": 1\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Ejemplo de error: transición inválida",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/order/{{orderId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "order",
+                "{{orderId}}"
+              ]
+            },
+            "description": "DELIVERED → PENDING → 409 `No se puede pasar de DELIVERED a PENDING (estado final)`.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"PENDING\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

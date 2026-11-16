@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "StockMovement" ADD COLUMN     "priceAtTime" DOUBLE PRECISION NOT NULL DEFAULT 0;

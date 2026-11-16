@@ -1,0 +1,94 @@
+# Blueprint de Render: https://render.com/docs/blueprint-spec
+# Render → New → Blueprint → elegir este repo. Los valores con `sync: false`
+# se cargan a mano en el dashboard (son secretos o dependen del ambiente).
+services:
+  - type: web
+    name: canela-en-rama-api
+    runtime: docker
+    plan: starter # el plan free se duerme: webhooks lentos y el vencimiento de pedidos no corre
+    region: virginia # junto a Supabase (us-east-1)
+    branch: main
+    autoDeploy: true
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/health
+    # Aplica migraciones antes de poner la versión nueva en línea (usa DIRECT_URL)
+    preDeployCommand: npx prisma migrate deploy --schema=src/config/prisma/schema.prisma
+    # UNA sola instancia: el proceso corre el vencimiento de pedidos de Mercado Pago
+    numInstances: 1
+    envVars:
+      - key: NODE_ENV
+        value: production
+      # Base de datos (Supabase de PRODUCCIÓN)
+      - key: DATABASE_URL
+        sync: false
+      - key: DIRECT_URL
+        sync: false
+      # SuperTokens (core de producción)
+      - key: SUPERTOKENS_CONNECTION_URI
+        sync: false
+      - key: SUPERTOKENS_API_KEY
+        sync: false
+      - key: API_DOMAIN
+        value: https://api.canelaenrama.com.ar
+      - key: WEBSITE_DOMAIN
+        value: https://canelaenrama.com.ar
+      # El login con Google (client id/secret) se configura en el core de SuperTokens, no acá
+      - key: CORS_ORIGINS
+        value: https://canelaenrama.com.ar,https://www.canelaenrama.com.ar,https://admin.canelaenrama.com.ar
+      # Cloudinary
+      - key: CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
+      # Reseñas de Google
+      - key: GOOGLE_PLACES_API_KEY
+        sync: false
+      - key: GOOGLE_PLACE_ID
+        sync: false
+      - key: GOOGLE_PLACE_QUERY
+        value: Canela en Rama, Colombia 1268, Godoy Cruz, Mendoza
+      - key: GOOGLE_PLACES_LANGUAGE
+        value: es
+      # Mercado Pago
+      - key: MP_ACCESS_TOKEN
+        sync: false
+      - key: MP_WEBHOOK_SECRET
+        sync: false
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: SMTP_FROM_EMAIL
+        sync: false
+      - key: SMTP_FROM_NAME
+        value: Canela en Rama
+      - key: DASHBOARD_URL
+        sync: false
+      - key: SHIPPING_PICKUP_STREET
+        value: Colombia 1268
+      - key: SHIPPING_PICKUP_CITY
+        value: Godoy Cruz
+      - key: SHIPPING_PICKUP_PHONE
+        sync: false
+      - key: UBER_DIRECT_CUSTOMER_ID
+        sync: false
+      - key: UBER_DIRECT_CLIENT_ID
+        sync: false
+      - key: UBER_DIRECT_CLIENT_SECRET
+        sync: false
+      - key: WEB_URL
+        value: https://canelaenrama.com.ar
+      - key: API_PUBLIC_URL
+        value: https://api.canelaenrama.com.ar
+      - key: MP_STATEMENT_DESCRIPTOR
+        value: CANELA EN RAMA
+      - key: MP_ORDER_TTL_HOURS
+        value: "48"
+      - key: MP_ALLOW_CASH
+        value: "false"

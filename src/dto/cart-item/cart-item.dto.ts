@@ -1,0 +1,32 @@
+import { CartDto } from "../cart/cart.dto.js";
+import { ProductVariantDto } from "../product-variant/product-variant.dto.js";
+
+export class CartItemDto {
+  id: number;
+  quantity: number;
+  productVariant?: ProductVariantDto;
+  productVariantId: number;
+  /** Tamaño de paquete (g/u). 0 o ausente = venta suelta / presentación más chica. */
+  selectedBulkOption?: number;
+  createdAt: Date;
+  cart?: CartDto;
+  cartId: number;
+
+  constructor(
+    id: number,
+    quantity: number,
+    productVariantId: number,
+    cartId: number,
+    createdAt: Date,
+    productVariant?: ProductVariantDto,
+    cart?: CartDto,
+  ) {
+    this.id = id;
+    this.quantity = quantity;
+    this.productVariant = productVariant;
+    this.productVariantId = productVariantId;
+    this.cart = cart;
+    this.cartId = cartId;
+    this.createdAt = createdAt;
+  }
+}

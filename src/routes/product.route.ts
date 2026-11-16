@@ -1,13 +1,36 @@
 import express from "express";
-const router = express.Router();
-import {
-  getAllProducts,
-  createProduct,
-  deleteProduct,
-  getOneProduct,
-} from "../controllers/product.controller.ts";
+import { ProductController } from "../controllers/product.controller.js";
+import { attachRoles, optionalSession, requirePermission } from "../middleware/auth.middleware.js";
+import { cloudinaryUpload, upload } from "../middleware/fileUploader.js";
+import { hideCostForPublic, webOnlyForPublic } from "../middleware/publicView.js";
 
-router.route("/").get(getAllProducts).post(createProduct);
-router.route("/:id").get(getOneProduct).delete(deleteProduct);
+const router = express.Router();
+const productController = new ProductController();
+
+const publicView = [optionalSession, attachRoles, hideCostForPublic, webOnlyForPublic("product")];
+const staff = requirePermission("catalog.edit");
+const admin = requirePermission("catalog.delete");
+
+router
+  .route("/")
+  .get(...publicView, productController.findAll.bind(productController))
+  .post(
+    ...staff,
+    upload.array("image", 7),
+    cloudinaryUpload("products"),
+    productController.create.bind(productController),
+  );
+router
+  .route("/:id")
+  .get(...publicView, productController.findOne.bind(productController))
+  .put(...staff, productController.update.bind(productController));
+router
+  .route("/:id/tags")
+  .put(...staff, productController.addProductTags.bind(productController))
+  .delete(...staff, productController.removeProductTags.bind(productController));
+router
+  .route("/:id/active/")
+  .delete(...admin, productController.deactivate.bind(productController))
+  .put(...admin, productController.activate.bind(productController));
 
 export default router;

@@ -1,0 +1,18 @@
+node_modules
+dist
+generated
+docker-data
+.git
+.env
+.env.*
+!.env.example
+*.log
+postman
+node-fetch.js
+
+# Mappers sin trackear en git (código muerto, no compilan). Ver pendiente de deploy:
+# borrarlos o arreglarlos. Desde git no llegan, esto solo protege el build local.
+src/mappings/cart/cart.mapper.ts
+src/mappings/order/order.mapper.ts
+src/mappings/product-variants/product-variant.mapper.ts
+src/mappings/products/product.mapper.ts

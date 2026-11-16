@@ -1,12 +1,12 @@
 name: CI
 
 on:
-  pull_request:
   push:
-    branches: [main]
+    branches: [main, develop, dev-agus]
+  pull_request:
 
 jobs:
-  build:
+  test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -14,8 +14,7 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      - run: npm ci
-      # prisma generate + tsc
-      - run: npm run build
-      # Verifica que la imagen que despliega Render compile
-      - run: docker build -t canela-api:ci .
+      - run: npm ci --no-audit --no-fund
+      - run: npx prisma generate --schema=src/config/prisma/schema.prisma
+      - run: npm run typecheck
+      - run: npm test

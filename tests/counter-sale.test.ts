@@ -77,6 +77,22 @@ describe("venta de mostrador", () => {
     expect(created).toBeNull();
   });
 
+  it("tienda online: transferencia va como Efectivo / Transferencia (CASH) y solo en retiro", async () => {
+    const item = [{ productVariantId: 1, quantity: 1, selectedBulkOption: 500 }];
+    v.availableWeb = true;
+    await expect(service.createOrder({ paymentType: "TRANSFER", shippingMethod: "PICKUP", orderItems: item } as any, "u1")).rejects.toThrow(
+      /Efectivo \/ Transferencia/,
+    );
+    const order = await service.createOrder({ paymentType: "CASH", shippingMethod: "PICKUP", orderItems: item } as any, "u1");
+    expect(order).toMatchObject({ paymentType: "CASH", status: "PENDING" });
+    expect(order.channel).not.toBe("COUNTER");
+  });
+
+  it("mostrador: transferencia sigue disponible", async () => {
+    const order = await service.createCounterSale({ paymentType: "TRANSFER", orderItems: [{ productVariantId: 1, quantity: 1, selectedBulkOption: 500 }] } as any, "staff-1");
+    expect(order.paymentType).toBe("TRANSFER");
+  });
+
   it("no acepta débito ni crédito", async () => {
     await expect(
       service.createCounterSale({ paymentType: "DEBIT", orderItems: [{ productVariantId: 1, quantity: 1 }] } as any, "staff-1"),

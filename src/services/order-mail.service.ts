@@ -20,7 +20,7 @@ export type OrderMailKind = "received" | "paid" | "ready" | "onTheWay" | "cancel
 const PAYMENT_LABEL: Record<string, string> = {
   DEBIT: "Tarjeta de débito",
   CREDIT: "Tarjeta de crédito",
-  CASH: "Efectivo",
+  CASH: "Efectivo o transferencia (al retirar)",
   TRANSFER: "Transferencia",
   MERCADOPAGO: "Mercado Pago",
 };

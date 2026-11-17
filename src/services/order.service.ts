@@ -106,6 +106,7 @@ export class OrderService extends GenericServiceImpl<OrderDto, CreateOrderDto, U
     }
     const paymentType = this.parsePaymentType(data.paymentType);
     const shipping = await this.resolveShipping((data as any).shippingMethod, userId);
+    this.assertWebPayment(paymentType, shipping.method);
 
     const order = await this.orderRepository.withTransaction((tx) => this.placeOrder(data, paymentType, userId, tx, shipping));
     this.logCreated(order, userId, false);
@@ -152,6 +153,7 @@ export class OrderService extends GenericServiceImpl<OrderDto, CreateOrderDto, U
   private async createOrderFromCart(data: CreateOrderDto, userId: string) {
     const paymentType = this.parsePaymentType(data.paymentType);
     const shipping = await this.resolveShipping((data as any).shippingMethod, userId);
+    this.assertWebPayment(paymentType, shipping.method);
     return this.orderRepository.withTransaction(async (tx) => {
       const { cartId, items } = await this.cartService.itemsForCheckout(userId, tx);
       const order = await this.placeOrder(
@@ -201,6 +203,19 @@ export class OrderService extends GenericServiceImpl<OrderDto, CreateOrderDto, U
       `Venta de mostrador ${order.id} registrada (${paymentType}, $${Number(order.totalPrice)})`,
     );
     return order;
+  }
+
+  /**
+   * Tienda online: Mercado Pago siempre; "Efectivo / Transferencia" (CASH) solo
+   * para retiro en el local, se paga al retirar. TRANSFER queda para el mostrador.
+   */
+  private assertWebPayment(paymentType: string, method: string) {
+    if (paymentType === "TRANSFER") {
+      throw new ValidationError("Elegí Efectivo / Transferencia: se paga al retirar en el local.");
+    }
+    if (paymentType === "CASH" && method !== "PICKUP") {
+      throw new ValidationError("Los envíos a domicilio se pagan con Mercado Pago. Efectivo / Transferencia es solo para retiro en el local.");
+    }
   }
 
   private parsePaymentType(value?: string, opts: { counter?: boolean } = {}) {

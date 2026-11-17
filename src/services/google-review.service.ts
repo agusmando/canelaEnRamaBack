@@ -2,6 +2,9 @@ import { GoogleReviewRepository, type GoogleReviewInput } from "../repository/go
 import { ExternalServiceError } from "../errors/infra/ExternalServiceError.js";
 import { BadRequestError } from "../errors/application/BadRequestError.js";
 import { ValidationError } from "../errors/application/ValidationError.js";
+import { getLogger, errInfo } from "../config/logger.js";
+
+const log = getLogger("google-review");
 
 const PLACES_URL = "https://places.googleapis.com/v1/places/";
 const FIELD_MASK = "id,displayName,rating,userRatingCount,googleMapsUri,reviews";
@@ -71,8 +74,8 @@ export class GoogleReviewService {
     if (!res.ok) throw new Error(data?.error?.message ?? `HTTP ${res.status}`);
     const found = data.places?.[0];
     if (!found?.id) throw new Error(`No se encontró el local en Google buscando "${placeQuery}"`);
-    console.info(
-      `[google-review] Place ID resuelto: ${found.id} (${found.displayName?.text ?? ""} · ${found.formattedAddress ?? ""}). ` +
+    log.info(
+      `Place ID resuelto: ${found.id} (${found.displayName?.text ?? ""} · ${found.formattedAddress ?? ""}). ` +
         "Podés fijarlo con GOOGLE_PLACE_ID.",
     );
     this.resolvedPlaceId = found.id;
@@ -99,7 +102,7 @@ export class GoogleReviewService {
     if (place.configured && stale && Date.now() - this.lastAutoSyncAt > RETRY_MS) {
       this.lastAutoSyncAt = Date.now();
       // No bloquea la respuesta; los errores quedan en GooglePlace.lastError
-      this.sync().catch((err) => console.warn("[google-review] sync en segundo plano falló:", err.message));
+      this.sync().catch((err) => log.warn(errInfo(err), "Sync de reseñas en segundo plano falló"));
     }
     return { place, reviews: await this.repository.list(true) };
   }

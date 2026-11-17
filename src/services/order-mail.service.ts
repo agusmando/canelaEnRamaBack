@@ -1,6 +1,9 @@
 import { prisma as sharedPrisma } from "../config/prisma/client.js";
 import { emailLayout, escapeHtml, sendMail } from "../config/mailer.js";
 import { pickupInfo } from "./shipping-quote.service.js";
+import { getLogger, errInfo } from "../config/logger.js";
+
+const log = getLogger("mail");
 
 /**
  * Mails al cliente sobre su pedido. Se mandan DESPUÉS de confirmar la
@@ -182,7 +185,7 @@ export class OrderMailService {
 
   /** Manda el mail en segundo plano. Nunca tira. */
   notify(kind: OrderMailKind, orderId: number) {
-    this.send(kind, orderId).catch((err) => console.warn(`[mail] pedido ${orderId} (${kind}):`, err.message));
+    this.send(kind, orderId).catch((err) => log.warn({ orderId, kind, ...errInfo(err) }, `Mail de pedido ${orderId} (${kind}) falló`));
   }
 
   async send(kind: OrderMailKind, orderId: number): Promise<boolean> {
@@ -195,7 +198,10 @@ export class OrderMailService {
       },
     });
     const to = order?.user?.email;
-    if (!to) return false;
+    if (!to) {
+      log.warn({ orderId, kind }, `Orden ${orderId} sin email: no se manda el mail "${kind}"`);
+      return false;
+    }
     const { subject, html } = buildOrderMail(kind, order);
     return sendMail({ to, subject, html });
   }

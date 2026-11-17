@@ -18,6 +18,9 @@ import { isMercadoPagoConfigured } from "../config/mercadopago.js";
 import { streetLine, ShippingQuoteService, type ShippingQuote } from "./shipping-quote.service.js";
 import { orderMails } from "./order-mail.service.js";
 import { newTrackingCode } from "../utils/trackingCode.js";
+import { getLogger } from "../config/logger.js";
+
+const log = getLogger("order");
 
 /** Envío resuelto antes de abrir la transacción (la cotización es una llamada externa). */
 type ShippingChoice =
@@ -96,8 +99,27 @@ export class OrderService extends GenericServiceImpl<OrderDto, CreateOrderDto, U
     const shipping = await this.resolveShipping((data as any).shippingMethod, userId);
 
     const order = await this.orderRepository.withTransaction((tx) => this.placeOrder(data, paymentType, userId, tx, shipping));
+    this.logCreated(order, userId, false);
     this.mailReceived(order);
     return order;
+  }
+
+  private logCreated(order: any, userId: string, fromCart: boolean) {
+    if (!order?.id) return;
+    log.info(
+      {
+        orderId: order.id,
+        userId,
+        fromCart,
+        paymentType: order.paymentType,
+        total: Number(order.totalPrice),
+        shippingCost: Number(order.shippingCost) || 0,
+        shippingMethod: order.shipment?.method ?? "PICKUP",
+        items: order.orderItems?.length,
+        event: "order_created",
+      },
+      `Orden ${order.id} creada (${order.paymentType}, $${Number(order.totalPrice) + (Number(order.shippingCost) || 0)})`,
+    );
   }
 
   /** Mail de "pedido recibido". Con Mercado Pago se manda al acreditarse el pago. */
@@ -133,6 +155,7 @@ export class OrderService extends GenericServiceImpl<OrderDto, CreateOrderDto, U
       await this.cartService.clearCart(cartId, tx);
       return order;
     }).then((order) => {
+      this.logCreated(order, userId, true);
       this.mailReceived(order);
       return order;
     });
@@ -294,6 +317,7 @@ export class OrderService extends GenericServiceImpl<OrderDto, CreateOrderDto, U
     if (!data) throw new ValidationError("body vacío");
 
     let cancelled = false;
+    let change: Record<string, any> | null = null;
     const updated = await this.orderRepository.withTransaction(async (tx) => {
       const order = await this.getOrder(id, actor, tx);
 
@@ -377,8 +401,21 @@ export class OrderService extends GenericServiceImpl<OrderDto, CreateOrderDto, U
       }
 
       cancelled = fields.status === "CANCELLED";
+      change = {
+        ...(fields.status && fields.status !== order.status ? { status: { from: order.status, to: fields.status } } : {}),
+        ...(Number(fields.totalPrice) !== Number(order.totalPrice) ? { totalPrice: { from: Number(order.totalPrice), to: fields.totalPrice } } : {}),
+        ...(data.editItem?.length ? { editedItems: data.editItem.length } : {}),
+      };
       return this.orderRepository.updateOrderFields(id, fields, tx);
     });
+    // (se asigna dentro del callback: TS no lo ve)
+    const changes = change as Record<string, any> | null;
+    if (changes && Object.keys(changes).length) {
+      log.info(
+        { orderId: id, by: actor.userId, staff: actor.isStaff, ...changes, event: cancelled ? "order_cancelled" : "order_updated" },
+        cancelled ? `Orden ${id} cancelada` : `Orden ${id} actualizada`,
+      );
+    }
     if (cancelled) orderMails.notify("cancelled", id);
     return updated;
   }

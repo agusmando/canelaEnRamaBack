@@ -1,4 +1,7 @@
 import nodemailer, { type Transporter } from "nodemailer";
+import { getLogger, errInfo, maskEmail } from "./logger.js";
+
+const log = getLogger("mail");
 
 /**
  * Envío de mails por SMTP propio (el mismo que usa SuperTokens para las
@@ -50,15 +53,17 @@ export async function sendMail(mail: { to: string; subject: string; html: string
   const cfg = smtpSettings();
   const t = getTransporter();
   if (!cfg || !t) {
-    if (!warned) console.warn("[mail] SMTP no configurado: no se mandan mails de pedidos");
+    if (!warned) log.warn("SMTP no configurado: no se mandan mails de pedidos");
     warned = true;
     return false;
   }
   try {
+    const start = Date.now();
     await t.sendMail({ from: { name: cfg.fromName, address: cfg.fromEmail }, ...mail });
+    log.info({ to: maskEmail(mail.to), subject: mail.subject, ms: Date.now() - start }, `Mail enviado: "${mail.subject}"`);
     return true;
   } catch (err: any) {
-    console.warn(`[mail] no se pudo mandar "${mail.subject}" a ${mail.to}:`, err.message);
+    log.error({ to: maskEmail(mail.to), subject: mail.subject, ...errInfo(err) }, `No se pudo mandar "${mail.subject}"`);
     return false;
   }
 }

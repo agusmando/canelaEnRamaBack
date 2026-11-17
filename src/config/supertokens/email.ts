@@ -1,6 +1,9 @@
 import { SMTPService } from "supertokens-node/recipe/emailpassword/emaildelivery";
 import { SMTPService as VerificationSMTPService } from "supertokens-node/recipe/emailverification/emaildelivery";
 import { emailLayout, escapeHtml, smtpSettings } from "../mailer.js";
+import { getLogger } from "../logger.js";
+
+const log = getLogger("auth");
 
 /**
  * Envío del mail de "recuperar contraseña" por SMTP propio (Gmail, Brevo,
@@ -72,7 +75,7 @@ export function passwordResetEmailDelivery() {
   const cfg = smtpSettings();
   if (!cfg) {
     if (process.env.NODE_ENV === "production") {
-      console.warn("[auth] SMTP no configurado: el mail de recuperar contraseña usa el servicio genérico de SuperTokens");
+      log.warn("SMTP no configurado: el mail de recuperar contraseña usa el servicio genérico de SuperTokens");
     }
     return undefined;
   }

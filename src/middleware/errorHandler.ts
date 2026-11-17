@@ -68,8 +68,12 @@ export const errorHandler = (rawErr: any, req: any, res: any, next: any) => {
   const err = translatePrismaError(rawErr);
   const status = statusFor(err);
 
+  // El log de la request (pino-http) sale con este error: 5xx con stack completo,
+  // 4xx solo con el mensaje (en el campo errorMessage).
   if (status >= 500) {
-    console.error(`[${req.method} ${req.originalUrl}]`, rawErr);
+    res.err = rawErr;
+  } else {
+    res.locals.errorMessage = err.message;
   }
 
   // No exponemos detalles internos de errores 500 en producción

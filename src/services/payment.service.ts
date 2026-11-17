@@ -8,6 +8,9 @@ import { BadRequestError } from "../errors/application/BadRequestError.js";
 import { ConflictError } from "../errors/application/ConflictError.js";
 import { orderMails } from "./order-mail.service.js";
 import { ExternalServiceError } from "../errors/infra/ExternalServiceError.js";
+import { errInfo, getLogger } from "../config/logger.js";
+
+const log = getLogger("payment");
 
 /** Estados de pago de Mercado Pago → PaymentStatus de la orden. */
 const STATUS_MAP: Record<string, string> = {
@@ -127,14 +130,26 @@ export class PaymentService {
         idempotencyKey: crypto.randomUUID(),
       });
     } catch (err: any) {
+      log.error({ orderId: order.id, total, ...errInfo(err) }, `No se pudo crear la preferencia de pago de la orden ${order.id}`);
       throw new ExternalServiceError("Mercado Pago", err.message);
     }
 
     await this.orderRepository.updateOrderFields(order.id, { paymentPreferenceId: pref.id });
+    log.info(
+      {
+        orderId: order.id,
+        preferenceId: pref.id,
+        total,
+        items: body.items.length,
+        expiresAt: body.expiration_date_to,
+        notificationUrl: !!body.notification_url,
+        autoReturn: !!body.auto_return,
+      },
+      `Link de pago creado para la orden ${order.id} ($${total})`,
+    );
     return {
       preferenceId: pref.id as string,
       initPoint: pref.init_point as string,
-      sandboxInitPoint: (pref.sandbox_init_point ?? null) as string | null,
     };
   }
 
@@ -198,8 +213,13 @@ export class PaymentService {
       );
       results = data?.results ?? [];
     } catch (err: any) {
+      log.warn({ orderId: order.id, ...errInfo(err) }, `No se pudieron consultar los pagos de la orden ${order.id}`);
       throw new ExternalServiceError("Mercado Pago", err.message);
     }
+    log.debug(
+      { orderId: order.id, found: results.length, statuses: results.map((p) => `${p.id}:${p.status}`) },
+      `Sync de la orden ${order.id}: ${results.length} pago(s) en Mercado Pago`,
+    );
     const best =
       results.find((p) => p.status === "approved") ??
       results.find((p) => ["in_process", "authorized", "in_mediation"].includes(p.status)) ??
@@ -212,7 +232,7 @@ export class PaymentService {
   private async applyPayment(payment: any) {
     const orderId = Number(payment?.external_reference);
     if (!Number.isInteger(orderId) || orderId <= 0) {
-      console.warn(`[payment] pago ${payment?.id} sin external_reference de orden; se ignora`);
+      log.warn({ paymentId: payment?.id, externalReference: payment?.external_reference, status: payment?.status }, `Pago ${payment?.id} sin external_reference de orden; se ignora`);
       return;
     }
     const mapped = STATUS_MAP[payment.status] ?? "PENDING";
@@ -223,14 +243,19 @@ export class PaymentService {
       await tx.$executeRaw`SELECT 1 FROM "Order" WHERE id = ${orderId} FOR UPDATE`;
       const order = await tx.order.findUnique({ where: { id: orderId } });
       if (!order) {
-        console.warn(`[payment] pago ${paymentId} apunta a la orden ${orderId}, que no existe`);
+        log.warn({ orderId, paymentId }, `Pago ${paymentId} apunta a la orden ${orderId}, que no existe`);
         return;
       }
 
       // Ya pagada con OTRO pago: no la pisamos con intentos viejos/rechazados
       if (order.paymentStatus === "APPROVED" && order.paymentId && order.paymentId !== paymentId) {
         if (mapped === "APPROVED") {
-          console.warn(`[payment] orden ${orderId}: pago duplicado ${paymentId} (ya pagada con ${order.paymentId}); revisar reintegro`);
+          log.error(
+            { orderId, paymentId, existingPaymentId: order.paymentId, amount: payment.transaction_amount, alert: "duplicate_payment" },
+            `Orden ${orderId}: pago duplicado ${paymentId} (ya pagada con ${order.paymentId}); revisar reintegro`,
+          );
+        } else {
+          log.debug({ orderId, paymentId, mpStatus: payment.status }, "Pago viejo de una orden ya pagada; se ignora");
         }
         return;
       }
@@ -245,7 +270,10 @@ export class PaymentService {
         const paid = Number(payment.transaction_amount);
         if (payment.currency_id !== "ARS" || !(paid + 0.01 >= chargeTotal(order))) {
           // No debería pasar (el importe lo fija la preferencia): lo dejamos para revisión manual
-          console.error(`[payment] orden ${orderId}: pago ${paymentId} por ${payment.currency_id} ${paid} ≠ total ${chargeTotal(order)}`);
+          log.error(
+            { orderId, paymentId, currency: payment.currency_id, paid, expected: chargeTotal(order), alert: "amount_mismatch" },
+            `Orden ${orderId}: pago ${paymentId} por ${payment.currency_id} ${paid} ≠ total ${chargeTotal(order)}`,
+          );
           fields.paymentStatus = "IN_PROCESS";
           fields.paymentStatusDetail = "amount_mismatch";
         } else {
@@ -253,16 +281,37 @@ export class PaymentService {
           if (order.status === "PENDING") fields.status = "PROCESSING";
           if (order.status === "CANCELLED") {
             fields.paymentStatusDetail = "paid_after_cancel";
-            console.warn(`[payment] orden ${orderId} cancelada pero pagada (${paymentId}): hay que reintegrar el pago`);
+            log.error({ orderId, paymentId, paid, alert: "paid_after_cancel" }, `Orden ${orderId} cancelada pero pagada (${paymentId}): hay que reintegrar el pago`);
           }
         }
       }
 
       await tx.order.update({ where: { id: orderId }, data: fields });
+      const changed =
+        order.paymentStatus !== fields.paymentStatus || order.paymentId !== paymentId || (!!fields.status && fields.status !== order.status);
+      const details = {
+        orderId,
+        paymentId,
+        mpStatus: payment.status,
+        mpStatusDetail: payment.status_detail,
+        paymentMethod: payment.payment_method_id,
+        paymentType: payment.payment_type_id,
+        amount: payment.transaction_amount,
+        paymentStatus: { from: order.paymentStatus, to: fields.paymentStatus },
+        ...(fields.status ? { orderStatus: { from: order.status, to: fields.status } } : {}),
+      };
+      if (changed) {
+        log.info(details, `Orden ${orderId}: pago ${paymentId} ${payment.status} (${order.paymentStatus} → ${fields.paymentStatus})`);
+      } else {
+        log.debug(details, `Orden ${orderId}: pago ${paymentId} sin cambios (${fields.paymentStatus})`);
+      }
       // Primer pago aprobado de una orden activa: mail de confirmación (una sola vez)
       justPaid = fields.paymentStatus === "APPROVED" && order.paymentStatus !== "APPROVED" && order.status !== "CANCELLED";
     });
-    if (justPaid) orderMails.notify("paid", orderId);
+    if (justPaid) {
+      log.info({ orderId, paymentId, amount: payment.transaction_amount, event: "order_paid" }, `Orden ${orderId} pagada con Mercado Pago`);
+      orderMails.notify("paid", orderId);
+    }
   }
 
   /**
@@ -277,17 +326,19 @@ export class PaymentService {
     const stale = await this.orderRepository.findUnpaidMercadoPagoOrders(cutoff);
 
     let cancelled = 0;
+    if (stale.length) log.info({ count: stale.length, cutoff }, `Revisando ${stale.length} pedido(s) de Mercado Pago vencidos`);
     for (const { id } of stale) {
       try {
         const order = await this.syncOrder(id, SYSTEM_ACTOR);
         if (order.status !== "PENDING" || PAYMENT_LOCKED.includes(order.paymentStatus)) continue;
         await this.orderService.updateOrder(id, { status: "CANCELLED" } as any, SYSTEM_ACTOR);
         cancelled++;
+        log.info({ orderId: id }, `Orden ${id} cancelada por falta de pago (stock liberado)`);
       } catch (err: any) {
-        console.warn(`[payment] no se pudo vencer la orden ${id}:`, err.message);
+        log.warn({ orderId: id, ...errInfo(err) }, `No se pudo vencer la orden ${id}`);
       }
     }
-    if (cancelled) console.info(`[payment] ${cancelled} pedido(s) sin pagar cancelados`);
+    if (cancelled) log.info({ cancelled }, `${cancelled} pedido(s) sin pagar cancelados`);
     return cancelled;
   }
 }

@@ -10,6 +10,9 @@ import EmailVerification from "supertokens-node/recipe/emailverification";
 import { prisma } from "../prisma/client.js";
 import { passwordResetEmailDelivery } from "./email.js";
 import { accountRecipes, NOT_ALLOWED_REASON } from "./account-linking.js";
+import { getLogger, errInfo } from "../logger.js";
+
+const log = getLogger("auth");
 
 /** userContext de EmailPassword.signUp para no mandar el mail de verificación (ej. invitaciones). */
 export type SignUpContext = { skipVerificationEmail?: boolean };
@@ -85,7 +88,7 @@ export const initSupertokens = () =>
                     response.user.id,
                     response.recipeUserId,
                     email,
-                  ).catch((err: any) => console.warn("[auth] no se pudo mandar el mail de verificación:", err.message));
+                  ).catch((err: any) => log.warn(errInfo(err), "No se pudo mandar el mail de verificación"));
                 }
               }
               return response;

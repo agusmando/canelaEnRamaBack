@@ -3,6 +3,9 @@ import { isUberConfigured, uberQuote, type UberAddress } from "../config/uber.js
 import { ValidationError } from "../errors/application/ValidationError.js";
 import { NotFoundError } from "../errors/application/NotFoundError.js";
 import { translatePrismaError } from "../errors/infra/translatePrismaError.js";
+import { getLogger, errInfo } from "../config/logger.js";
+
+const log = getLogger("shipping");
 
 /**
  * Cotización de envíos a domicilio.
@@ -224,9 +227,9 @@ export class ShippingQuoteService {
             reason: null,
           };
         }
-        console.warn(`[shipping] cotización de Uber en ${q.currency}: se usa la tarifa propia`);
+        log.warn({ currency: q.currency }, `Cotización de Uber en ${q.currency}: se usa la tarifa propia`);
       } catch (err: any) {
-        console.warn("[shipping] Uber no cotizó, se usa la tarifa propia:", err.message);
+        log.warn(errInfo(err), "Uber no cotizó, se usa la tarifa propia");
       }
     }
 

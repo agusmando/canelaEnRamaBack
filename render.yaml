@@ -18,6 +18,9 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
+      # Logs (Render → Logs). "debug" agrega las llamadas a Mercado Pago/Uber con su duración
+      - key: LOG_LEVEL
+        value: info
       # Base de datos (Supabase de PRODUCCIÓN)
       - key: DATABASE_URL
         sync: false
@@ -127,6 +130,9 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
+      # En dev, todo el detalle (incluye cada llamada a Mercado Pago)
+      - key: LOG_LEVEL
+        value: debug
       - key: DATABASE_URL
         sync: false
       - key: DIRECT_URL

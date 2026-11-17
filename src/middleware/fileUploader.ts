@@ -1,13 +1,23 @@
 import Multer from "multer";
 import { ImageService } from "../services/image.service.js";
+import { errInfo, getLogger } from "../config/logger.js";
+
+const log = getLogger("upload");
 
 const storage = Multer.memoryStorage();
 export const upload = Multer({ storage }); // usar upload.single('file'), upload.array('files'), upload.fields([...]) según necesidad
 
 const imageService = new ImageService();
 
+const describe = (files: any[]) => ({
+  count: files.length,
+  bytes: files.reduce((sum, f) => sum + (f?.buffer?.length ?? 0), 0),
+  types: [...new Set(files.map((f) => f?.mimetype))],
+});
+
 export function cloudinaryUpload(folderOrFn?: string | ((req: any) => string)) {
   return async (req: any, _res: any, next: any) => {
+    let folder: string | undefined;
     try {
       // req.files es un array con upload.array() y un objeto { campo: [archivos] }
       // con upload.fields() (banners): ambos casos cuentan como "hay archivos".
@@ -19,70 +29,46 @@ export function cloudinaryUpload(folderOrFn?: string | ((req: any) => string)) {
       if (!hasFiles) {
         return next();
       }
-      // debugging: ensure multer ran
-      console.log(
-        "cloudinaryUpload middleware hit; has req.file?",
-        !!req.file,
-        "has req.files?",
-        !!req.files,
-        "isArray",
-        Array.isArray(req.files),
-        "is object",
-        typeof req.files === "object"
-      );
 
-      const folder =
-        typeof folderOrFn === "function" ? folderOrFn(req) : folderOrFn;
+      folder = typeof folderOrFn === "function" ? folderOrFn(req) : folderOrFn;
+      const start = Date.now();
 
       // Single file (req.file)
       if (req.file && req.file.buffer) {
-        console.log("Uploading single file:", {
-          fieldname: req.file.fieldname,
-          mimetype: req.file.mimetype,
-          size: req.file.buffer.length,
-        });
-        const res = await imageService.uploadBuffer(
-          req.file.buffer,
-          req.file.mimetype,
-          folder
-        );
-        req.file = res;
+        const info = describe([req.file]);
+        req.file = await imageService.uploadBuffer(req.file.buffer, req.file.mimetype, folder);
+        log.info({ folder, ...info, ms: Date.now() - start }, "Imagen subida a Cloudinary");
         return next();
       }
 
       // Multer array -> req.files is array
       if (Array.isArray(req.files)) {
-        console.log("Uploading array of files, count:", req.files.length);
-        const uploads = await Promise.all(
-          req.files.map((f: any) =>
-            imageService.uploadBuffer(f.buffer, f.mimetype, folder)
-          )
+        const info = describe(req.files);
+        req.files = await Promise.all(
+          req.files.map((f: any) => imageService.uploadBuffer(f.buffer, f.mimetype, folder)),
         );
-        req.files = uploads;
+        log.info({ folder, ...info, ms: Date.now() - start }, `${info.count} imagen(es) subidas a Cloudinary`);
         return next();
       }
 
       // Multer fields -> req.files is an object { fieldName: [file, ...], ... }
       if (req.files && typeof req.files === "object") {
         const keys = Object.keys(req.files);
-        console.log("Uploading fields:", keys);
+        const info = describe(keys.flatMap((k) => req.files[k]));
         const result: any = {};
         for (const key of keys) {
-          const arr = req.files[key];
           result[key] = await Promise.all(
-            arr.map((f: any) =>
-              imageService.uploadBuffer(f.buffer, f.mimetype, folder)
-            )
+            req.files[key].map((f: any) => imageService.uploadBuffer(f.buffer, f.mimetype, folder)),
           );
         }
         req.files = result;
+        log.info({ folder, fields: keys, ...info, ms: Date.now() - start }, `${info.count} imagen(es) subidas a Cloudinary`);
         return next();
       }
 
-      console.log("No files found to upload.");
       return next();
     } catch (err) {
-      console.error("cloudinaryUpload caught error:", err);
+      log.error({ folder, ...errInfo(err) }, "Falló la subida de imágenes a Cloudinary");
       return next(err);
     }
   };

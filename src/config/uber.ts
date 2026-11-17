@@ -6,6 +6,10 @@
  * Sin esas variables el proveedor queda deshabilitado y se usa la tarifa propia.
  */
 
+import { getLogger } from "./logger.js";
+
+const log = getLogger("uber");
+
 const AUTH_URL = "https://auth.uber.com/oauth/v2/token";
 const API_URL = "https://api.uber.com/v1";
 const TIMEOUT_MS = 15_000;
@@ -65,6 +69,7 @@ async function getToken(): Promise<string> {
   });
   const data: any = await res.json().catch(() => ({}));
   if (!res.ok || !data.access_token) {
+    log.error({ status: res.status, error: data.error }, "Uber: no se pudo obtener el token (revisar credenciales)");
     throw new Error(`Uber auth ${res.status}: ${data.error_description ?? data.error ?? "sin token"}`);
   }
   token = { value: data.access_token, expiresAt: Date.now() + Number(data.expires_in ?? 3600) * 1000 };
@@ -72,6 +77,7 @@ async function getToken(): Promise<string> {
 }
 
 async function uberRequest<T = any>(path: string, body?: unknown, method = body ? "POST" : "GET"): Promise<T> {
+  const start = Date.now();
   const res = await fetch(`${API_URL}/customers/${encodeURIComponent(cfg().customerId)}${path}`, {
     method,
     headers: { authorization: `Bearer ${await getToken()}`, "content-type": "application/json" },
@@ -79,7 +85,12 @@ async function uberRequest<T = any>(path: string, body?: unknown, method = body 
     signal: AbortSignal.timeout(TIMEOUT_MS),
   });
   const data: any = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(`Uber ${res.status}: ${data.message ?? data.code ?? "error"}`);
+  const ms = Date.now() - start;
+  if (!res.ok) {
+    log.warn({ method, path, status: res.status, ms, code: data.code, cause: data.message }, `Uber respondió ${res.status}`);
+    throw new Error(`Uber ${res.status}: ${data.message ?? data.code ?? "error"}`);
+  }
+  log.debug({ method, path, status: res.status, ms }, `Uber ${method} ${path} ${res.status}`);
   return data as T;
 }
 

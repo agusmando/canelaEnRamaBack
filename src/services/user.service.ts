@@ -13,6 +13,9 @@ import { ConflictError } from "../errors/application/ConflictError.js";
 import { NotFoundError } from "../errors/application/NotFoundError.js";
 import { ValidationError } from "../errors/application/ValidationError.js";
 import type { Actor } from "../middleware/auth.middleware.js";
+import { getLogger, errInfo } from "../config/logger.js";
+
+const log = getLogger("users");
 
 const TENANT = "public";
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -278,7 +281,7 @@ export class UserService {
         });
         emailSent = true;
       } catch (err: any) {
-        console.warn("[users] no se pudo mandar la invitación:", err.message);
+        log.warn(errInfo(err), "No se pudo mandar la invitación");
       }
     }
     return { inviteLink, emailSent };

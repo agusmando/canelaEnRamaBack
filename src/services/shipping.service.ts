@@ -5,6 +5,9 @@ import { NotFoundError } from "../errors/application/NotFoundError.js";
 import { ExternalServiceError } from "../errors/infra/ExternalServiceError.js";
 import { FINAL_SHIPMENT_STATUSES, ShipmentService } from "./shipment.service.js";
 import { dropoffAddress, pickupInfo } from "./shipping-quote.service.js";
+import { errInfo, getLogger } from "../config/logger.js";
+
+const log = getLogger("shipping");
 
 /** Estado de Uber Direct → estado del envío. `canceled` no mueve el envío (se puede volver a pedir). */
 const UBER_STATUS: Record<string, string | null> = {
@@ -89,8 +92,13 @@ export class ShippingService {
         value: Number(s.order?.totalPrice) || undefined,
       });
     } catch (err: any) {
+      log.error({ shipmentId: id, orderId: s.orderId, ...errInfo(err) }, `No se pudo pedir repartidor de Uber para el envío ${id}`);
       throw new ExternalServiceError("Uber Direct", err.message);
     }
+    log.info(
+      { shipmentId: id, orderId: s.orderId, deliveryId: delivery.id, uberStatus: delivery.status, fee: delivery.fee, event: "uber_dispatched" },
+      `Repartidor de Uber pedido para la orden ${s.orderId}`,
+    );
 
     await this.prisma.shipment.update({
       where: { id },
@@ -127,6 +135,7 @@ export class ShippingService {
     try {
       const delivery = await uberCancelDelivery(s.providerDeliveryId);
       await this.applyProviderStatus(s, delivery.status || "canceled", delivery.trackingUrl);
+      log.info({ shipmentId: id, orderId: s.orderId, deliveryId: s.providerDeliveryId }, `Repartidor de Uber cancelado (envío ${id})`);
     } catch (err: any) {
       throw new ExternalServiceError("Uber Direct", err.message);
     }
@@ -146,7 +155,7 @@ export class ShippingService {
       select: { id: true },
     });
     for (const { id } of active) {
-      await this.sync(id).catch((err) => console.warn(`[shipping] no se pudo sincronizar el envío ${id}:`, err.message));
+      await this.sync(id).catch((err) => log.warn({ shipmentId: id, ...errInfo(err) }, `No se pudo sincronizar el envío ${id}`));
     }
     return active.length;
   }
@@ -160,6 +169,10 @@ export class ShippingService {
     }
     if (providerStatus === s.providerStatus) return;
     const target = UBER_STATUS[providerStatus];
+    log.info(
+      { shipmentId: s.id, orderId: s.orderId, uberStatus: { from: s.providerStatus, to: providerStatus }, shipmentStatus: target ?? s.status },
+      `Envío ${s.id}: Uber ${s.providerStatus ?? "-"} → ${providerStatus}`,
+    );
     if (target) await this.advanceTo(s.id, target, UBER_TEXT[providerStatus]);
   }
 

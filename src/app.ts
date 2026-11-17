@@ -10,6 +10,7 @@ import {
   WRITE_LIMITED_PATHS,
   writeLimiter,
 } from "./middleware/security.js";
+import { httpLogger } from "./config/logger.js";
 import { initSupertokens } from "./config/supertokens/supertokens.config.js";
 import supertokens from "supertokens-node";
 import {
@@ -21,6 +22,8 @@ initSupertokens();
 const app = express();
 app.set("trust proxy", 1); // Render/proxies: IP real del cliente (rate limit)
 app.disable("x-powered-by");
+// Primero: así se loguean también las requests que cortan CORS, rate limit o auth
+app.use(httpLogger);
 app.use(securityHeaders);
 app.use(express.json({ limit: "1mb" }));
 
@@ -35,6 +38,7 @@ const corsMiddleware = cors({
   origin: allowedOrigins.length ? allowedOrigins : true,
   allowedHeaders: ["content-type", ...supertokens.getAllCORSHeaders()],
   credentials: true,
+  exposedHeaders: ["x-request-id"], // para que la web pueda mostrar/reportar el id de un error
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
 });
 

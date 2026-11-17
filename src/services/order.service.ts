@@ -46,6 +46,13 @@ export const ORDER_TRANSITIONS: Record<string, string[]> = {
   CANCELLED: [],
 };
 
+/** Espejo de SHIPMENT_TRANSITIONS.PICKUP (shipment.service), sin import circular. */
+const PICKUP_SHIPMENT_TRANSITIONS: Record<string, string[]> = {
+  PENDING: ["PREPARING", "READY_FOR_PICKUP", "CANCELLED"],
+  PREPARING: ["READY_FOR_PICKUP", "CANCELLED"],
+  READY_FOR_PICKUP: ["DELIVERED", "CANCELLED"],
+};
+
 /** El cliente solo puede cancelar mientras nadie empezó a preparar la orden. */
 const CUSTOMER_CANCELLABLE = ["PENDING"];
 const CLOSED_ITEM_STATUSES = ["CANCELLED", "RETURNED"];
@@ -317,6 +324,7 @@ export class OrderService extends GenericServiceImpl<OrderDto, CreateOrderDto, U
     if (!data) throw new ValidationError("body vacío");
 
     let cancelled = false;
+    let readyForPickup = false;
     let change: Record<string, any> | null = null;
     const updated = await this.orderRepository.withTransaction(async (tx) => {
       const order = await this.getOrder(id, actor, tx);
@@ -400,6 +408,32 @@ export class OrderService extends GenericServiceImpl<OrderDto, CreateOrderDto, U
         );
       }
 
+      // Retiro en el local: "despachar" la orden = listo para retirar; "entregada" = retirado.
+      // El envío acompaña (así el seguimiento coincide) y el cliente recibe el aviso de retiro.
+      if (
+        shipment?.method === "PICKUP" &&
+        fields.status &&
+        fields.status !== order.status &&
+        (fields.status === "SHIPPED" || fields.status === "DELIVERED")
+      ) {
+        const target = fields.status === "SHIPPED" ? "READY_FOR_PICKUP" : "DELIVERED";
+        const allowed = PICKUP_SHIPMENT_TRANSITIONS[shipment.status] ?? [];
+        if (shipment.status !== target && allowed.includes(target)) {
+          const now = new Date();
+          await this.shipmentRepository.updateShipment(
+            shipment.id,
+            {
+              status: target,
+              ...(target === "READY_FOR_PICKUP" && !shipment.shippedAt ? { shippedAt: now } : {}),
+              ...(target === "DELIVERED" ? { deliveredAt: now } : {}),
+            },
+            { status: target, description: target === "READY_FOR_PICKUP" ? "Tu pedido está listo para retirar" : "Pedido retirado" },
+            tx,
+          );
+          if (target === "READY_FOR_PICKUP") readyForPickup = true;
+        }
+      }
+
       cancelled = fields.status === "CANCELLED";
       change = {
         ...(fields.status && fields.status !== order.status ? { status: { from: order.status, to: fields.status } } : {}),
@@ -417,6 +451,8 @@ export class OrderService extends GenericServiceImpl<OrderDto, CreateOrderDto, U
       );
     }
     if (cancelled) orderMails.notify("cancelled", id);
+    // (se asigna dentro del callback: TS lo estrecha a false)
+    if ((readyForPickup as boolean)) orderMails.notify("ready", id);
     return updated;
   }
 

@@ -351,6 +351,8 @@ model Order {
   totalPrice  Float
   totalItems  Int
   paymentType String
+  // WEB = tienda online; COUNTER = venta de mostrador cargada desde el panel
+  channel     OrderChannel @default(WEB)
 
   estimatedReadyAt DateTime? // Fecha estimada de entrega/retiro
   // PENDING (recién creada, esperando confirmación/pago) -> PROCESSING -> SHIPPED -> DELIVERED
@@ -384,6 +386,11 @@ enum PaymentStatus {
   CANCELLED
   REFUNDED
   CHARGED_BACK
+}
+
+enum OrderChannel {
+  WEB
+  COUNTER
 }
 
 enum OrderStatus {

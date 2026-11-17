@@ -49,7 +49,8 @@ export class OrderRepository extends GenericRepositoryImpl<
   }
 
   async listByUser(userSuperTokensId: string, page = 1, perPage = 10) {
-    const where = { userSuperTokensId };
+    // Las ventas de mostrador quedan a nombre del empleado: no son sus pedidos
+    const where = { userSuperTokensId, channel: "WEB" as const };
     const [totalElements, entityList] = await Promise.all([
       this.prisma.order.count({ where }),
       this.prisma.order.findMany({

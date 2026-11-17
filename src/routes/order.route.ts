@@ -11,6 +11,7 @@ router
   .route("/")
   .get(...requirePermission("orders.manage"), orderController.findAll.bind(orderController))
   .post(...user, orderController.create.bind(orderController));
+router.post("/counter", ...requirePermission("orders.manage"), orderController.createCounterSale.bind(orderController));
 router.get("/mine", ...user, orderController.findMine.bind(orderController));
 router
   .route("/:id")

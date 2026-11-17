@@ -170,7 +170,40 @@ export class OrderService extends GenericServiceImpl<OrderDto, CreateOrderDto, U
     });
   }
 
-  private parsePaymentType(value?: string) {
+  /**
+   * Venta de mostrador (POST /order/counter, solo staff): en un paso queda
+   * entregada y cobrada, descuenta stock y suma a las estadísticas. Sin envío
+   * ni mails. Si falta stock de alguna línea no se registra nada.
+   */
+  async createCounterSale(data: CreateOrderDto, userId: string): Promise<any> {
+    if (!userId) throw new ValidationError("Session id is required");
+    if (!Array.isArray(data?.orderItems) || data.orderItems.length === 0) {
+      throw new ValidationError("Agregá al menos un producto");
+    }
+    for (const item of data.orderItems) {
+      if (!Number.isInteger(Number(item.productVariantId)) || !Number.isInteger(Number(item.quantity)) || !(Number(item.quantity) > 0)) {
+        throw new ValidationError("Cada ítem necesita productVariantId y quantity entera > 0");
+      }
+    }
+    const paymentType = this.parsePaymentType(data.paymentType, { counter: true });
+    const order = await this.orderRepository.withTransaction((tx) =>
+      this.placeOrder(data, paymentType, userId, tx, { method: "PICKUP" }, { counter: true }),
+    );
+    log.info(
+      {
+        orderId: order.id,
+        userId,
+        paymentType,
+        total: Number(order.totalPrice),
+        items: order.orderItems?.length,
+        event: "counter_sale",
+      },
+      `Venta de mostrador ${order.id} registrada (${paymentType}, $${Number(order.totalPrice)})`,
+    );
+    return order;
+  }
+
+  private parsePaymentType(value?: string, opts: { counter?: boolean } = {}) {
     const paymentType = value ? String(value).toUpperCase() : "CASH";
     if (paymentType === "DEBIT" || paymentType === "CREDIT") {
       throw new ValidationError("Las tarjetas de débito y crédito se pagan con Mercado Pago.");
@@ -178,7 +211,7 @@ export class OrderService extends GenericServiceImpl<OrderDto, CreateOrderDto, U
     if (!NEW_ORDER_PAYMENT_TYPES.includes(paymentType)) {
       throw new ValidationError(`paymentType debe ser uno de ${NEW_ORDER_PAYMENT_TYPES.join(", ")}`);
     }
-    if (paymentType === "MERCADOPAGO" && !isMercadoPagoConfigured()) {
+    if (paymentType === "MERCADOPAGO" && !opts.counter && !isMercadoPagoConfigured()) {
       throw new ValidationError("El pago con Mercado Pago no está disponible en este momento. Elegí otra forma de pago.");
     }
     return paymentType;
@@ -191,6 +224,7 @@ export class OrderService extends GenericServiceImpl<OrderDto, CreateOrderDto, U
     userId: string,
     tx: any,
     shipping: ShippingChoice = { method: "PICKUP" },
+    opts: { counter?: boolean } = {},
   ) {
     await this.stockRepository.lockVariants(
       data.orderItems.map((i) => i.productVariantId),
@@ -205,7 +239,8 @@ export class OrderService extends GenericServiceImpl<OrderDto, CreateOrderDto, U
     // Secuencial: cada línea ve el stock ya descontado por las anteriores
     for (const item of data.orderItems) {
       const variant: any = await this.variantRepository.findForSale(item.productVariantId, tx);
-      if (!variant || !variant.active || !variant.product?.active || !variant.availableWeb) {
+      // En mostrador se vende todo lo activo, aunque no se publique en la tienda
+      if (!variant || !variant.active || !variant.product?.active || (!opts.counter && !variant.availableWeb)) {
         throw new ValidationError(
           `La variante ${item.productVariantId} no existe o no está disponible`,
         );
@@ -216,9 +251,16 @@ export class OrderService extends GenericServiceImpl<OrderDto, CreateOrderDto, U
         Number(item.quantity),
         item.selectedBulkOption ? Number(item.selectedBulkOption) : undefined,
       );
+      // Mostrador: la mercadería ya se entregó, no se ajusta ni se deja en espera
+      if (opts.counter && (fulfillment.status !== "FULFILLED" || fulfillment.finalQty !== Number(item.quantity))) {
+        throw new ConflictError(
+          `No alcanza el stock de ${variant.product?.name ?? ""} ${variant.name}`.trim() +
+            ". Corregí el stock con un ajuste y volvé a registrar la venta.",
+        );
+      }
 
       let awaitingStockAt: Date | undefined;
-      const days = Number(variant.requestTime) || 0;
+      const days = opts.counter ? 0 : Number(variant.requestTime) || 0;
       if (days > 0) {
         awaitingStockAt = new Date(now);
         awaitingStockAt.setDate(awaitingStockAt.getDate() + days);
@@ -263,7 +305,9 @@ export class OrderService extends GenericServiceImpl<OrderDto, CreateOrderDto, U
         totalPrice: Math.round(totalPrice * 100) / 100,
         totalItems: orderItems.length,
         paymentType,
-        status: "PENDING",
+        status: opts.counter ? "DELIVERED" : "PENDING",
+        // Mostrador: se cobra en el momento (también Mercado Pago, con QR o link fuera de la tienda)
+        ...(opts.counter ? { channel: "COUNTER", paymentStatus: "APPROVED", paidAt: now } : {}),
         estimatedReadyAt,
         orderItems,
         shippingMethod: shipping.method,
@@ -435,8 +479,16 @@ export class OrderService extends GenericServiceImpl<OrderDto, CreateOrderDto, U
             { status: target, description: target === "READY_FOR_PICKUP" ? "Tu pedido está listo para retirar" : "Pedido retirado" },
             tx,
           );
-          if (target === "READY_FOR_PICKUP") readyForPickup = true;
         }
+      }
+      // Aviso de "listo para retirar" (los pedidos web con retiro no siempre tienen envío)
+      if (
+        (order.shippingMethod ?? "PICKUP") === "PICKUP" &&
+        order.channel !== "COUNTER" &&
+        fields.status === "SHIPPED" &&
+        order.status !== "SHIPPED"
+      ) {
+        readyForPickup = true;
       }
 
       cancelled = fields.status === "CANCELLED";

@@ -49,7 +49,7 @@ export class OrderMapper {
       userSuperTokensId: dto.userSuperTokensId,
       totalPrice: Number(dto.totalPrice),
       totalItems: Number(dto.totalItems),
-      paymentType: dto.paymentType || "DEBIT",
+      paymentType: dto.paymentType || "CASH",
       status: dto.status || "PENDING",
     };
 

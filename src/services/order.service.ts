@@ -28,6 +28,8 @@ type ShippingChoice =
   | { method: "DELIVERY"; quote: ShippingQuote; address: any };
 
 export const PAYMENT_TYPES = ["DEBIT", "CREDIT", "CASH", "TRANSFER", "MERCADOPAGO"];
+/** Medios aceptados en órdenes nuevas: las tarjetas se cobran por Mercado Pago (DEBIT/CREDIT quedan solo en pedidos viejos). */
+export const NEW_ORDER_PAYMENT_TYPES = ["CASH", "TRANSFER", "MERCADOPAGO"];
 const ORDER_STATUSES = ["PENDING", "PROCESSING", "SHIPPED", "DELIVERED", "CANCELLED"];
 
 /**
@@ -169,9 +171,12 @@ export class OrderService extends GenericServiceImpl<OrderDto, CreateOrderDto, U
   }
 
   private parsePaymentType(value?: string) {
-    const paymentType = value ? String(value).toUpperCase() : "DEBIT";
-    if (!PAYMENT_TYPES.includes(paymentType)) {
-      throw new ValidationError(`paymentType debe ser uno de ${PAYMENT_TYPES.join(", ")}`);
+    const paymentType = value ? String(value).toUpperCase() : "CASH";
+    if (paymentType === "DEBIT" || paymentType === "CREDIT") {
+      throw new ValidationError("Las tarjetas de débito y crédito se pagan con Mercado Pago.");
+    }
+    if (!NEW_ORDER_PAYMENT_TYPES.includes(paymentType)) {
+      throw new ValidationError(`paymentType debe ser uno de ${NEW_ORDER_PAYMENT_TYPES.join(", ")}`);
     }
     if (paymentType === "MERCADOPAGO" && !isMercadoPagoConfigured()) {
       throw new ValidationError("El pago con Mercado Pago no está disponible en este momento. Elegí otra forma de pago.");

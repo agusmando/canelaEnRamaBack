@@ -272,7 +272,11 @@ export class OrderMailService {
       },
     });
     const to = order?.user?.email;
-    if (!to) return false;
+    if (!to) {
+      console.warn(`[mail] pedido ${orderId} (${kind}): el cliente no tiene email, no se manda`);
+      return false;
+    }
+    console.log(`[mail] pedido ${orderId}: mandando "${kind}" a ${to}`);
     const { subject, html } = buildOrderMail(kind, order);
     return sendMail({ to, subject, html });
   }

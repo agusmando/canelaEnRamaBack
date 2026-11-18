@@ -41,6 +41,11 @@ const getTransporter = () => {
     port: cfg.port,
     secure: cfg.secure,
     auth: cfg.user ? { user: cfg.user, pass: cfg.password } : undefined,
+    // Por defecto nodemailer espera hasta 2 min: si el puerto está bloqueado
+    // (p. ej. plan free de Render) el error tardaba en verse o no se veía nunca.
+    connectionTimeout: 10_000,
+    greetingTimeout: 10_000,
+    socketTimeout: 20_000,
   });
   return transporter;
 };
@@ -56,10 +61,36 @@ export async function sendMail(mail: { to: string; subject: string; html: string
   }
   try {
     await t.sendMail({ from: { name: cfg.fromName, address: cfg.fromEmail }, ...mail });
+    console.log(`[mail] enviado "${mail.subject}" a ${mail.to}`);
     return true;
   } catch (err: any) {
     console.warn(`[mail] no se pudo mandar "${mail.subject}" a ${mail.to}:`, err.message);
     return false;
+  }
+}
+
+/**
+ * Al arrancar: prueba la conexión y el login SMTP y deja el resultado en el log,
+ * para saber de entrada si los mails van a salir.
+ */
+export async function checkSmtp(): Promise<void> {
+  const cfg = smtpSettings();
+  const t = getTransporter();
+  if (!cfg || !t) {
+    console.warn("[mail] SMTP no configurado (faltan SMTP_HOST / SMTP_PASSWORD / SMTP_USER): no se mandan mails");
+    return;
+  }
+  try {
+    await t.verify();
+    console.log(`[mail] SMTP OK (${cfg.host}:${cfg.port} como ${cfg.user ?? cfg.fromEmail})`);
+  } catch (err: any) {
+    const hint =
+      /timeout|ETIMEDOUT|ECONNREFUSED|ENETUNREACH/i.test(`${err.code} ${err.message}`)
+        ? " → no se puede conectar al servidor SMTP (¿puerto bloqueado? el plan free de Render bloquea 25/465/587)"
+        : /535|Invalid login|auth/i.test(err.message)
+          ? " → usuario o contraseña rechazados (en Gmail hace falta una contraseña de aplicación)"
+          : "";
+    console.warn(`[mail] SMTP con error: ${err.code ?? ""} ${err.message}${hint}`);
   }
 }
 

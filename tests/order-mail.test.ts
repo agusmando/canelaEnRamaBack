@@ -67,4 +67,11 @@ describe("mails de pedido", () => {
     expect(m.html).toContain("Almendras");
     expect(m.html).toContain("diciembre");
   });
+
+  it("reintegro: monto y si fue total o parcial", () => {
+    const parcial = buildOrderMail("refunded", { ...order, paymentStatus: "APPROVED" }, { amount: 2500 });
+    expect(parcial.subject).toContain("$2.500");
+    expect(parcial.html).toContain("parte del pago");
+    expect(buildOrderMail("refunded", { ...order, paymentStatus: "REFUNDED" }, { amount: 7500 }).html).toContain("el pago del pedido");
+  });
 });

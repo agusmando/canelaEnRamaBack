@@ -32,6 +32,26 @@ export class PaymentController {
     }
   }
 
+  /** GET /payment/order/:id/refund — cobrado, devuelto y monto sugerido (consulta Mercado Pago). */
+  async refundInfo(req: any, res: any, next: any) {
+    try {
+      const info = await this.service.refundInfo(parseId(req.params.id), getActor(req));
+      res.status(200).json(new BaseResponse(200, "Refund info", info));
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /** POST /payment/order/:id/refund { amount?, reason? } — reintegro total (sin amount) o parcial. */
+  async refund(req: any, res: any, next: any) {
+    try {
+      const order = await this.service.refund(parseId(req.params.id), req.body ?? {}, getActor(req));
+      res.status(201).json(new BaseResponse(201, "Refund created", order));
+    } catch (error) {
+      next(error);
+    }
+  }
+
   /**
    * POST /payment/webhook — notificaciones de Mercado Pago.
    * Formato Webhooks: ?data.id=123&type=payment (+ body { type, data: { id } }).

@@ -20,6 +20,7 @@ export const PERMISSIONS = {
   "catalog.delete": "Dar de baja productos y cambiar productos de marca",
   "shipping.config": "Configurar tarifas de envío",
   "users.manage": "Ver usuarios y asignar roles",
+  "payments.refund": "Devolver dinero a clientes por Mercado Pago",
 } as const;
 
 export type Permission = keyof typeof PERMISSIONS;

@@ -13,6 +13,7 @@ import { pickupInfo } from "./shipping-quote.service.js";
  *   failedAttempt  el repartidor no pudo entregarlo
  *   delivered entregado / retirado
  *   updated   la tienda cambió productos del pedido (sin stock o a la espera de reposición)
+ *   refunded  reintegro (total o parcial) por Mercado Pago
  *   cancelled pedido cancelado (por la tienda, por el cliente o por falta de pago)
  */
 export type OrderMailKind =
@@ -23,7 +24,11 @@ export type OrderMailKind =
   | "failedAttempt"
   | "delivered"
   | "updated"
+  | "refunded"
   | "cancelled";
+
+/** Datos extra de algunos mails (p. ej. el monto reintegrado). */
+export type OrderMailExtra = { amount?: number };
 
 const PAYMENT_LABEL: Record<string, string> = {
   DEBIT: "Tarjeta de débito",
@@ -130,7 +135,7 @@ function changesList(order: any) {
 }
 
 /** Arma asunto y HTML. Exportado para tests. */
-export function buildOrderMail(kind: OrderMailKind, order: any) {
+export function buildOrderMail(kind: OrderMailKind, order: any, extra: OrderMailExtra = {}) {
   const n = `#${order.id}`;
   const name = order.user?.name?.trim()?.split(/\s+/)[0];
   const hi = p(name ? `Hola ${escapeHtml(name)},` : "Hola,");
@@ -236,6 +241,23 @@ export function buildOrderMail(kind: OrderMailKind, order: any) {
           button: orderLink,
         }),
       };
+    case "refunded": {
+      const amount = Number(extra.amount ?? 0);
+      const total = order.paymentStatus === "REFUNDED";
+      return {
+        subject: `Te devolvimos ${money(amount)} · pedido ${n}`,
+        html: emailLayout({
+          title: total ? `Te devolvimos el pago del pedido ${n}` : `Te devolvimos parte del pago del pedido ${n}`,
+          body:
+            hi +
+            p(`Hicimos un reintegro de <strong>${money(amount)}</strong> por Mercado Pago, al mismo medio con el que pagaste.`) +
+            p(
+              "Si pagaste con dinero en cuenta de Mercado Pago, lo ves al instante. Con tarjeta puede tardar unos días hábiles y, en tarjetas de crédito, aparecer en el resumen siguiente.",
+            ),
+          button: orderLink,
+        }),
+      };
+    }
     case "cancelled":
       return {
         subject: `Pedido ${n} cancelado`,
@@ -258,11 +280,11 @@ export class OrderMailService {
   constructor(private readonly prisma: any = sharedPrisma) {}
 
   /** Manda el mail en segundo plano. Nunca tira. */
-  notify(kind: OrderMailKind, orderId: number) {
-    this.send(kind, orderId).catch((err) => console.warn(`[mail] pedido ${orderId} (${kind}):`, err.message));
+  notify(kind: OrderMailKind, orderId: number, extra?: OrderMailExtra) {
+    this.send(kind, orderId, extra).catch((err) => console.warn(`[mail] pedido ${orderId} (${kind}):`, err.message));
   }
 
-  async send(kind: OrderMailKind, orderId: number): Promise<boolean> {
+  async send(kind: OrderMailKind, orderId: number, extra?: OrderMailExtra): Promise<boolean> {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
       include: {
@@ -277,7 +299,7 @@ export class OrderMailService {
       return false;
     }
     console.log(`[mail] pedido ${orderId}: mandando "${kind}" a ${to}`);
-    const { subject, html } = buildOrderMail(kind, order);
+    const { subject, html } = buildOrderMail(kind, order, extra);
     return sendMail({ to, subject, html });
   }
 }

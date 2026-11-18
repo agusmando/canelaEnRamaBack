@@ -240,6 +240,11 @@ export class PaymentService {
         paymentId,
         paymentStatusDetail: payment.status_detail ?? null,
       };
+      // Reintegros: Mercado Pago es la fuente (incluye los hechos desde su panel)
+      if (mapped === "APPROVED" || mapped === "REFUNDED") {
+        fields.paidAmount = round2(Number(payment.transaction_amount) || 0);
+        fields.refundedAmount = round2(Number(payment.transaction_amount_refunded) || 0);
+      }
 
       if (mapped === "APPROVED") {
         const paid = Number(payment.transaction_amount);
@@ -263,6 +268,103 @@ export class PaymentService {
       justPaid = fields.paymentStatus === "APPROVED" && order.paymentStatus !== "APPROVED" && order.status !== "CANCELLED";
     });
     if (justPaid) orderMails.notify("paid", orderId);
+  }
+
+  /** Pago de Mercado Pago de una orden, consultado en vivo. */
+  private async fetchOrderPayment(order: any) {
+    if (order.paymentType !== "MERCADOPAGO") {
+      throw new ConflictError("Este pedido no se cobró con Mercado Pago: el reintegro se hace por fuera del sistema");
+    }
+    if (!order.paymentId) throw new ConflictError("El pedido no tiene un pago de Mercado Pago registrado");
+    try {
+      return await mpRequest(`/v1/payments/${encodeURIComponent(order.paymentId)}`);
+    } catch (err: any) {
+      throw new ExternalServiceError("Mercado Pago", err.message);
+    }
+  }
+
+  /**
+   * Cuánto se cobró, cuánto se devolvió y cuánto conviene devolver.
+   * Sugerido: lo cobrado de más respecto del total actual del pedido (ítems
+   * devueltos o cancelados), o todo lo que queda si el pedido está cancelado.
+   */
+  async refundInfo(orderId: number, actor: Actor) {
+    this.ensureConfigured();
+    const order = await this.orderService.getOrder(orderId, actor);
+    const payment = await this.fetchOrderPayment(order);
+    const paid = round2(Number(payment.transaction_amount) || 0);
+    const refunded = round2(Number(payment.transaction_amount_refunded) || 0);
+    const refundable = payment.status === "approved" ? round2(Math.max(0, paid - refunded)) : 0;
+    const owed = order.status === "CANCELLED" ? refundable : round2(paid - refunded - chargeTotal(order));
+    return {
+      paymentId: String(payment.id),
+      paymentStatus: payment.status as string,
+      paid,
+      refunded,
+      refundable,
+      currentTotal: chargeTotal(order),
+      suggested: round2(Math.min(refundable, Math.max(0, owed))),
+      refunds: order.refunds ?? [],
+    };
+  }
+
+  /**
+   * Reintegra al cliente (todo lo que queda, o `amount` si es parcial) por
+   * Mercado Pago. No toca stock ni ítems: eso se hace antes, devolviendo o
+   * cancelando los productos del pedido.
+   */
+  async refund(orderId: number, data: { amount?: number | string; reason?: string }, actor: Actor) {
+    const info = await this.refundInfo(orderId, actor);
+    if (info.paymentStatus !== "approved") {
+      throw new ConflictError(
+        info.paymentStatus === "refunded"
+          ? "El pago ya se devolvió completo"
+          : `El pago no está aprobado (estado en Mercado Pago: ${info.paymentStatus})`,
+      );
+    }
+    const amount = data?.amount == null || data.amount === "" ? info.refundable : round2(Number(data.amount));
+    if (!Number.isFinite(amount) || amount <= 0) throw new BadRequestError("El monto a devolver tiene que ser mayor a 0");
+    if (amount > info.refundable + 0.001) {
+      throw new BadRequestError(`Se puede devolver como máximo $${info.refundable} (cobrado $${info.paid}, ya devuelto $${info.refunded})`);
+    }
+    const total = info.refunded === 0 && amount === info.refundable;
+    const reason = typeof data?.reason === "string" ? data.reason.trim().slice(0, 300) || null : null;
+
+    // La misma operación repetida (doble clic, reintento) usa la misma clave:
+    // Mercado Pago devuelve el mismo reintegro en vez de hacer otro.
+    const cents = (n: number) => Math.round(n * 100);
+    const idempotencyKey = `refund-${orderId}-${info.paymentId}-${cents(info.refunded)}-${cents(amount)}`;
+    let mpRefund: any;
+    try {
+      mpRefund = await mpRequest(`/v1/payments/${encodeURIComponent(info.paymentId)}/refunds`, {
+        method: "POST",
+        // Sin monto = reintegro total
+        body: total ? {} : { amount },
+        idempotencyKey,
+      });
+    } catch (err: any) {
+      throw new ExternalServiceError("Mercado Pago", err.message);
+    }
+
+    await this.orderRepository.saveRefund({
+      orderId,
+      paymentId: info.paymentId,
+      mpRefundId: String(mpRefund.id),
+      amount: round2(Number(mpRefund.amount ?? amount)),
+      status: String(mpRefund.status ?? "approved"),
+      reason,
+      createdBy: actor.userId ?? null,
+    });
+    console.info(`[payment] orden ${orderId}: reintegro ${mpRefund.id} por $${amount} (${total ? "total" : "parcial"})`);
+
+    // Estado actualizado del pago (refunded / approved con partially_refunded)
+    try {
+      await this.applyPayment(await mpRequest(`/v1/payments/${encodeURIComponent(info.paymentId)}`));
+    } catch (err: any) {
+      console.warn(`[payment] orden ${orderId}: no se pudo refrescar el pago tras el reintegro:`, err.message);
+    }
+    orderMails.notify("refunded", orderId, { amount: round2(Number(mpRefund.amount ?? amount)) });
+    return this.orderService.getOrder(orderId, actor);
   }
 
   /**

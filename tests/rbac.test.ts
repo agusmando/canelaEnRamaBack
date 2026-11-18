@@ -11,7 +11,7 @@ describe("roles y permisos", () => {
   });
 
   it("solo ADMIN gestiona usuarios, tarifas y bajas", () => {
-    for (const p of ["users.manage", "shipping.config", "catalog.delete"] as const) {
+    for (const p of ["users.manage", "shipping.config", "catalog.delete", "payments.refund"] as const) {
       expect(permissionsFor(["EDITOR", "EMPLOYEE"])).not.toContain(p);
       expect(permissionsFor(["ADMIN"])).toContain(p);
     }

@@ -9,6 +9,7 @@ import { PaymentService } from "./services/payment.service.js";
 import { ShippingService } from "./services/shipping.service.js";
 import { UserService } from "./services/user.service.js";
 import { CartService } from "./services/cart.service.js";
+import { checkMail } from "./config/mailer.js";
 
 const log = getLogger("server");
 const PORT = process.env.PORT || 8080;
@@ -41,7 +42,7 @@ const server = app.listen(PORT, () => {
           }
         : "disabled",
       uber: isUberConfigured(),
-      smtp: !!process.env.SMTP_HOST,
+      mail: process.env.BREVO_API_KEY ? "brevo" : process.env.SMTP_HOST ? "smtp" : "disabled",
     },
     `Servidor escuchando en el puerto ${PORT}`,
   );
@@ -58,6 +59,9 @@ const job = (name: string, fn: () => Promise<unknown>) => async () => {
     jobLog.error({ ...errInfo(err), ms: Date.now() - start }, `Tarea ${name} falló`);
   }
 };
+
+// Deja en el log si el canal de mail (Brevo o SMTP) funciona
+checkMail();
 
 // Roles del dashboard (RBAC): crea los que falten en SuperTokens y alinea User.role
 new UserService().ensureRoles().catch((err) => log.warn(errInfo(err), "No se pudieron sincronizar los roles"));

@@ -22,6 +22,8 @@ router
   .route("/:id/brands")
   .put(supplierController.addSupplierBrands.bind(supplierController))
   .delete(supplierController.removeSupplierBrands.bind(supplierController));
+// Pasa marcas a otro proveedor: { brandsId: [{ id }], toSupplierId }
+router.post("/:id/brands/transfer", supplierController.transferSupplierBrands.bind(supplierController));
 router
   .route("/:id/active/")
   .delete(supplierController.deactivate.bind(supplierController))

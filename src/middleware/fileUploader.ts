@@ -1,11 +1,45 @@
 import Multer from "multer";
 import { ImageService } from "../services/image.service.js";
 import { errInfo, getLogger } from "../config/logger.js";
+import { BadRequestError } from "../errors/application/BadRequestError.js";
+import { ExternalServiceError } from "../errors/infra/ExternalServiceError.js";
 
 const log = getLogger("upload");
 
+/**
+ * Tope por imagen. Cloudinary (plan gratuito) rechaza archivos de más de 10 MB;
+ * el dashboard ya las achica antes de subirlas, esto es el resguardo.
+ */
+export const MAX_IMAGE_MB = 10;
+
 const storage = Multer.memoryStorage();
-export const upload = Multer({ storage }); // usar upload.single('file'), upload.array('files'), upload.fields([...]) según necesidad
+const multerUpload = Multer({
+  storage,
+  limits: { fileSize: MAX_IMAGE_MB * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (/^image\/(jpeg|png|webp|gif|avif)$/.test(file.mimetype)) return cb(null, true);
+    cb(new BadRequestError("Solo se aceptan imágenes JPG, PNG, WEBP, GIF o AVIF"));
+  },
+});
+
+/** Errores de Multer (tamaño, cantidad, campo) → 400 con un mensaje claro. */
+const translateMulter = (mw: any) => (req: any, res: any, next: any) =>
+  mw(req, res, (err: any) => {
+    if (!err || !(err instanceof Multer.MulterError)) return next(err);
+    const message =
+      err.code === "LIMIT_FILE_SIZE"
+        ? `Cada imagen puede pesar como máximo ${MAX_IMAGE_MB} MB`
+        : err.code === "LIMIT_FILE_COUNT" || err.code === "LIMIT_UNEXPECTED_FILE"
+          ? `Demasiadas imágenes o campo inválido (${err.field ?? err.code})`
+          : `Archivo inválido (${err.code})`;
+    next(new BadRequestError(message));
+  });
+
+export const upload = {
+  single: (field: string) => translateMulter(multerUpload.single(field)),
+  array: (field: string, max?: number) => translateMulter(multerUpload.array(field, max)),
+  fields: (fields: Multer.Field[]) => translateMulter(multerUpload.fields(fields)),
+};
 
 const imageService = new ImageService();
 
@@ -14,6 +48,35 @@ const describe = (files: any[]) => ({
   bytes: files.reduce((sum, f) => sum + (f?.buffer?.length ?? 0), 0),
   types: [...new Set(files.map((f) => f?.mimetype))],
 });
+
+/** Error de Cloudinary → error de la app (el más común: imagen demasiado pesada). */
+const translateCloudinary = (err: any): Error => {
+  const msg = String(err?.message ?? "");
+  if (/file size too large/i.test(msg)) {
+    return new BadRequestError(`La imagen es demasiado pesada (máximo ${MAX_IMAGE_MB} MB). Achicala y volvé a intentar.`);
+  }
+  if (err?.http_code && err.http_code >= 400 && err.http_code < 500) {
+    return new BadRequestError(`No se pudo procesar la imagen: ${msg}`);
+  }
+  return new ExternalServiceError("cloudinary", msg || undefined);
+};
+
+/**
+ * Sube todos los archivos; si alguno falla, borra de Cloudinary los que sí
+ * subieron (para no dejar huérfanos) y tira el error traducido.
+ */
+async function uploadAll(files: any[], folder?: string) {
+  const results = await Promise.allSettled(
+    files.map((f: any) => imageService.uploadBuffer(f.buffer, f.mimetype, folder)),
+  );
+  const failed = results.find((r): r is PromiseRejectedResult => r.status === "rejected");
+  if (failed) {
+    const ok = results.flatMap((r) => (r.status === "fulfilled" ? [r.value] : []));
+    await imageService.abortImageUpload(ok);
+    throw translateCloudinary(failed.reason);
+  }
+  return results.map((r) => (r as PromiseFulfilledResult<any>).value);
+}
 
 export function cloudinaryUpload(folderOrFn?: string | ((req: any) => string)) {
   return async (req: any, _res: any, next: any) => {
@@ -36,7 +99,8 @@ export function cloudinaryUpload(folderOrFn?: string | ((req: any) => string)) {
       // Single file (req.file)
       if (req.file && req.file.buffer) {
         const info = describe([req.file]);
-        req.file = await imageService.uploadBuffer(req.file.buffer, req.file.mimetype, folder);
+        const [res] = await uploadAll([req.file], folder);
+        req.file = res;
         log.info({ folder, ...info, ms: Date.now() - start }, "Imagen subida a Cloudinary");
         return next();
       }
@@ -44,9 +108,7 @@ export function cloudinaryUpload(folderOrFn?: string | ((req: any) => string)) {
       // Multer array -> req.files is array
       if (Array.isArray(req.files)) {
         const info = describe(req.files);
-        req.files = await Promise.all(
-          req.files.map((f: any) => imageService.uploadBuffer(f.buffer, f.mimetype, folder)),
-        );
+        req.files = await uploadAll(req.files, folder);
         log.info({ folder, ...info, ms: Date.now() - start }, `${info.count} imagen(es) subidas a Cloudinary`);
         return next();
       }
@@ -55,12 +117,11 @@ export function cloudinaryUpload(folderOrFn?: string | ((req: any) => string)) {
       if (req.files && typeof req.files === "object") {
         const keys = Object.keys(req.files);
         const info = describe(keys.flatMap((k) => req.files[k]));
-        const result: any = {};
-        for (const key of keys) {
-          result[key] = await Promise.all(
-            req.files[key].map((f: any) => imageService.uploadBuffer(f.buffer, f.mimetype, folder)),
-          );
-        }
+        // Se suben todos juntos para que un fallo limpie también los de otros campos
+        const flat = keys.flatMap((key) => req.files[key].map((f: any) => ({ key, f })));
+        const uploaded = await uploadAll(flat.map((x) => x.f), folder);
+        const result: any = Object.fromEntries(keys.map((k) => [k, []]));
+        flat.forEach((x, i) => result[x.key].push(uploaded[i]));
         req.files = result;
         log.info({ folder, fields: keys, ...info, ms: Date.now() - start }, `${info.count} imagen(es) subidas a Cloudinary`);
         return next();

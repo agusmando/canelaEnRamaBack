@@ -45,4 +45,33 @@ describe("mails de pedido", () => {
     const m = buildOrderMail("cancelled", { ...order, paymentType: "MERCADOPAGO", paymentStatus: "PENDING" });
     expect(m.html).toContain("No recibimos el pago a tiempo");
   });
+
+  it("entregado distingue retiro en el local de envío", () => {
+    expect(buildOrderMail("delivered", order).subject).toContain("Entregamos");
+    expect(buildOrderMail("delivered", { ...order, shippingMethod: "PICKUP" }).subject).toContain("Retiraste");
+  });
+
+  it("cambios en el pedido lista lo que se sacó y lo que espera reposición", () => {
+    const m = buildOrderMail("updated", {
+      ...order,
+      estimatedReadyAt: "2026-12-01T15:00:00Z",
+      orderItems: [
+        ...order.orderItems,
+        { ...order.orderItems[0], productNameSnapshot: "Almendras", status: "AWAITING_STOCK", awaitingStockAt: "2026-12-01T15:00:00Z" },
+      ],
+    });
+    expect(m.subject).toContain("#42");
+    expect(m.html).toContain("Sin stock");
+    expect(m.html).toContain("Té");
+    expect(m.html).toContain("Esperando reposición");
+    expect(m.html).toContain("Almendras");
+    expect(m.html).toContain("diciembre");
+  });
+
+  it("reintegro: monto y si fue total o parcial", () => {
+    const parcial = buildOrderMail("refunded", { ...order, paymentStatus: "APPROVED" }, { amount: 2500 });
+    expect(parcial.subject).toContain("$2.500");
+    expect(parcial.html).toContain("parte del pago");
+    expect(buildOrderMail("refunded", { ...order, paymentStatus: "REFUNDED" }, { amount: 7500 }).html).toContain("el pago del pedido");
+  });
 });

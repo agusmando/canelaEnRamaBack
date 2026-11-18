@@ -1,20 +1,43 @@
 import { SMTPService } from "supertokens-node/recipe/emailpassword/emaildelivery";
 import { SMTPService as VerificationSMTPService } from "supertokens-node/recipe/emailverification/emaildelivery";
-import { emailLayout, escapeHtml, smtpSettings } from "../mailer.js";
+import { emailLayout, escapeHtml, mailSender, sendMail, smtpSettings } from "../mailer.js";
 import { getLogger } from "../logger.js";
 
 const log = getLogger("auth");
 
 /**
- * Envío del mail de "recuperar contraseña" por SMTP propio (Gmail, Brevo,
- * Zoho, el hosting del dominio, etc.).
+ * Mails de SuperTokens (recuperar contraseña, invitación al panel, confirmar
+ * email) con nuestro texto y enviados por el mismo canal que el resto
+ * (Brevo o SMTP, ver config/mailer.ts).
  *
- *   SMTP_HOST, SMTP_PORT (465 = SSL, 587 = STARTTLS), SMTP_USER, SMTP_PASSWORD
- *   SMTP_FROM_EMAIL (por defecto SMTP_USER), SMTP_FROM_NAME (por defecto "Canela en Rama")
- *
- * Sin SMTP configurado se devuelve `undefined` y SuperTokens usa su servicio
+ * Sin canal configurado se devuelve `undefined` y SuperTokens usa su servicio
  * por defecto (mail genérico en inglés): sirve para probar, no para producción.
  */
+
+/**
+ * Settings para el SMTPService de SuperTokens. Solo se usan para construirlo:
+ * el envío real lo hace `sendRaw` (override de sendRawEmail), así que con
+ * Brevo no hace falta SMTP.
+ */
+function serviceSettings() {
+  const from = mailSender();
+  if (!from) return null;
+  const smtp = smtpSettings();
+  return {
+    host: smtp?.host ?? "localhost",
+    port: smtp?.port ?? 587,
+    secure: smtp?.secure ?? false,
+    authUsername: smtp?.user,
+    password: smtp?.password ?? "",
+    from,
+  };
+}
+
+/** Envía por nuestro canal; si falla, tira para que SuperTokens lo reporte. */
+async function sendRaw(input: { toEmail: string; subject: string; body: string }) {
+  const ok = await sendMail({ to: input.toEmail, subject: input.subject, html: input.body });
+  if (!ok) throw new Error(`No se pudo mandar "${input.subject}" a ${input.toEmail}`);
+}
 
 
 /** Datos de la invitación al panel: el mismo enlace de "elegir contraseña" con otro texto. */
@@ -72,8 +95,8 @@ function passwordResetHtml(link: string, invite?: InviteContext["invite"]) {
 }
 
 export function passwordResetEmailDelivery() {
-  const cfg = smtpSettings();
-  if (!cfg) {
+  const settings = serviceSettings();
+  if (!settings) {
     if (process.env.NODE_ENV === "production") {
       log.warn("SMTP no configurado: el mail de recuperar contraseña usa el servicio genérico de SuperTokens");
     }
@@ -82,16 +105,10 @@ export function passwordResetEmailDelivery() {
 
   return {
     service: new SMTPService({
-      smtpSettings: {
-        host: cfg.host,
-        port: cfg.port,
-        secure: cfg.secure,
-        authUsername: cfg.user,
-        password: cfg.password,
-        from: { name: cfg.fromName, email: cfg.fromEmail },
-      },
+      smtpSettings: settings,
       override: (original) => ({
         ...original,
+        sendRawEmail: sendRaw,
         getContent: async (input) => {
           const invite = (input.userContext as Partial<InviteContext> | undefined)?.invite;
           return {
@@ -108,20 +125,14 @@ export function passwordResetEmailDelivery() {
 
 /** Mail de "confirmá tu email" (verificación), mismo SMTP y misma estética. */
 export function emailVerificationEmailDelivery() {
-  const cfg = smtpSettings();
-  if (!cfg) return undefined;
+  const settings = serviceSettings();
+  if (!settings) return undefined;
   return {
     service: new VerificationSMTPService({
-      smtpSettings: {
-        host: cfg.host,
-        port: cfg.port,
-        secure: cfg.secure,
-        authUsername: cfg.user,
-        password: cfg.password,
-        from: { name: cfg.fromName, email: cfg.fromEmail },
-      },
+      smtpSettings: settings,
       override: (original) => ({
         ...original,
+        sendRawEmail: sendRaw,
         getContent: async (input) => ({
           toEmail: input.user.email,
           subject: "Confirmá tu email · Canela en Rama",

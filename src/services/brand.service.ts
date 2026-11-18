@@ -5,6 +5,7 @@ import { CreateBrandDto } from "../dto/brand/create-brand.dto.js";
 import { UpdateBrandDto } from "../dto/brand/update-brand.dto.js";
 import { NotFoundError } from "../errors/application/NotFoundError.js";
 import { ValidationError } from "../errors/application/ValidationError.js";
+import { ConflictError } from "../errors/application/ConflictError.js";
 import { BrandRepository } from "../repository/brand.repository.js";
 
 export class BrandService extends GenericServiceImpl<
@@ -26,6 +27,13 @@ export class BrandService extends GenericServiceImpl<
     }
     if (!productData.productsId || productData.productsId.length == 0) {
       throw new ValidationError("Product ids are required for adding products to brand");
+    }
+    // Todo producto tiene una marca: no se lo puede dejar "sin marca". Para
+    // sacarlo de esta se lo asocia a otra (PUT /brand/:otra/products lo mueve).
+    if (!addingProduct) {
+      throw new ConflictError(
+        "Un producto siempre tiene una marca: para sacarlo de esta, movelo a otra marca.",
+      );
     }
     return this.brandRepository.addRemoveProducts(Number(brandId), productData, addingProduct);
   }

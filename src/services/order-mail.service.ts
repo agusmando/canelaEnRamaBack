@@ -13,9 +13,25 @@ const log = getLogger("mail");
  *   paid      pago acreditado en Mercado Pago (hace de confirmación del pedido)
  *   ready     listo para retirar en el local
  *   onTheWay  en camino (envío a domicilio)
+ *   failedAttempt  el repartidor no pudo entregarlo
+ *   delivered entregado / retirado
+ *   updated   la tienda cambió productos del pedido (sin stock o a la espera de reposición)
+ *   refunded  reintegro (total o parcial) por Mercado Pago
  *   cancelled pedido cancelado (por la tienda, por el cliente o por falta de pago)
  */
-export type OrderMailKind = "received" | "paid" | "ready" | "onTheWay" | "cancelled";
+export type OrderMailKind =
+  | "received"
+  | "paid"
+  | "ready"
+  | "onTheWay"
+  | "failedAttempt"
+  | "delivered"
+  | "updated"
+  | "refunded"
+  | "cancelled";
+
+/** Datos extra de algunos mails (p. ej. el monto reintegrado). */
+export type OrderMailExtra = { amount?: number };
 
 const PAYMENT_LABEL: Record<string, string> = {
   DEBIT: "Tarjeta de débito",
@@ -96,8 +112,33 @@ function deliveryText(order: any) {
   return `Retiro en el local: ${escapeHtml(pickup.address.street)}, ${escapeHtml(pickup.address.city)}.`;
 }
 
+const dateLabel = (d: string | Date) =>
+  new Date(d).toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "long", timeZone: "America/Argentina/Buenos_Aires" });
+
+/** Líneas sin stock (canceladas por la tienda) y a la espera de reposición. */
+function changesList(order: any) {
+  const line = (it: any) =>
+    `${escapeHtml(it.productNameSnapshot)}${it.variantNameSnapshot ? ` · ${escapeHtml(it.variantNameSnapshot)}` : ""}`;
+  const cancelled = (order.orderItems ?? []).filter((it: any) => it.status === "CANCELLED");
+  const waiting = (order.orderItems ?? []).filter((it: any) => it.status === "AWAITING_STOCK");
+  let html = "";
+  if (cancelled.length) {
+    html += p(
+      `<strong>Sin stock, los sacamos del pedido</strong> (no se cobran):<br>${cancelled.map(line).join("<br>")}`,
+    );
+  }
+  if (waiting.length) {
+    html += p(
+      `<strong>Esperando reposición</strong>:<br>${waiting
+        .map((it: any) => line(it) + (it.awaitingStockAt ? ` <span style="color:#666">(llega aprox. el ${escapeHtml(dateLabel(it.awaitingStockAt))})</span>` : ""))
+        .join("<br>")}`,
+    );
+  }
+  return html;
+}
+
 /** Arma asunto y HTML. Exportado para tests. */
-export function buildOrderMail(kind: OrderMailKind, order: any) {
+export function buildOrderMail(kind: OrderMailKind, order: any, extra: OrderMailExtra = {}) {
   const n = `#${order.id}`;
   const name = order.user?.name?.trim()?.split(/\s+/)[0];
   const hi = p(name ? `Hola ${escapeHtml(name)},` : "Hola,");
@@ -162,6 +203,64 @@ export function buildOrderMail(kind: OrderMailKind, order: any) {
         }),
       };
     }
+    case "failedAttempt":
+      return {
+        subject: `No pudimos entregar tu pedido ${n}`,
+        html: emailLayout({
+          title: `No pudimos entregar tu pedido ${n}`,
+          body:
+            hi +
+            p("Pasamos a entregarlo pero no lo pudimos dejar. Escribinos para coordinar un nuevo horario o cambiar la dirección.") +
+            p(`<strong>Entrega:</strong> ${deliveryText(order)}`),
+          button: orderLink,
+        }),
+      };
+    case "delivered": {
+      const pickup = order.shippingMethod !== "DELIVERY";
+      return {
+        subject: pickup ? `Retiraste tu pedido ${n} · ¡Gracias!` : `Entregamos tu pedido ${n} · ¡Gracias!`,
+        html: emailLayout({
+          title: pickup ? `¡Gracias por retirar tu pedido ${n}!` : `Tu pedido ${n} fue entregado`,
+          body:
+            hi +
+            p("Esperamos que lo disfrutes. Si algo no llegó como esperabas, respondé este mail y lo resolvemos.") +
+            p("Nos ayuda muchísimo que dejes tu opinión de los productos en la tienda."),
+          button: orderLink,
+        }),
+      };
+    }
+    case "updated":
+      return {
+        subject: `Hubo cambios en tu pedido ${n}`,
+        html: emailLayout({
+          title: `Actualizamos tu pedido ${n}`,
+          body:
+            hi +
+            p("Te contamos los cambios en tu pedido:") +
+            changesList(order) +
+            (order.estimatedReadyAt ? p(`Fecha estimada en que va a estar listo: <strong>${escapeHtml(dateLabel(order.estimatedReadyAt))}</strong>.`) : "") +
+            p("Así queda el pedido:") +
+            itemsTable(order),
+          button: orderLink,
+        }),
+      };
+    case "refunded": {
+      const amount = Number(extra.amount ?? 0);
+      const total = order.paymentStatus === "REFUNDED";
+      return {
+        subject: `Te devolvimos ${money(amount)} · pedido ${n}`,
+        html: emailLayout({
+          title: total ? `Te devolvimos el pago del pedido ${n}` : `Te devolvimos parte del pago del pedido ${n}`,
+          body:
+            hi +
+            p(`Hicimos un reintegro de <strong>${money(amount)}</strong> por Mercado Pago, al mismo medio con el que pagaste.`) +
+            p(
+              "Si pagaste con dinero en cuenta de Mercado Pago, lo ves al instante. Con tarjeta puede tardar unos días hábiles y, en tarjetas de crédito, aparecer en el resumen siguiente.",
+            ),
+          button: orderLink,
+        }),
+      };
+    }
     case "cancelled":
       return {
         subject: `Pedido ${n} cancelado`,
@@ -184,11 +283,11 @@ export class OrderMailService {
   constructor(private readonly prisma: any = sharedPrisma) {}
 
   /** Manda el mail en segundo plano. Nunca tira. */
-  notify(kind: OrderMailKind, orderId: number) {
-    this.send(kind, orderId).catch((err) => log.warn({ orderId, kind, ...errInfo(err) }, `Mail de pedido ${orderId} (${kind}) falló`));
+  notify(kind: OrderMailKind, orderId: number, extra?: OrderMailExtra) {
+    this.send(kind, orderId, extra).catch((err) => log.warn({ orderId, kind, ...errInfo(err) }, `Mail de pedido ${orderId} (${kind}) falló`));
   }
 
-  async send(kind: OrderMailKind, orderId: number): Promise<boolean> {
+  async send(kind: OrderMailKind, orderId: number, extra?: OrderMailExtra): Promise<boolean> {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
       include: {
@@ -202,7 +301,8 @@ export class OrderMailService {
       log.warn({ orderId, kind }, `Orden ${orderId} sin email: no se manda el mail "${kind}"`);
       return false;
     }
-    const { subject, html } = buildOrderMail(kind, order);
+    log.info({ orderId, kind }, `Mandando el mail "${kind}" de la orden ${orderId}`);
+    const { subject, html } = buildOrderMail(kind, order, extra);
     return sendMail({ to, subject, html });
   }
 }

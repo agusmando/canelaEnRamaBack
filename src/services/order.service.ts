@@ -16,7 +16,7 @@ import { CartService } from "./cart.service.js";
 import { ShipmentRepository } from "../repository/shipment.repository.js";
 import { isMercadoPagoConfigured } from "../config/mercadopago.js";
 import { streetLine, ShippingQuoteService, type ShippingQuote } from "./shipping-quote.service.js";
-import { orderMails } from "./order-mail.service.js";
+import { orderMails, type OrderMailKind } from "./order-mail.service.js";
 import { newTrackingCode } from "../utils/trackingCode.js";
 import { getLogger } from "../config/logger.js";
 
@@ -388,8 +388,9 @@ export class OrderService extends GenericServiceImpl<OrderDto, CreateOrderDto, U
     if (!data) throw new ValidationError("body vacío");
 
     let cancelled = false;
-    let readyForPickup = false;
     let change: Record<string, any> | null = null;
+    // Aviso al cliente, se decide dentro de la transacción y sale después del commit
+    let mail: OrderMailKind | null = null;
     const updated = await this.orderRepository.withTransaction(async (tx) => {
       const order = await this.getOrder(id, actor, tx);
 
@@ -496,17 +497,8 @@ export class OrderService extends GenericServiceImpl<OrderDto, CreateOrderDto, U
           );
         }
       }
-      // Aviso de "listo para retirar" (los pedidos web con retiro no siempre tienen envío)
-      if (
-        (order.shippingMethod ?? "PICKUP") === "PICKUP" &&
-        order.channel !== "COUNTER" &&
-        fields.status === "SHIPPED" &&
-        order.status !== "SHIPPED"
-      ) {
-        readyForPickup = true;
-      }
-
       cancelled = fields.status === "CANCELLED";
+      mail = this.mailFor(order, fields.status, data.editItem ?? [], actor);
       change = {
         ...(fields.status && fields.status !== order.status ? { status: { from: order.status, to: fields.status } } : {}),
         ...(Number(fields.totalPrice) !== Number(order.totalPrice) ? { totalPrice: { from: Number(order.totalPrice), to: fields.totalPrice } } : {}),
@@ -522,10 +514,29 @@ export class OrderService extends GenericServiceImpl<OrderDto, CreateOrderDto, U
         cancelled ? `Orden ${id} cancelada` : `Orden ${id} actualizada`,
       );
     }
-    if (cancelled) orderMails.notify("cancelled", id);
-    // (se asigna dentro del callback: TS lo estrecha a false)
-    if ((readyForPickup as boolean)) orderMails.notify("ready", id);
+    // (se asigna dentro del callback: TS lo estrecha a null)
+    const pendingMail = mail as OrderMailKind | null;
+    if (pendingMail) orderMails.notify(pendingMail, id);
     return updated;
+  }
+
+  /**
+   * Qué mail corresponde a un cambio hecho con updateOrder (uno solo, el más
+   * importante). Los cambios del envío (listo, en camino, entregado) se avisan
+   * desde ShipmentService, que actualiza la orden por otro camino.
+   */
+  private mailFor(order: any, newStatus: string | undefined, changes: UpdateOrderItemDto[], actor: Actor): OrderMailKind | null {
+    // Las ventas de mostrador no mandan mails (el cliente está en el local)
+    if (order.channel === "COUNTER") return null;
+    const changed = newStatus && newStatus !== order.status ? newStatus : null;
+    if (changed === "CANCELLED") return "cancelled";
+    if (changed === "SHIPPED") return order.shippingMethod === "DELIVERY" ? "onTheWay" : "ready";
+    if (changed === "DELIVERED") return "delivered";
+    // La tienda sacó productos sin stock o los puso a la espera de reposición
+    const affectsCustomer = changes.some(
+      (c) => c.status === "CANCELLED" || c.status === "AWAITING_STOCK" || !!c.awaitingStockAt,
+    );
+    return actor.isStaff && affectsCustomer ? "updated" : null;
   }
 
   /** Devuelve TODO el stock de una línea y la cierra. */

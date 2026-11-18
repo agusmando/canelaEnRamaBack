@@ -374,8 +374,29 @@ model Order {
   paymentId           String? // id del pago en Mercado Pago
   paymentPreferenceId String? // última preferencia (checkout) creada
   paidAt              DateTime?
+  // Lo que efectivamente cobró Mercado Pago y lo que ya se devolvió (dato de
+  // Mercado Pago: incluye reintegros hechos desde su panel).
+  paidAmount          Float?
+  refundedAmount      Float         @default(0)
+  refunds             Refund[]
 
   @@index([paymentType, paymentStatus, status])
+}
+
+/// Reintegro (total o parcial) de un pago de Mercado Pago hecho desde el panel.
+model Refund {
+  id         Int      @id @default(autoincrement())
+  orderId    Int
+  order      Order    @relation(fields: [orderId], references: [id])
+  paymentId  String // pago de Mercado Pago reintegrado
+  mpRefundId String   @unique
+  amount     Float
+  status     String // estado del reintegro en Mercado Pago (approved, in_process, ...)
+  reason     String?
+  createdBy  String? // supertokensId del usuario del staff
+  createdAt  DateTime @default(now())
+
+  @@index([orderId])
 }
 
 enum PaymentStatus {

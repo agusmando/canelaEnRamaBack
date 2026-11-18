@@ -5,6 +5,10 @@ import { UpdateOrderDto } from "../dto/order/update-order.dto.js";
 import { translatePrismaError } from "../errors/infra/translatePrismaError.js";
 
 const ORDER_INCLUDE = {
+  refunds: {
+    orderBy: { createdAt: "asc" as const },
+    select: { id: true, amount: true, status: true, reason: true, createdAt: true },
+  },
   shipment: {
     include: { events: { orderBy: [{ createdAt: "asc" as const }, { id: "asc" as const }] } },
   },
@@ -110,6 +114,27 @@ export class OrderRepository extends GenericRepositoryImpl<
       return await (tx ?? this.prisma).orderItem.update({
         where: { id: Number(itemId) },
         data,
+      });
+    } catch (error) {
+      throw translatePrismaError(error);
+    }
+  }
+
+  /** Registra un reintegro de Mercado Pago (idempotente por mpRefundId). */
+  async saveRefund(data: {
+    orderId: number;
+    paymentId: string;
+    mpRefundId: string;
+    amount: number;
+    status: string;
+    reason: string | null;
+    createdBy: string | null;
+  }) {
+    try {
+      return await this.prisma.refund.upsert({
+        where: { mpRefundId: data.mpRefundId },
+        update: { status: data.status },
+        create: data,
       });
     } catch (error) {
       throw translatePrismaError(error);

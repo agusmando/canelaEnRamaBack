@@ -1,13 +1,17 @@
 import nodemailer, { type Transporter } from "nodemailer";
 
 /**
- * Envío de mails por SMTP propio (el mismo que usa SuperTokens para las
- * contraseñas, ver supertokens/email.ts).
+ * Envío de mails (pedidos y, vía supertokens/email.ts, contraseñas y
+ * verificación). Dos canales, en este orden:
  *
- *   SMTP_HOST, SMTP_PORT (465 = SSL, 587 = STARTTLS), SMTP_USER, SMTP_PASSWORD
+ *   1. Brevo por API HTTPS: BREVO_API_KEY. Funciona aunque el hosting bloquee
+ *      los puertos SMTP (plan free de Render). El remitente (SMTP_FROM_EMAIL)
+ *      tiene que estar verificado en Brevo → Senders.
+ *   2. SMTP: SMTP_HOST, SMTP_PORT (465 = SSL, 587 = STARTTLS), SMTP_USER, SMTP_PASSWORD.
+ *
  *   SMTP_FROM_EMAIL (por defecto SMTP_USER), SMTP_FROM_NAME (por defecto "Canela en Rama")
  *
- * Sin SMTP configurado los mails no se mandan (se avisa una vez en el log).
+ * Sin ninguno configurado los mails no se mandan (se avisa en el log).
  */
 
 export const escapeHtml = (text: string) =>
@@ -28,7 +32,23 @@ export const smtpSettings = () => {
   };
 };
 
-export const isMailConfigured = () => smtpSettings() !== null;
+const BREVO_URL = "https://api.brevo.com/v3";
+
+/** Brevo: API key + remitente (el de SMTP_FROM_EMAIL / SMTP_USER). */
+export const brevoSettings = () => {
+  const { BREVO_API_KEY, SMTP_FROM_EMAIL, SMTP_USER, SMTP_FROM_NAME } = process.env;
+  const fromEmail = SMTP_FROM_EMAIL || SMTP_USER;
+  if (!BREVO_API_KEY || !fromEmail) return null;
+  return { apiKey: BREVO_API_KEY, fromEmail, fromName: SMTP_FROM_NAME || "Canela en Rama" };
+};
+
+/** Remitente del canal activo (Brevo o SMTP), o null si no hay ninguno. */
+export const mailSender = () => {
+  const cfg = brevoSettings() ?? smtpSettings();
+  return cfg ? { name: cfg.fromName, email: cfg.fromEmail } : null;
+};
+
+export const isMailConfigured = () => mailSender() !== null;
 
 let transporter: Transporter | null = null;
 let warned = false;
@@ -50,8 +70,41 @@ const getTransporter = () => {
   return transporter;
 };
 
-/** Manda un mail. Devuelve false si no hay SMTP o si falla (nunca tira). */
-export async function sendMail(mail: { to: string; subject: string; html: string; text?: string }): Promise<boolean> {
+type Mail = { to: string; subject: string; html: string; text?: string };
+
+async function sendWithBrevo(cfg: NonNullable<ReturnType<typeof brevoSettings>>, mail: Mail) {
+  const res = await fetch(`${BREVO_URL}/smtp/email`, {
+    method: "POST",
+    headers: { "api-key": cfg.apiKey, "content-type": "application/json", accept: "application/json" },
+    body: JSON.stringify({
+      sender: { name: cfg.fromName, email: cfg.fromEmail },
+      to: [{ email: mail.to }],
+      subject: mail.subject,
+      htmlContent: mail.html,
+      ...(mail.text ? { textContent: mail.text } : {}),
+    }),
+    signal: AbortSignal.timeout(15_000),
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`Brevo ${res.status}: ${body.slice(0, 300)}`);
+  }
+}
+
+/** Manda un mail. Devuelve false si no hay canal configurado o si falla (nunca tira). */
+export async function sendMail(mail: Mail): Promise<boolean> {
+  const brevo = brevoSettings();
+  if (brevo) {
+    try {
+      await sendWithBrevo(brevo, mail);
+      console.log(`[mail] enviado por Brevo "${mail.subject}" a ${mail.to}`);
+      return true;
+    } catch (err: any) {
+      console.warn(`[mail] no se pudo mandar "${mail.subject}" a ${mail.to}:`, err.message);
+      return false;
+    }
+  }
+
   const cfg = smtpSettings();
   const t = getTransporter();
   if (!cfg || !t) {
@@ -73,11 +126,25 @@ export async function sendMail(mail: { to: string; subject: string; html: string
  * Al arrancar: prueba la conexión y el login SMTP y deja el resultado en el log,
  * para saber de entrada si los mails van a salir.
  */
-export async function checkSmtp(): Promise<void> {
+export async function checkMail(): Promise<void> {
+  const brevo = brevoSettings();
+  if (brevo) {
+    try {
+      const res = await fetch(`${BREVO_URL}/account`, {
+        headers: { "api-key": brevo.apiKey, accept: "application/json" },
+        signal: AbortSignal.timeout(10_000),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}: ${(await res.text().catch(() => "")).slice(0, 200)}`);
+      console.log(`[mail] Brevo OK (remitente ${brevo.fromEmail}; tiene que estar verificado en Brevo → Senders)`);
+    } catch (err: any) {
+      console.warn(`[mail] Brevo con error: ${err.message} → revisá BREVO_API_KEY`);
+    }
+    return;
+  }
   const cfg = smtpSettings();
   const t = getTransporter();
   if (!cfg || !t) {
-    console.warn("[mail] SMTP no configurado (faltan SMTP_HOST / SMTP_PASSWORD / SMTP_USER): no se mandan mails");
+    console.warn("[mail] sin canal de mail (falta BREVO_API_KEY o SMTP_HOST / SMTP_PASSWORD / SMTP_USER): no se mandan mails");
     return;
   }
   try {

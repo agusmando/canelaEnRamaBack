@@ -68,6 +68,9 @@ services:
         sync: false
       - key: SMTP_FROM_NAME
         value: Canela en Rama
+      # Opcional: si está, los mails salen por la API de Brevo en vez de SMTP
+      - key: BREVO_API_KEY
+        sync: false
       - key: DASHBOARD_URL
         sync: false
       # Dashboard de SuperTokens (/api/auth/dashboard): apagado en prod. "on" para usarlo un rato.
@@ -183,3 +186,8 @@ services:
         sync: false
       - key: SMTP_FROM_NAME
         value: Canela en Rama (DEV)
+      - key: SMTP_FROM_EMAIL
+        sync: false
+      # El plan free bloquea los puertos SMTP: en dev los mails salen por la API de Brevo
+      - key: BREVO_API_KEY
+        sync: false

@@ -6,7 +6,7 @@ import { PaymentService } from "./services/payment.service.js";
 import { ShippingService } from "./services/shipping.service.js";
 import { UserService } from "./services/user.service.js";
 import { CartService } from "./services/cart.service.js";
-import { checkSmtp } from "./config/mailer.js";
+import { checkMail } from "./config/mailer.js";
 
 const PORT = process.env.PORT || 8080;
 
@@ -14,8 +14,8 @@ const server = app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
 
-// Deja en el log si el SMTP conecta y acepta el login
-checkSmtp();
+// Deja en el log si el canal de mail (Brevo o SMTP) funciona
+checkMail();
 
 // Roles del dashboard (RBAC): crea los que falten en SuperTokens y alinea User.role
 new UserService().ensureRoles().catch((err) => console.warn("[users] no se pudieron sincronizar los roles:", err.message));

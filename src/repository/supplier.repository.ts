@@ -36,4 +36,26 @@ export class SupplierRepository extends GenericRepositoryImpl<
       throw translatePrismaError(error);
     }
   }
+
+  async findWithBrands(id: number): Promise<any> {
+    try {
+      return await this.prisma.supplier.findUnique({ where: { id }, include: { brands: { select: { id: true } } } });
+    } catch (error) {
+      throw translatePrismaError(error);
+    }
+  }
+
+  /** Saca las marcas de un proveedor y se las asigna a otro, en una sola transacción. */
+  async transferBrands(fromSupplierId: number, toSupplierId: number, brandIds: number[]): Promise<any> {
+    try {
+      return await this.prisma.$transaction(async (tx: any) => {
+        const ids = brandIds.map((id) => ({ id }));
+        await tx.supplier.update({ where: { id: fromSupplierId }, data: { brands: { disconnect: ids } } });
+        await tx.supplier.update({ where: { id: toSupplierId }, data: { brands: { connect: ids } } });
+        return tx.supplier.findUnique({ where: { id: fromSupplierId }, include: { brands: true } });
+      });
+    } catch (error) {
+      throw translatePrismaError(error);
+    }
+  }
 }

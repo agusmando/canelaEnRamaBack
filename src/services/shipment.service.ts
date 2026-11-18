@@ -16,7 +16,7 @@ import { ORDER_TRANSITIONS } from "./order.service.js";
 import { ValidationError } from "../errors/application/ValidationError.js";
 import { NotFoundError } from "../errors/application/NotFoundError.js";
 import { ConflictError } from "../errors/application/ConflictError.js";
-import { orderMails } from "./order-mail.service.js";
+import { orderMails, type OrderMailKind } from "./order-mail.service.js";
 import type { Actor } from "../middleware/auth.middleware.js";
 
 export const FINAL_SHIPMENT_STATUSES: ShipmentStatus[] = ["DELIVERED", "RETURNED", "CANCELLED"];
@@ -159,7 +159,7 @@ export class ShipmentService extends GenericServiceImpl<
     }
 
     // Se completa dentro de la transacción y el mail sale después de confirmarla
-    const pending: { mail?: { kind: "ready" | "onTheWay"; orderId: number } } = {};
+    const pending: { mail?: { kind: OrderMailKind; orderId: number } } = {};
     const result = await this.shipmentRepository.withTransaction(async (tx) => {
       const shipment: any = await this.shipmentRepository.getById(id, tx);
       if (!shipment) throw new NotFoundError("Envío no encontrado");
@@ -209,7 +209,8 @@ export class ShipmentService extends GenericServiceImpl<
       if (status === "READY_FOR_PICKUP") pending.mail = { kind: "ready", orderId: shipment.orderId };
       else if (shipment.method === "DELIVERY" && onTheWay.includes(status) && !onTheWay.includes(shipment.status)) {
         pending.mail = { kind: "onTheWay", orderId: shipment.orderId };
-      }
+      } else if (status === "FAILED_ATTEMPT") pending.mail = { kind: "failedAttempt", orderId: shipment.orderId };
+      else if (status === "DELIVERED") pending.mail = { kind: "delivered", orderId: shipment.orderId };
 
       return updated;
     });

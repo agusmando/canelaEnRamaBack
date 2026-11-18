@@ -10,9 +10,20 @@ import { pickupInfo } from "./shipping-quote.service.js";
  *   paid      pago acreditado en Mercado Pago (hace de confirmación del pedido)
  *   ready     listo para retirar en el local
  *   onTheWay  en camino (envío a domicilio)
+ *   failedAttempt  el repartidor no pudo entregarlo
+ *   delivered entregado / retirado
+ *   updated   la tienda cambió productos del pedido (sin stock o a la espera de reposición)
  *   cancelled pedido cancelado (por la tienda, por el cliente o por falta de pago)
  */
-export type OrderMailKind = "received" | "paid" | "ready" | "onTheWay" | "cancelled";
+export type OrderMailKind =
+  | "received"
+  | "paid"
+  | "ready"
+  | "onTheWay"
+  | "failedAttempt"
+  | "delivered"
+  | "updated"
+  | "cancelled";
 
 const PAYMENT_LABEL: Record<string, string> = {
   DEBIT: "Tarjeta de débito",
@@ -93,6 +104,31 @@ function deliveryText(order: any) {
   return `Retiro en el local: ${escapeHtml(pickup.address.street)}, ${escapeHtml(pickup.address.city)}.`;
 }
 
+const dateLabel = (d: string | Date) =>
+  new Date(d).toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "long", timeZone: "America/Argentina/Buenos_Aires" });
+
+/** Líneas sin stock (canceladas por la tienda) y a la espera de reposición. */
+function changesList(order: any) {
+  const line = (it: any) =>
+    `${escapeHtml(it.productNameSnapshot)}${it.variantNameSnapshot ? ` · ${escapeHtml(it.variantNameSnapshot)}` : ""}`;
+  const cancelled = (order.orderItems ?? []).filter((it: any) => it.status === "CANCELLED");
+  const waiting = (order.orderItems ?? []).filter((it: any) => it.status === "AWAITING_STOCK");
+  let html = "";
+  if (cancelled.length) {
+    html += p(
+      `<strong>Sin stock, los sacamos del pedido</strong> (no se cobran):<br>${cancelled.map(line).join("<br>")}`,
+    );
+  }
+  if (waiting.length) {
+    html += p(
+      `<strong>Esperando reposición</strong>:<br>${waiting
+        .map((it: any) => line(it) + (it.awaitingStockAt ? ` <span style="color:#666">(llega aprox. el ${escapeHtml(dateLabel(it.awaitingStockAt))})</span>` : ""))
+        .join("<br>")}`,
+    );
+  }
+  return html;
+}
+
 /** Arma asunto y HTML. Exportado para tests. */
 export function buildOrderMail(kind: OrderMailKind, order: any) {
   const n = `#${order.id}`;
@@ -159,6 +195,47 @@ export function buildOrderMail(kind: OrderMailKind, order: any) {
         }),
       };
     }
+    case "failedAttempt":
+      return {
+        subject: `No pudimos entregar tu pedido ${n}`,
+        html: emailLayout({
+          title: `No pudimos entregar tu pedido ${n}`,
+          body:
+            hi +
+            p("Pasamos a entregarlo pero no lo pudimos dejar. Escribinos para coordinar un nuevo horario o cambiar la dirección.") +
+            p(`<strong>Entrega:</strong> ${deliveryText(order)}`),
+          button: orderLink,
+        }),
+      };
+    case "delivered": {
+      const pickup = order.shippingMethod !== "DELIVERY";
+      return {
+        subject: pickup ? `Retiraste tu pedido ${n} · ¡Gracias!` : `Entregamos tu pedido ${n} · ¡Gracias!`,
+        html: emailLayout({
+          title: pickup ? `¡Gracias por retirar tu pedido ${n}!` : `Tu pedido ${n} fue entregado`,
+          body:
+            hi +
+            p("Esperamos que lo disfrutes. Si algo no llegó como esperabas, respondé este mail y lo resolvemos.") +
+            p("Nos ayuda muchísimo que dejes tu opinión de los productos en la tienda."),
+          button: orderLink,
+        }),
+      };
+    }
+    case "updated":
+      return {
+        subject: `Hubo cambios en tu pedido ${n}`,
+        html: emailLayout({
+          title: `Actualizamos tu pedido ${n}`,
+          body:
+            hi +
+            p("Te contamos los cambios en tu pedido:") +
+            changesList(order) +
+            (order.estimatedReadyAt ? p(`Fecha estimada en que va a estar listo: <strong>${escapeHtml(dateLabel(order.estimatedReadyAt))}</strong>.`) : "") +
+            p("Así queda el pedido:") +
+            itemsTable(order),
+          button: orderLink,
+        }),
+      };
     case "cancelled":
       return {
         subject: `Pedido ${n} cancelado`,

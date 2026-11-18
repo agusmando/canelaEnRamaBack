@@ -16,7 +16,7 @@ import { CartService } from "./cart.service.js";
 import { ShipmentRepository } from "../repository/shipment.repository.js";
 import { isMercadoPagoConfigured } from "../config/mercadopago.js";
 import { streetLine, ShippingQuoteService, type ShippingQuote } from "./shipping-quote.service.js";
-import { orderMails } from "./order-mail.service.js";
+import { orderMails, type OrderMailKind } from "./order-mail.service.js";
 import { newTrackingCode } from "../utils/trackingCode.js";
 
 /** Envío resuelto antes de abrir la transacción (la cotización es una llamada externa). */
@@ -293,7 +293,8 @@ export class OrderService extends GenericServiceImpl<OrderDto, CreateOrderDto, U
     if (!id) throw new NotFoundError();
     if (!data) throw new ValidationError("body vacío");
 
-    let cancelled = false;
+    // Aviso al cliente, se decide dentro de la transacción y sale después del commit
+    let mail: OrderMailKind | null = null;
     const updated = await this.orderRepository.withTransaction(async (tx) => {
       const order = await this.getOrder(id, actor, tx);
 
@@ -376,11 +377,28 @@ export class OrderService extends GenericServiceImpl<OrderDto, CreateOrderDto, U
         );
       }
 
-      cancelled = fields.status === "CANCELLED";
+      mail = this.mailFor(order, fields.status, data.editItem ?? [], actor);
       return this.orderRepository.updateOrderFields(id, fields, tx);
     });
-    if (cancelled) orderMails.notify("cancelled", id);
+    if (mail) orderMails.notify(mail, id);
     return updated;
+  }
+
+  /**
+   * Qué mail corresponde a un cambio hecho con updateOrder (uno solo, el más
+   * importante). Los cambios del envío (listo, en camino, entregado) se avisan
+   * desde ShipmentService, que actualiza la orden por otro camino.
+   */
+  private mailFor(order: any, newStatus: string | undefined, changes: UpdateOrderItemDto[], actor: Actor): OrderMailKind | null {
+    const changed = newStatus && newStatus !== order.status ? newStatus : null;
+    if (changed === "CANCELLED") return "cancelled";
+    if (changed === "SHIPPED") return order.shippingMethod === "DELIVERY" ? "onTheWay" : "ready";
+    if (changed === "DELIVERED") return "delivered";
+    // La tienda sacó productos sin stock o los puso a la espera de reposición
+    const affectsCustomer = changes.some(
+      (c) => c.status === "CANCELLED" || c.status === "AWAITING_STOCK" || !!c.awaitingStockAt,
+    );
+    return actor.isStaff && affectsCustomer ? "updated" : null;
   }
 
   /** Devuelve TODO el stock de una línea y la cierra. */

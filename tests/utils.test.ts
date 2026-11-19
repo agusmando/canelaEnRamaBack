@@ -66,7 +66,7 @@ describe("fecha en movimientos manuales", () => {
 
 
 // ---------------------------------------------------------------- Búsqueda de catálogo
-import { normalizeText, rankByText, stem } from "../src/utils/textSearch.js";
+import { editDistance, normalizeText, rankByText, searchWords, stem } from "../src/utils/textSearch.js";
 import { CatalogSearchService } from "../src/services/catalog-search.service.js";
 
 describe("búsqueda de catálogo", () => {
@@ -99,6 +99,33 @@ describe("búsqueda de catálogo", () => {
     expect(rankByText(items, "nuez")).toEqual([3]);
     expect(rankByText(items, "almen")).toEqual([2, 1]);
     expect(rankByText(items, "mani")).toEqual([4]);
+  });
+
+  it("ignora palabras de relleno pero no 'sin'", () => {
+    const more = [...items, { id: 6, name: "Harina almendras", text: "Harinas" }];
+    expect(rankByText(more, "harina de almendras")).toEqual([6, 1]);
+    expect(rankByText(more, "harina almendras")).toEqual([6, 1]);
+    expect(rankByText(more, "harinas con almendras")).toEqual([6, 1]);
+    expect(searchWords("galletas sin tacc")).toEqual(["galletas", "sin", "tacc"]);
+    expect(searchWords("de la")).toEqual(["de", "la"]);
+  });
+
+  it("tolera errores de tipeo (después de las coincidencias exactas)", () => {
+    expect(rankByText(items, "almedras")).toEqual([2, 1]);
+    expect(rankByText(items, "harian de almendras")).toEqual([1]);
+    expect(rankByText(items, "almnedra")).toEqual([2, 1]);
+    expect(rankByText(items, "nueses")).toEqual([3]);
+    // a medio escribir con un error
+    expect(rankByText(items, "almedr")).toEqual([2, 1]);
+    // palabras cortas: sin tolerancia
+    expect(rankByText(items, "mano")).toEqual([]);
+    expect(editDistance("almendra", "almnedra", 2)).toBe(1);
+  });
+
+  it("con 3+ palabras y sin resultados, todas menos una", () => {
+    expect(rankByText(items, "harina almendras tostadas")).toEqual([1]);
+    // con 2 palabras no hay plan B
+    expect(rankByText(items, "almendras tostadas")).toEqual([]);
   });
 
   it("el índice se arma una vez y se renueva al invalidar", async () => {

@@ -1,11 +1,15 @@
 -- Permite conservar la fecha elegida al registrar movimientos manuales.
+-- También elimina la variante sin zona horaria creada por una migración previa
+-- para evitar llamadas ambiguas entre overloads con argumentos por defecto.
 DROP FUNCTION IF EXISTS public.create_stock_movement(INT, INT, TEXT);
+DROP FUNCTION IF EXISTS public.create_stock_movement(INT, INT, TEXT, TIMESTAMP WITHOUT TIME ZONE);
+DROP FUNCTION IF EXISTS public.create_stock_movement(INT, INT, TEXT, TIMESTAMPTZ);
 
 CREATE FUNCTION public.create_stock_movement(
   p_variant_id INT,
   p_quantity   INT,
   p_type       TEXT,
-  p_created_at TIMESTAMPTZ DEFAULT NOW()
+  p_created_at TIMESTAMPTZ DEFAULT NULL
 ) RETURNS INT
 LANGUAGE plpgsql AS $$
 DECLARE
@@ -15,6 +19,10 @@ DECLARE
 BEGIN
   IF p_type IS NULL OR NOT (p_type = ANY (enum_range(NULL::"MovementType")::TEXT[])) THEN
     RAISE EXCEPTION 'Tipo de movimiento inválido: %', p_type;
+  END IF;
+
+  IF p_created_at IS NOT NULL AND p_created_at > NOW() + INTERVAL '5 minutes' THEN
+    RAISE EXCEPTION 'La fecha del movimiento no puede ser futura';
   END IF;
 
   SELECT pv."currentStock", pv.name, pv.price * (1 + pv."profitMargin")

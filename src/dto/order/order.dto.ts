@@ -16,6 +16,17 @@ export class OrderDto {
   paymentId?: string | null;
   paymentPreferenceId?: string | null;
   paidAt?: Date | null;
+  refundId?: string | null;
+  refundStatus?: string | null;
+  refundAmount?: number | null;
+  refundNote?: string | null;
+  refundedAt?: Date | null;
+  refundEmailId?: string | null;
+  refundEmailSentAt?: Date | null;
+  shippingMethod?: "DELIVERY" | "PICKUP" | null;
+  shippingCost?: number;
+  shippingProvider?: string | null;
+  shippingZone?: string | null;
 
   estimatedReadyAt: Date;
   status: string;

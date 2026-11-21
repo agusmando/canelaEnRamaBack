@@ -1,38 +1,34 @@
 import express from "express";
 import { CategoryController } from "../controllers/category.controller.js";
-import { isAuthenticated, requireRole, STAFF_ROLES } from "../middleware/auth.middleware.js";
+import { isAuthenticated, requirePermission } from "../middleware/auth.middleware.js";
 const router = express.Router();
 
 const categoryController = new CategoryController();
 
-const staff = STAFF_ROLES;
+const manageMasters = [isAuthenticated, requirePermission("masters.edit")];
 
 router
   .route("/")
   .get(categoryController.findAll.bind(categoryController))
   .post(
-    isAuthenticated,
-    requireRole(staff),
+    ...manageMasters,
     categoryController.create.bind(categoryController)
   );
 router
   .route("/:id")
   .get(categoryController.findOne.bind(categoryController))
   .put(
-    isAuthenticated,
-    requireRole(staff),
+    ...manageMasters,
     categoryController.update.bind(categoryController)
   );
 router
   .route("/:id/active/")
   .delete(
-    isAuthenticated,
-    requireRole(staff),
+    ...manageMasters,
     categoryController.deactivate.bind(categoryController)
   )
   .put(
-    isAuthenticated,
-    requireRole(staff),
+    ...manageMasters,
     categoryController.activate.bind(categoryController)
   );
 

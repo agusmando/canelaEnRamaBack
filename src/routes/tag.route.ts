@@ -1,38 +1,34 @@
 import express from "express";
 import { TagController } from "../controllers/tag.controller.js";
-import { isAuthenticated, requireRole, STAFF_ROLES } from "../middleware/auth.middleware.js";
+import { isAuthenticated, requirePermission } from "../middleware/auth.middleware.js";
 const router = express.Router();
 
 const tagsController = new TagController();
 
-const staff = STAFF_ROLES;
+const manageMasters = [isAuthenticated, requirePermission("masters.edit")];
 
 router
   .route("/")
   .get(tagsController.findAll.bind(tagsController))
   .post(
-    isAuthenticated,
-    requireRole(staff),
+    ...manageMasters,
     tagsController.create.bind(tagsController)
   );
 router
   .route("/:id")
   .get(tagsController.findOne.bind(tagsController))
   .put(
-    isAuthenticated,
-    requireRole(staff),
+    ...manageMasters,
     tagsController.update.bind(tagsController)
   );
 router
   .route("/:id/active/")
   .delete(
-    isAuthenticated,
-    requireRole(staff),
+    ...manageMasters,
     tagsController.deactivate.bind(tagsController)
   )
   .put(
-    isAuthenticated,
-    requireRole(staff),
+    ...manageMasters,
     tagsController.activate.bind(tagsController)
   );
 

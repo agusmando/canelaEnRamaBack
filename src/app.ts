@@ -8,18 +8,17 @@ import {
   errorHandler as supertokensErrorHandler,
   middleware,
 } from "supertokens-node/framework/express";
+import { getAllowedCorsOrigins } from "./config/cors.js";
 
 initSupertokens();
 const app = express();
 app.set("trust proxy", 1); // Render/proxies: cookies secure e IP real
 app.use(express.json({ limit: "1mb" }));
 
-// CORS_ORIGINS="https://tienda.com,https://admin.tienda.com". Sin definir refleja
-// cualquier origen (comportamiento anterior): definirlo en producción.
-const allowedOrigins = (process.env.CORS_ORIGINS ?? "")
-  .split(",")
-  .map((o) => o.trim())
-  .filter(Boolean);
+// CORS_ORIGINS="https://tienda.com,https://admin.tienda.com".
+// En desarrollo puede omitirse y refleja orígenes para facilitar localhost;
+// en producción el arranque falla si no existe una lista explícita.
+const allowedOrigins = getAllowedCorsOrigins(process.env.CORS_ORIGINS, process.env.NODE_ENV);
 
 const corsMiddleware = cors({
   origin: allowedOrigins.length ? allowedOrigins : true,
@@ -29,7 +28,6 @@ const corsMiddleware = cors({
 });
 
 app.use(corsMiddleware);
-
 
 app.use(middleware());
 app.use("/api", rutas);

@@ -17,7 +17,6 @@ export const productVariantUpdateMapping = {
   packagingOptions: { field: "packagingOptions", parseFloatArray: true },
   requestTime: { field: "requestTime" },
   availableWeb: { field: "availableWeb", parseBoolean: true },
-  availablePedidosYa: { field: "availablePedidosYa", parseBoolean: true },
   stockThreshold: { field: "stockThreshold", parseInt: true },
   roundingOption: { field: "roundingOption", parseInt: true },
   images: {

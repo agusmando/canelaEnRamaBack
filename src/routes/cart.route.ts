@@ -4,8 +4,7 @@ import {
   attachRoles,
   isAuthenticated,
   optionalSession,
-  requireRole,
-  STAFF_ROLES,
+  requirePermission,
 } from "../middleware/auth.middleware.js";
 
 const router = express.Router();
@@ -15,7 +14,7 @@ const maybeUser = [optionalSession, attachRoles];
 
 router
   .route("/")
-  .get(isAuthenticated, requireRole(STAFF_ROLES), cartController.findAll.bind(cartController))
+  .get(isAuthenticated, requirePermission("orders.manage"), cartController.findAll.bind(cartController))
   .post(...maybeUser, cartController.create.bind(cartController));
 router.get("/me", ...maybeUser, cartController.findMine.bind(cartController));
 router

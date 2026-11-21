@@ -1,15 +1,14 @@
 import express from "express";
 import { MovementController } from "../controllers/movement.controller.js";
-import { isAuthenticated, requireRole, STAFF_ROLES } from "../middleware/auth.middleware.js";
+import { isAuthenticated, requirePermission } from "../middleware/auth.middleware.js";
 const router = express.Router();
 
 const movementController = new MovementController();
 
-const staff = STAFF_ROLES;
-
 router.use(isAuthenticated);
-router.use(requireRole(staff));
+router.use(requirePermission("stock.manage"));
 
+router.post("/bulk", movementController.createBulk.bind(movementController));
 router
   .route("/")
   .get(movementController.findAll.bind(movementController))

@@ -3,20 +3,24 @@ import { ShipmentController } from "../controllers/shipment.controller.js";
 import {
   attachRoles,
   isAuthenticated,
-  requireRole,
-  STAFF_ROLES,
+  requirePermission,
+  requirePermissionForStaff,
 } from "../middleware/auth.middleware.js";
 
 const router = express.Router();
 const shipmentController = new ShipmentController();
 
-const staff = [isAuthenticated, requireRole(STAFF_ROLES)];
+const staff = [isAuthenticated, requirePermission("orders.manage")];
 const user = [isAuthenticated, attachRoles];
 
-// Rutas fijas antes de "/:id"
 router.get("/meta", shipmentController.meta.bind(shipmentController));
 router.get("/track/:code", shipmentController.track.bind(shipmentController));
-router.get("/order/:orderId", ...user, shipmentController.findByOrder.bind(shipmentController));
+router.get(
+  "/order/:orderId",
+  ...user,
+  requirePermissionForStaff("orders.manage"),
+  shipmentController.findByOrder.bind(shipmentController),
+);
 
 router
   .route("/")

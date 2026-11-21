@@ -1,50 +1,44 @@
 import express from "express";
 import { BrandController } from "../controllers/brand.controller.js";
-import { isAuthenticated, requireRole, STAFF_ROLES } from "../middleware/auth.middleware.js";
+import { isAuthenticated, requirePermission } from "../middleware/auth.middleware.js";
 const router = express.Router();
 
 const brandController = new BrandController();
 
-const staff = STAFF_ROLES;
+const manageMasters = [isAuthenticated, requirePermission("masters.edit")];
 
 router
   .route("/")
   .get(brandController.findAll.bind(brandController))
   .post(
-    isAuthenticated,
-    requireRole(staff),
+    ...manageMasters,
     brandController.create.bind(brandController)
   );
 router
   .route("/:id")
   .get(brandController.findOne.bind(brandController))
   .put(
-    isAuthenticated,
-    requireRole(staff),
+    ...manageMasters,
     brandController.update.bind(brandController)
   );
 router
   .route("/:id/products")
   .put(
-    isAuthenticated,
-    requireRole(["ADMIN"]),
+    ...manageMasters,
     brandController.addBrandProducts.bind(brandController)
   )
   .delete(
-    isAuthenticated,
-    requireRole(["ADMIN"]),
+    ...manageMasters,
     brandController.removeBrandProducts.bind(brandController)
   )
 router
   .route("/:id/active/")
   .delete(
-    isAuthenticated,
-    requireRole(staff),
+    ...manageMasters,
     brandController.deactivate.bind(brandController)
   )
   .put(
-    isAuthenticated,
-    requireRole(staff),
+    ...manageMasters,
     brandController.activate.bind(brandController)
   );
 

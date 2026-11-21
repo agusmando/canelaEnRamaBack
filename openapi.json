@@ -1,0 +1,65 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Canela en Rama API",
+    "version": "1.1.0",
+    "description": "Inventario operativo versionado. Los contratos detallados se mantienen en DTO y rutas; pagos operativos: CASH, TRANSFER y MERCADOPAGO."
+  },
+  "servers": [{ "url": "/api" }],
+  "paths": {
+    "/health": { "get": { "summary": "Estado del servicio", "responses": { "200": { "description": "Servidor disponible" } } } },
+    "/payment/config": { "get": { "summary": "Configuración pública de pagos", "responses": { "200": { "description": "Configuración disponible" } } } },
+    "/payment/webhook": { "post": { "summary": "Notificación de Mercado Pago", "responses": { "200": { "description": "Aceptada" }, "401": { "description": "Firma inválida" }, "500": { "description": "Reintento requerido" } } } },
+    "/payment/order/{id}/preference": { "post": { "summary": "Crear preferencia", "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }], "responses": { "201": { "description": "Preferencia creada" } } } },
+    "/payment/order/{id}/refund": {
+      "post": {
+        "summary": "Cancelar la orden, solicitar reintegro total de Mercado Pago y notificar al cliente",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["note"], "properties": { "note": { "type": "string", "maxLength": 2000, "description": "Productos faltantes y motivo para el cliente" } } } } } },
+        "responses": { "200": { "description": "Orden cancelada y reintegro procesado; incluye si se envió el email" }, "409": { "description": "La orden no tiene un pago aprobado o no es reintegrable" } }
+      }
+    },
+    "/banner/public": { "get": { "summary": "Banners vigentes públicos", "parameters": [{ "name": "placement", "in": "query", "schema": { "type": "string" } }], "responses": { "200": { "description": "Banners vigentes" } } } },
+    "/shipping/config": { "get": { "summary": "Configuración pública de envíos", "responses": { "200": { "description": "Zonas, departamentos, proveedor propio y dirección de retiro" } } } },
+    "/shipping/quote": { "get": { "summary": "Cotizar envío del domicilio del usuario", "parameters": [{ "name": "value", "in": "query", "required": true, "schema": { "type": "number", "minimum": 0 } }], "responses": { "200": { "description": "Cotización; incluye available=false si no hay domicilio o tarifa activa" } } } },
+    "/shipping/address": {
+      "get": { "summary": "Consultar domicilio del usuario autenticado", "responses": { "200": { "description": "Domicilio o null" } } },
+      "put": { "summary": "Guardar domicilio del usuario autenticado", "responses": { "200": { "description": "Domicilio guardado" }, "400": { "description": "Datos inválidos" } } }
+    },
+    "/shipping/zones": {
+      "get": { "summary": "Listar tarifas (staff con shipping.config)", "responses": { "200": { "description": "Tarifas activas e inactivas" } } },
+      "post": { "summary": "Crear tarifa (staff con shipping.config)", "responses": { "201": { "description": "Tarifa creada" } } }
+    },
+    "/shipping/zones/{id}": {
+      "put": {
+        "summary": "Actualizar tarifa (staff con shipping.config)",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }],
+        "responses": { "200": { "description": "Tarifa actualizada" }, "404": { "description": "Tarifa inexistente" } }
+      }
+    },
+    "/user": { "get": { "summary": "Listar usuarios (users.manage)", "responses": { "200": { "description": "Usuarios paginados, roles, permisos y contadores" } } } },
+    "/user/roles": { "get": { "summary": "Consultar roles y permisos disponibles (users.manage)", "responses": { "200": { "description": "Roles de staff y matriz de permisos" } } } },
+    "/user/invite": { "post": { "summary": "Invitar usuario al equipo (users.manage)", "responses": { "201": { "description": "Cuenta, rol y estado de envío del enlace de invitación" } } } },
+    "/user/{supertokensId}/detail": {
+      "get": {
+        "summary": "Consultar detalle administrable de usuario (users.manage)",
+        "parameters": [{ "name": "supertokensId", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": { "200": { "description": "Usuario, método de acceso y última orden" } }
+      }
+    },
+    "/user/{supertokensId}/role": {
+      "put": {
+        "summary": "Asignar o quitar rol de staff (users.manage)",
+        "parameters": [{ "name": "supertokensId", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": { "200": { "description": "Usuario actualizado y sesiones anteriores revocadas" } }
+      }
+    },
+    "/user/{supertokensId}/revoke-sessions": {
+      "post": {
+        "summary": "Revocar sesiones del usuario (users.manage)",
+        "parameters": [{ "name": "supertokensId", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": { "200": { "description": "Cantidad de sesiones revocadas" } }
+      }
+    }
+  }
+}

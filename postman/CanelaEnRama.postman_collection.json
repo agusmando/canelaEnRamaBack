@@ -1500,7 +1500,7 @@
                 },
                 {
                   "key": "variants",
-                  "value": "[{\"name\": \"Almendra natural\", \"price\": 10000, \"profitMargin\": 0.5, \"roundingOption\": 10, \"contentMeasure\": \"KG\", \"packagingOptions\": [250, 500, 1000], \"currentStock\": 5000, \"stockThreshold\": 500, \"requestTime\": \"\", \"availableWeb\": true, \"availablePedidosYa\": true}]",
+                  "value": "[{\"name\": \"Almendra natural\", \"price\": 10000, \"profitMargin\": 0.5, \"roundingOption\": 10, \"contentMeasure\": \"KG\", \"packagingOptions\": [250, 500, 1000], \"currentStock\": 5000, \"stockThreshold\": 500, \"requestTime\": \"\", \"availableWeb\": true}]",
                   "type": "text",
                   "description": "JSON string. currentStock = stock inicial (g si KG) y se registra como movimiento IN."
                 },
@@ -1876,7 +1876,7 @@
             "description": "Staff. Acepta JSON o multipart (campo `image` para fotos).",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"productId\": \"{{productId}}\",\n  \"name\": \"Almendra 1kg\",\n  \"price\": 10000,\n  \"profitMargin\": 0.5,\n  \"roundingOption\": 10,\n  \"contentMeasure\": \"KG\",\n  \"packagingOptions\": [\n    250,\n    500,\n    1000\n  ],\n  \"currentStock\": 5000,\n  \"stockThreshold\": 500,\n  \"requestTime\": \"\",\n  \"availableWeb\": true,\n  \"availablePedidosYa\": true\n}",
+              "raw": "{\n  \"productId\": \"{{productId}}\",\n  \"name\": \"Almendra 1kg\",\n  \"price\": 10000,\n  \"profitMargin\": 0.5,\n  \"roundingOption\": 10,\n  \"contentMeasure\": \"KG\",\n  \"packagingOptions\": [\n    250,\n    500,\n    1000\n  ],\n  \"currentStock\": 5000,\n  \"stockThreshold\": 500,\n  \"requestTime\": \"\",\n  \"availableWeb\": true\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -2132,7 +2132,7 @@
             "description": "Staff. `requestTime` = días de demora (setea fecha estimada en la orden). `stockThreshold`: por debajo de este stock no aplican ofertas.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"availableWeb\": true,\n  \"availablePedidosYa\": false,\n  \"packagingOptions\": [\n    100,\n    250,\n    500\n  ],\n  \"stockThreshold\": 300,\n  \"requestTime\": \"3\"\n}",
+              "raw": "{\n  \"availableWeb\": true,\n  \"packagingOptions\": [\n    100,\n    250,\n    500\n  ],\n  \"stockThreshold\": 300,\n  \"requestTime\": \"3\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -3124,7 +3124,7 @@
                 "order"
               ]
             },
-            "description": "Requiere sesión. La orden nace en **PENDING** (stock reservado, esperando confirmación/pago). Para comprar lo que hay en el carrito usar *Checkout desde el carrito* (carpeta 11).\n\n`paymentType`: DEBIT | CREDIT | CASH | TRANSFER | MERCADOPAGO.\n\n- Con `selectedBulkOption`: `quantity` = cantidad de paquetes de ese tamaño (g/u).\n- Sin presentación: `quantity` = g (KG) o unidades.\n\nTodo ocurre en una transacción con bloqueo de stock. Si no alcanza, la línea se ajusta (PARTIALLY_RETURNED) o se cancela. Si no hay stock para ninguna → 409 y no se crea la orden.\n\nLos precios y ofertas se calculan en el servidor; los que mande el cliente se ignoran.",
+            "description": "Requiere sesión. La orden nace en **PENDING** (stock reservado, esperando confirmación/pago). Para comprar lo que hay en el carrito usar *Checkout desde el carrito* (carpeta 11).\n\n`paymentType`: CASH | TRANSFER | MERCADOPAGO. Efectivo y transferencia se coordinan manualmente; Mercado Pago requiere credenciales configuradas.\n\n- Con `selectedBulkOption`: `quantity` = cantidad de paquetes de ese tamaño (g/u).\n- Sin presentación: `quantity` = g (KG) o unidades.\n\nTodo ocurre en una transacción con bloqueo de stock. Si no alcanza, la línea se ajusta (PARTIALLY_RETURNED) o se cancela. Si no hay stock para ninguna → 409 y no se crea la orden.\n\nLos precios y ofertas se calculan en el servidor; los que mande el cliente se ignoran.",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"paymentType\": \"TRANSFER\",\n  \"orderItems\": [\n    {\n      \"productVariantId\": \"{{variantId}}\",\n      \"quantity\": 2,\n      \"selectedBulkOption\": 500\n    },\n    {\n      \"productVariantId\": \"{{componentVariantId}}\",\n      \"quantity\": 300\n    }\n  ]\n}",

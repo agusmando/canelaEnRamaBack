@@ -152,6 +152,46 @@ export class ProductVariantService extends GenericServiceImpl<
     }
   }
 
+  async adjustStock(
+    id: number,
+    data: { currentStock?: unknown; stockIncrement?: unknown },
+  ): Promise<ProductVariantDto> {
+    if (!Number.isInteger(id) || id <= 0) throw new NotFoundError();
+    if (!data || (data.currentStock === undefined) === (data.stockIncrement === undefined)) {
+      throw new ValidationError("Enviar currentStock o stockIncrement, no ambos");
+    }
+
+    return this.productVariantRepository.withTransaction(async (tx) => {
+      const variant: any = await this.productVariantRepository.getById(id, tx);
+      if (!variant) throw new NotFoundError();
+
+      if (data.currentStock !== undefined) {
+        const target = Number(data.currentStock);
+        if (!Number.isInteger(target) || target < 0) {
+          throw new ValidationError("currentStock debe ser un entero mayor o igual a 0");
+        }
+        await this.stockRepository.setStockLevel(id, target, tx);
+      } else {
+        const increment = Number(data.stockIncrement);
+        if (!Number.isInteger(increment) || increment === 0) {
+          throw new ValidationError("stockIncrement debe ser un entero distinto de 0");
+        }
+        const isMix = (variant.hasComponents?.length ?? 0) > 0;
+        if (increment > 0 && isMix) {
+          await this.stockRepository.processMixProduction(id, increment, tx);
+        } else {
+          await this.stockRepository.createStockMovement(
+            id,
+            increment,
+            increment < 0 ? "OUT" : "IN",
+            tx,
+          );
+        }
+      }
+      return this.productVariantRepository.getById(id, tx);
+    });
+  }
+
   /** Aplica cambios de receta. Devuelve true si hubo cambios. */
   private async applyComponentChanges(
     mixVariantId: number,

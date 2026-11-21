@@ -37,5 +37,4 @@ export const productVariantSearchQueryMapping = {
   },
   ofuscatedstockThreshold: { field: "stockThreshold", type: "number" },
   availableWeb: { field: "availableWeb", type: "boolean" },
-  availablePedidosYa: { field: "availablePedidosYa", type: "boolean" },
 };

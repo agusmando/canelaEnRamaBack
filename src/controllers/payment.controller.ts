@@ -32,6 +32,20 @@ export class PaymentController {
     }
   }
 
+  /** POST /payment/order/:id/refund — reintegra el total y cancela la orden. */
+  async refundFullOrder(req: any, res: any, next: any) {
+    try {
+      const result = await this.service.refundFullOrder(
+        parseId(req.params.id),
+        req.body?.note,
+        getActor(req),
+      );
+      res.status(200).json(new BaseResponse(200, "Full order refund processed", result));
+    } catch (error) {
+      next(error);
+    }
+  }
+
   /**
    * POST /payment/webhook — notificaciones de Mercado Pago.
    * Formato Webhooks: ?data.id=123&type=payment (+ body { type, data: { id } }).

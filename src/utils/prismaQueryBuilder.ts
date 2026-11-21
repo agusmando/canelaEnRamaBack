@@ -18,6 +18,27 @@ export const prismaQueryBuilder = (receivedDto: any, mappingRules: any = {}) => 
         where[config.field] = { contains: String(value), mode: "insensitive" };
         break;
 
+      case "search": {
+        const terms = String(value).trim().split(/\s+/).filter(Boolean);
+        for (const term of terms) {
+          and.push({
+            OR: (config.fields ?? []).map((field: any) => {
+              const condition = { contains: term, mode: "insensitive" };
+              if (!field.childField) return { [field.field]: condition };
+              if (field.relation === "some") {
+                return {
+                  [field.field]: {
+                    some: { [field.childField]: condition },
+                  },
+                };
+              }
+              return { [field.field]: { [field.childField]: condition } };
+            }),
+          });
+        }
+        break;
+      }
+
       case "number": {
         const n = Number(value);
         if (!Number.isNaN(n)) where[config.field] = n;

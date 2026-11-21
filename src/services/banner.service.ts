@@ -11,6 +11,7 @@ import {
 import { BannerRepository } from "../repository/banner.repository.js";
 import { ValidationError } from "../errors/application/ValidationError.js";
 import { NotFoundError } from "../errors/application/NotFoundError.js";
+import { ConflictError } from "../errors/application/ConflictError.js";
 
 type UploadedFile = { public_id: string; secure_url: string };
 export type BannerFiles = { desktopImage?: UploadedFile[]; mobileImage?: UploadedFile[] } | undefined;
@@ -80,6 +81,7 @@ export class BannerService extends GenericServiceImpl<BannerDto, BannerInput, Ba
       if (desktop) Object.assign(data, { desktopImageUrl: desktop.secure_url, desktopImagePublicId: desktop.public_id });
       if (mobile) Object.assign(data, { mobileImageUrl: mobile.secure_url, mobileImagePublicId: mobile.public_id });
       this.validateComplete(data);
+      await this.validateAnnouncementLimit(data);
       if (data.position === undefined) data.position = await this.bannerRepository.nextPosition(data.placement);
       return present(await this.bannerRepository.createBanner(data));
     } catch (error) {
@@ -110,6 +112,7 @@ export class BannerService extends GenericServiceImpl<BannerDto, BannerInput, Ba
 
       const merged = { ...current, ...data };
       this.validateComplete(merged);
+      await this.validateAnnouncementLimit(merged, id);
       if (merged.size !== (data.size ?? current.size)) data.size = merged.size;
       updated = await this.bannerRepository.updateBanner(id, data);
     } catch (error) {
@@ -128,6 +131,30 @@ export class BannerService extends GenericServiceImpl<BannerDto, BannerInput, Ba
     await this.imageService.deleteFromCloudinary(
       [banner.desktopImagePublicId, banner.mobileImagePublicId].filter(Boolean),
     );
+  }
+
+  async activate(id: number): Promise<BannerDto> {
+    const banner: any = await this.bannerRepository.findRaw(id);
+    if (!banner) throw new NotFoundError();
+    await this.validateAnnouncementLimit({ ...banner, active: true }, id);
+    return present(await this.bannerRepository.activate(id));
+  }
+
+  async deactivate(id: number): Promise<BannerDto> {
+    return present(await this.bannerRepository.deactivate(id));
+  }
+
+  private async validateAnnouncementLimit(banner: Record<string, any>, excludeId?: number) {
+    if (banner.placement !== "ANNOUNCEMENT_BAR" || !banner.active) return;
+    const now = new Date();
+    const startsAt = banner.startsAt ? new Date(banner.startsAt) : null;
+    const endsAt = banner.endsAt ? new Date(banner.endsAt) : null;
+    const isLive = (!startsAt || startsAt <= now) && (!endsAt || endsAt >= now);
+    if (!isLive) return;
+    const count = await this.bannerRepository.countLiveAnnouncementBars(excludeId);
+    if (count >= 1) {
+      throw new ConflictError("Solo puede haber una barra de anuncio activa y vigente");
+    }
   }
 
   /** Reordena los banners de UN espacio: position = índice en `ids`. */

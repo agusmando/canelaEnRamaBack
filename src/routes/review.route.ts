@@ -4,14 +4,13 @@ import {
   attachRoles,
   isAuthenticated,
   optionalSession,
-  requireRole,
-  STAFF_ROLES,
+  requirePermission,
 } from "../middleware/auth.middleware.js";
 
 const router = express.Router();
 const reviewController = new ReviewController();
 
-const staff = [isAuthenticated, requireRole(STAFF_ROLES)];
+const staff = [isAuthenticated, requirePermission("content.edit")];
 const user = [isAuthenticated, attachRoles];
 // Público, pero el staff logueado ve todos los estados
 const publicView = [optionalSession, attachRoles];

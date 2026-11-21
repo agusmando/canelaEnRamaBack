@@ -8,6 +8,10 @@ export class CreateOrderDto {
   status: string;
   orderItems: CreateOrderItemDto[] = [];
   estimatedReadyAt?: Date;
+  shippingMethod?: "DELIVERY" | "PICKUP";
+  shippingCost?: number;
+  shippingProvider?: string | null;
+  shippingZone?: string | null;
   /** Checkout: usa las líneas del carrito del usuario y lo vacía. */
   fromCart?: boolean;
 

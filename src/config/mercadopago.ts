@@ -12,6 +12,8 @@ import crypto from "node:crypto";
  *   MP_STATEMENT_DESCRIPTOR texto en el resumen de la tarjeta (máx. 22). Default "CANELA EN RAMA".
  *   MP_ORDER_TTL_HOURS     horas para pagar antes de cancelar el pedido y liberar stock. Default 48.
  *   MP_ALLOW_CASH          "true" para permitir Rapipago/Pago Fácil (pagos en efectivo diferidos).
+ *   RESEND_API_KEY         clave de API para enviar avisos de reintegro.
+ *   RESEND_FROM_EMAIL      remitente verificado en Resend.
  */
 export const mpConfig = () => {
   const ttl = Number(process.env.MP_ORDER_TTL_HOURS);
@@ -23,6 +25,8 @@ export const mpConfig = () => {
     statementDescriptor: (process.env.MP_STATEMENT_DESCRIPTOR || "CANELA EN RAMA").slice(0, 22),
     orderTtlHours: Number.isFinite(ttl) && ttl > 0 ? ttl : 48,
     allowCash: process.env.MP_ALLOW_CASH === "true",
+    resendApiKey: process.env.RESEND_API_KEY ?? "",
+    resendFromEmail: process.env.RESEND_FROM_EMAIL ?? "",
   };
 };
 

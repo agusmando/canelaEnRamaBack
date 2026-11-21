@@ -11,7 +11,6 @@ export class UpdateProductVariantDto {
   editComponents?: { productVariantId: number; quantity: number }[];
   stockIncrement?: number;
   availableWeb?: boolean;
-  availablePedidosYa?: boolean;
   currentStock?: number;
   removeImages?: { id: number }[];
   images?: any[];
@@ -20,7 +19,6 @@ export class UpdateProductVariantDto {
 
   constructor(
     availableWeb?: boolean,
-    availablePedidosYa?: boolean,
     stockThreshold?: number,
     roundingOption?: number,
     name?: string,
@@ -53,7 +51,6 @@ export class UpdateProductVariantDto {
     this.removeImages = removeImages;
     this.images = images;
     this.availableWeb = availableWeb;
-    this.availablePedidosYa = availablePedidosYa;
     this.stockThreshold = stockThreshold;
     this.roundingOption = roundingOption;
   }

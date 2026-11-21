@@ -1,14 +1,12 @@
 import express from "express";
 import { OfferController } from "../controllers/offer.controller.js";
-import { isAuthenticated, requireRole, STAFF_ROLES } from "../middleware/auth.middleware.js";
+import { isAuthenticated, requirePermission } from "../middleware/auth.middleware.js";
 const router = express.Router();
 
 const offerController = new OfferController();
 
-const staff = STAFF_ROLES;
-
 router.use(isAuthenticated);
-router.use(requireRole(staff));
+router.use(requirePermission("offers.edit"));
 
 router
   .route("/")

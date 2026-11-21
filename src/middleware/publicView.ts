@@ -20,7 +20,7 @@ const strip = (value: any): any => {
  * Requiere `optionalSession` + `attachRoles` antes.
  */
 export const hideCostForPublic = (req: any, res: any, next: any) => {
-  if (getActor(req).isStaff) return next();
+  if (getActor(req).permissions.includes("catalog.edit")) return next();
   const json = res.json.bind(res);
   res.json = (body: any) => json(strip(body));
   next();

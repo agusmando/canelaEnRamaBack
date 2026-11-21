@@ -29,7 +29,7 @@ export class OrderMapper {
         })
       : [];
 
-    return new OrderDto(
+    const dto = new OrderDto(
       dbOrder.id,
       dbOrder.createdAt,
       dbOrder.updatedAt,
@@ -42,6 +42,23 @@ export class OrderMapper {
       items,
       dbOrder.estimatedReadyAt
     );
+    dto.paymentStatus = dbOrder.paymentStatus;
+    dto.paymentStatusDetail = dbOrder.paymentStatusDetail;
+    dto.paymentId = dbOrder.paymentId;
+    dto.paymentPreferenceId = dbOrder.paymentPreferenceId;
+    dto.paidAt = dbOrder.paidAt;
+    dto.refundId = dbOrder.refundId;
+    dto.refundStatus = dbOrder.refundStatus;
+    dto.refundAmount = dbOrder.refundAmount;
+    dto.refundNote = dbOrder.refundNote;
+    dto.refundedAt = dbOrder.refundedAt;
+    dto.refundEmailId = dbOrder.refundEmailId;
+    dto.refundEmailSentAt = dbOrder.refundEmailSentAt;
+    dto.shippingMethod = dbOrder.shippingMethod;
+    dto.shippingCost = dbOrder.shippingCost;
+    dto.shippingProvider = dbOrder.shippingProvider;
+    dto.shippingZone = dbOrder.shippingZone;
+    return dto;
   }
 
   static toPrismaCreate(dto: CreateOrderDto): any {
@@ -49,7 +66,7 @@ export class OrderMapper {
       userSuperTokensId: dto.userSuperTokensId,
       totalPrice: Number(dto.totalPrice),
       totalItems: Number(dto.totalItems),
-      paymentType: dto.paymentType || "DEBIT",
+      paymentType: dto.paymentType || "CASH",
       status: dto.status || "PENDING",
     };
 

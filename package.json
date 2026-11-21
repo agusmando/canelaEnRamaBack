@@ -5,11 +5,13 @@
   "main": "index.js",
   "type": "module",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "node --import tsx --test test/**/*.test.ts",
+    "test:watch": "node --import tsx --test --watch test/**/*.test.ts",
     "dev": "tsx watch src/server.ts",
     "build": "npx prisma generate --schema=./src/config/prisma/schema.prisma && tsc",
     "start": "node dist/server.js",
-    "seed:images": "tsx scripts/seed-images.ts"
+    "seed:images": "tsx scripts/seed-images.ts",
+    "prisma:validate": "npx prisma validate --schema=./src/config/prisma/schema.prisma"
   },
   "repository": {
     "type": "git",

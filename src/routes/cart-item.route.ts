@@ -1,6 +1,6 @@
 import express from "express";
 import { CartItemController } from "../controllers/cart-item.controller.js";
-import { isAuthenticated, requireRole, STAFF_ROLES } from "../middleware/auth.middleware.js";
+import { isAuthenticated, requirePermission } from "../middleware/auth.middleware.js";
 
 const router = express.Router();
 const cartItemController = new CartItemController();
@@ -9,7 +9,7 @@ const cartItemController = new CartItemController();
 router.get(
   "/",
   isAuthenticated,
-  requireRole(STAFF_ROLES),
+  requirePermission("orders.manage"),
   cartItemController.findAll.bind(cartItemController),
 );
 

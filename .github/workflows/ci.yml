@@ -15,7 +15,10 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - run: npm run prisma:validate
+      - run: npm test
       # prisma generate + tsc
       - run: npm run build
+      - run: node -e "JSON.parse(require('node:fs').readFileSync('openapi.json','utf8'))"
       # Verifica que la imagen que despliega Render compile
       - run: docker build -t canela-api:ci .

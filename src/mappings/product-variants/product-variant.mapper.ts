@@ -23,7 +23,6 @@ export class ProductVariantMapper {
       dbVariant.requestTime ?? "",
       dbVariant.availableWeb,
       dbVariant.stockThreshold ?? 0,
-      dbVariant.availablePedidosYa,
       dbVariant.roundingOption ?? 10,
       dbVariant.contentMeasure,
       dbVariant.profitMargin,
@@ -45,7 +44,6 @@ export class ProductVariantMapper {
       currentStock: Number(dto.currentStock ?? 0),
       active: dto.active !== undefined ? Boolean(dto.active) : true,
       availableWeb: dto.availableWeb !== undefined ? Boolean(dto.availableWeb) : true,
-      availablePedidosYa: dto.availablePedidosYa !== undefined ? Boolean(dto.availablePedidosYa) : true,
       contentMeasure: dto.contentMeasure || "KG",
       roundingOption: Number(dto.roundingOption ?? 10),
       packagingOptions: dto.packagingOptions ? dto.packagingOptions.map(Number) : [],
@@ -78,7 +76,6 @@ export class ProductVariantMapper {
     if (dto.currentStock !== undefined) data.currentStock = Number(dto.currentStock);
     if (dto.active !== undefined) data.active = Boolean(dto.active);
     if (dto.availableWeb !== undefined) data.availableWeb = Boolean(dto.availableWeb);
-    if (dto.availablePedidosYa !== undefined) data.availablePedidosYa = Boolean(dto.availablePedidosYa);
     if (dto.contentMeasure !== undefined) data.contentMeasure = dto.contentMeasure;
     if (dto.roundingOption !== undefined) data.roundingOption = Number(dto.roundingOption);
     if (dto.packagingOptions !== undefined) data.packagingOptions = dto.packagingOptions.map(Number);

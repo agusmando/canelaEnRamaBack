@@ -47,11 +47,12 @@ export class StockMovementRepository extends GenericRepositoryImpl<
     delta: number,
     type: MovementType | string,
     tx?: any,
+    createdAt?: Date,
   ): Promise<number> {
     const rows = await this.callSp<{ stock: number }[]>(
       "create_stock_movement",
       (db) =>
-        db.$queryRaw`SELECT public.create_stock_movement(${Number(variantId)}::INT, ${Math.round(Number(delta))}::INT, ${type}::TEXT) AS stock`,
+        db.$queryRaw`SELECT public.create_stock_movement(${Number(variantId)}::INT, ${Math.round(Number(delta))}::INT, ${type}::TEXT, ${createdAt ?? new Date()}::TIMESTAMPTZ) AS stock`,
       tx,
     );
     return Number(rows?.[0]?.stock);

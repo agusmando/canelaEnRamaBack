@@ -4,8 +4,7 @@ import {
   attachRoles,
   isAuthenticated,
   optionalSession,
-  requireRole,
-  STAFF_ROLES,
+  requirePermission,
 } from "../middleware/auth.middleware.js";
 import { cloudinaryUpload, upload } from "../middleware/fileUploader.js";
 import { hideCostForPublic } from "../middleware/publicView.js";
@@ -14,14 +13,14 @@ const router = express.Router();
 const productController = new ProductController();
 
 const publicView = [optionalSession, attachRoles, hideCostForPublic];
-const staff = [isAuthenticated, requireRole(STAFF_ROLES)];
-const admin = [isAuthenticated, requireRole(["ADMIN"])];
+const editCatalog = [isAuthenticated, requirePermission("catalog.edit")];
+const deleteCatalog = [isAuthenticated, requirePermission("catalog.delete")];
 
 router
   .route("/")
   .get(...publicView, productController.findAll.bind(productController))
   .post(
-    ...staff,
+    ...editCatalog,
     upload.array("image", 7),
     cloudinaryUpload("products"),
     productController.create.bind(productController),
@@ -29,14 +28,14 @@ router
 router
   .route("/:id")
   .get(...publicView, productController.findOne.bind(productController))
-  .put(...staff, productController.update.bind(productController));
+  .put(...editCatalog, productController.update.bind(productController));
 router
   .route("/:id/tags")
-  .put(...staff, productController.addProductTags.bind(productController))
-  .delete(...staff, productController.removeProductTags.bind(productController));
+  .put(...editCatalog, productController.addProductTags.bind(productController))
+  .delete(...editCatalog, productController.removeProductTags.bind(productController));
 router
   .route("/:id/active/")
-  .delete(...admin, productController.deactivate.bind(productController))
-  .put(...admin, productController.activate.bind(productController));
+  .delete(...deleteCatalog, productController.deactivate.bind(productController))
+  .put(...deleteCatalog, productController.activate.bind(productController));
 
 export default router;

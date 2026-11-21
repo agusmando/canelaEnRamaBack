@@ -66,7 +66,6 @@ model ProductVariant {
   reviews    Review[]
 
   availableWeb       Boolean @default(true)
-  availablePedidosYa Boolean @default(true)
 }
 
 enum Measure {
@@ -298,14 +297,48 @@ model User {
   cart          Cart?
   orders        Order[]
   reviews       Review[]
+  shippingAddress UserAddress?
 
   // Ejemplo: si después quieres órdenes:
 }
 
 enum UserRole {
   ADMIN
+  EDITOR
   EMPLOYEE
   CONSUMER
+}
+
+model UserAddress {
+  id                Int      @id @default(autoincrement())
+  userSuperTokensId String   @unique
+  recipientName     String
+  phone             String
+  street            String
+  number            String
+  apartment         String?
+  zone              String
+  city              String?
+  province          String   @default("Mendoza")
+  postalCode        String?
+  notes             String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  user User @relation(fields: [userSuperTokensId], references: [supertokensId], onDelete: Cascade)
+}
+
+model ShippingZone {
+  id         Int      @id @default(autoincrement())
+  name       String   @unique
+  price      Float
+  etaMinutes Int?
+  active     Boolean  @default(true)
+  sortOrder  Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([active, sortOrder])
 }
 
 model Cart {
@@ -345,6 +378,10 @@ model Order {
   totalPrice  Float
   totalItems  Int
   paymentType String
+  shippingMethod   ShipmentMethod?
+  shippingCost     Float          @default(0)
+  shippingProvider String?
+  shippingZone     String?
 
   estimatedReadyAt DateTime? // Fecha estimada de entrega/retiro
   // PENDING (recién creada, esperando confirmación/pago) -> PROCESSING -> SHIPPED -> DELIVERED
@@ -359,6 +396,13 @@ model Order {
   paymentId           String? // id del pago en Mercado Pago
   paymentPreferenceId String? // última preferencia (checkout) creada
   paidAt              DateTime?
+  refundId            String?
+  refundStatus        String?
+  refundAmount        Float?
+  refundNote          String?
+  refundedAt          DateTime?
+  refundEmailId       String?
+  refundEmailSentAt   DateTime?
 
   @@index([paymentType, paymentStatus, status])
 }

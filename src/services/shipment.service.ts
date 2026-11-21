@@ -213,10 +213,10 @@ export class ShipmentService extends GenericServiceImpl<
   async findByOrder(orderId: number, actor: Actor) {
     const shipment: any = await this.shipmentRepository.findByOrderId(orderId);
     if (!shipment) throw new NotFoundError("La orden no tiene envío");
-    if (!actor.isStaff && shipment.order?.userSuperTokensId !== actor.userId) {
+    if (!actor.permissions.includes("orders.manage") && shipment.order?.userSuperTokensId !== actor.userId) {
       throw new NotFoundError("La orden no tiene envío");
     }
-    if (!actor.isStaff) delete shipment.order;
+    if (!actor.permissions.includes("orders.manage")) delete shipment.order;
     return shipment;
   }
 

@@ -15,8 +15,19 @@ import type { Actor } from "../middleware/auth.middleware.js";
 import { CartService } from "./cart.service.js";
 import { ShipmentRepository } from "../repository/shipment.repository.js";
 import { isMercadoPagoConfigured } from "../config/mercadopago.js";
+import { ShippingService } from "./shipping.service.js";
 
-export const PAYMENT_TYPES = ["DEBIT", "CREDIT", "CASH", "TRANSFER", "MERCADOPAGO"];
+export const PAYMENT_TYPES = ["CASH", "TRANSFER", "MERCADOPAGO"];
+export function parsePaymentType(value?: string) {
+  const paymentType = value ? String(value).toUpperCase() : "CASH";
+  if (!PAYMENT_TYPES.includes(paymentType)) {
+    throw new ValidationError(`paymentType debe ser uno de ${PAYMENT_TYPES.join(", ")}`);
+  }
+  if (paymentType === "MERCADOPAGO" && !isMercadoPagoConfigured()) {
+    throw new ValidationError("El pago con Mercado Pago no está disponible en este momento. Elegí otra forma de pago.");
+  }
+  return paymentType;
+}
 const ORDER_STATUSES = ["PENDING", "PROCESSING", "SHIPPED", "DELIVERED", "CANCELLED"];
 
 /**
@@ -58,6 +69,7 @@ export class OrderService extends GenericServiceImpl<OrderDto, CreateOrderDto, U
     private readonly pricingService = new PricingService(),
     private readonly cartService = new CartService(),
     private readonly shipmentRepository = new ShipmentRepository(),
+    private readonly shippingService = new ShippingService(),
   ) {
     super(orderRepository);
   }
@@ -108,14 +120,7 @@ export class OrderService extends GenericServiceImpl<OrderDto, CreateOrderDto, U
   }
 
   private parsePaymentType(value?: string) {
-    const paymentType = value ? String(value).toUpperCase() : "DEBIT";
-    if (!PAYMENT_TYPES.includes(paymentType)) {
-      throw new ValidationError(`paymentType debe ser uno de ${PAYMENT_TYPES.join(", ")}`);
-    }
-    if (paymentType === "MERCADOPAGO" && !isMercadoPagoConfigured()) {
-      throw new ValidationError("El pago con Mercado Pago no está disponible en este momento. Elegí otra forma de pago.");
-    }
-    return paymentType;
+    return parsePaymentType(value);
   }
 
   /** Núcleo de la creación: debe correr dentro de una transacción. */
@@ -184,6 +189,23 @@ export class OrderService extends GenericServiceImpl<OrderDto, CreateOrderDto, U
       throw new ConflictError("No hay stock disponible para ninguno de los productos de la orden");
     }
 
+    const shippingMethod = String(data.shippingMethod ?? "PICKUP").toUpperCase();
+    if (shippingMethod !== "DELIVERY" && shippingMethod !== "PICKUP") {
+      throw new ValidationError("shippingMethod debe ser DELIVERY o PICKUP");
+    }
+    let shippingCost = 0;
+    let shippingProvider: string | null = null;
+    let shippingZone: string | null = null;
+    if (shippingMethod === "DELIVERY") {
+      const quote = await this.shippingService.quote(userId, totalPrice, tx);
+      if (!quote.available) {
+        throw new ValidationError(quote.reason ?? "No hay envío disponible para este domicilio");
+      }
+      shippingCost = quote.price;
+      shippingProvider = quote.provider;
+      shippingZone = quote.zone;
+    }
+
     return this.orderRepository.createOrder(
       {
         userSuperTokensId: userId,
@@ -192,6 +214,10 @@ export class OrderService extends GenericServiceImpl<OrderDto, CreateOrderDto, U
         paymentType,
         status: "PENDING",
         estimatedReadyAt,
+        shippingMethod,
+        shippingCost,
+        shippingProvider,
+        shippingZone,
         orderItems,
       },
       tx,
@@ -202,7 +228,7 @@ export class OrderService extends GenericServiceImpl<OrderDto, CreateOrderDto, U
   async getOrder(id: number, actor?: Actor, tx?: any) {
     const order = await this.orderRepository.getOrder(id, tx);
     if (!order) throw new NotFoundError();
-    if (actor && !actor.isStaff && order.userSuperTokensId !== actor.userId) {
+    if (actor && !actor.permissions.includes("orders.manage") && order.userSuperTokensId !== actor.userId) {
       throw new NotFoundError(); // no revelamos que existe
     }
     return order;
@@ -228,7 +254,7 @@ export class OrderService extends GenericServiceImpl<OrderDto, CreateOrderDto, U
       if (order.status === "CANCELLED") {
         throw new ConflictError("Order is already cancelled");
       }
-      if (!actor.isStaff) {
+      if (!actor.permissions.includes("orders.manage")) {
         const onlyCancel =
           data.status === "CANCELLED" && !data.editItem?.length && Object.keys(data).length === 1;
         if (!onlyCancel) throw new ForbidenError("Solo podés cancelar tu orden");
@@ -254,6 +280,13 @@ export class OrderService extends GenericServiceImpl<OrderDto, CreateOrderDto, U
               (allowed.length ? ` (permitido: ${allowed.join(", ")})` : " (estado final)"),
           );
         }
+      }
+      if (
+        data.status === "CANCELLED" &&
+        order.paymentType === "MERCADOPAGO" &&
+        order.paymentStatus === "APPROVED"
+      ) {
+        throw new ConflictError("Usá la acción “Cancelar y reintegrar total” para cancelar una orden pagada");
       }
 
       const fields: Record<string, any> = {};

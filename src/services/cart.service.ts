@@ -190,7 +190,11 @@ export class CartService extends GenericServiceImpl<CartDto, CreateCartDto, Upda
    */
   private assertAccess(cart: any, actor: Actor) {
     if (!cart) throw new NotFoundError("Cart not found");
-    if (cart.userSuperTokensId && !actor.isStaff && cart.userSuperTokensId !== actor.userId) {
+    if (
+      cart.userSuperTokensId &&
+      !actor.permissions.includes("orders.manage") &&
+      cart.userSuperTokensId !== actor.userId
+    ) {
       throw new NotFoundError("Cart not found");
     }
   }

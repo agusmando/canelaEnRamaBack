@@ -1,12 +1,19 @@
 import dotenv from "dotenv";
 import supertokens from "supertokens-node";
 import Session from "supertokens-node/recipe/session";
+import AccountLinking from "supertokens-node/recipe/accountlinking";
 import EmailPassword from "supertokens-node/recipe/emailpassword";
+import EmailVerification from "supertokens-node/recipe/emailverification";
 import ThirdParty from "supertokens-node/recipe/thirdparty";
 import Dashboard from "supertokens-node/recipe/dashboard"; // Usa el paquete de backend aquí
 import UserRoles from "supertokens-node/recipe/userroles"; // Usa el paquete de backend aquí
 import UserMetadata from "supertokens-node/recipe/usermetadata";
 import { prisma } from "../prisma/client.js";
+import {
+  isBrandedEmailConfigured,
+  sendEmailVerification,
+  sendPasswordSetupEmail,
+} from "../../services/email.service.js";
 
 dotenv.config();
 export const initSupertokens = () =>
@@ -31,7 +38,44 @@ export const initSupertokens = () =>
       Dashboard.init(),
       UserRoles.init(),
       UserMetadata.init(),
+      EmailVerification.init({
+        mode: "OPTIONAL",
+        ...(isBrandedEmailConfigured()
+          ? { emailDelivery: { service: { sendEmail: sendEmailVerification } } }
+          : {}),
+      }),
+      AccountLinking.init({
+        shouldDoAutomaticAccountLinking: async (newAccountInfo, user) => {
+          if (
+            !user ||
+            newAccountInfo.recipeId !== "thirdparty" ||
+            newAccountInfo.thirdParty?.id !== "google" ||
+            !newAccountInfo.email ||
+            !user.loginMethods.some(
+              (method) =>
+                method.recipeId === "emailpassword" &&
+                method.email?.toLowerCase() === newAccountInfo.email?.toLowerCase(),
+            )
+          ) {
+            return { shouldAutomaticallyLink: false };
+          }
+
+          const existingAccount = await prisma.user.findUnique({
+            where: { supertokensId: user.id },
+            select: { role: true },
+          });
+          const isInvitedStaff =
+            existingAccount?.role === "ADMIN" ||
+            existingAccount?.role === "EDITOR" ||
+            existingAccount?.role === "EMPLOYEE";
+          if (!isInvitedStaff) return { shouldAutomaticallyLink: false };
+          return { shouldAutomaticallyLink: true, shouldRequireVerification: true };
+        },
+      }),
       EmailPassword.init({
+        ...(isBrandedEmailConfigured()
+          ? { emailDelivery: { service: { sendEmail: sendPasswordSetupEmail } } }
+          : {}),
         // ... otras configuraciones ...
         override: {
           functions: (original) => ({

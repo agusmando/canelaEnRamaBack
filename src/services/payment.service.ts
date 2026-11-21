@@ -7,6 +7,10 @@ import type { Actor } from "../middleware/auth.middleware.js";
 import { BadRequestError } from "../errors/application/BadRequestError.js";
 import { ConflictError } from "../errors/application/ConflictError.js";
 import { ExternalServiceError } from "../errors/infra/ExternalServiceError.js";
+import { permissionsForRoles } from "../config/rbac.js";
+import { ValidationError } from "../errors/application/ValidationError.js";
+import { NotFoundError } from "../errors/application/NotFoundError.js";
+import { emailBrandingConfig, isBrandedEmailConfigured, renderBrandedEmail } from "./email.service.js";
 
 /** Estados de pago de Mercado Pago → PaymentStatus de la orden. */
 const STATUS_MAP: Record<string, string> = {
@@ -24,9 +28,13 @@ const STATUS_MAP: Record<string, string> = {
 /** Mientras el pago esté en alguno de estos estados no se puede volver a pagar ni cancelar como cliente. */
 export const PAYMENT_LOCKED = ["APPROVED", "IN_PROCESS"];
 
-const SYSTEM_ACTOR: Actor = { userId: "system:mercadopago", roles: ["ADMIN"], isStaff: true };
+const SYSTEM_ACTOR: Actor = {
+  userId: "system:mercadopago",
+  roles: ["ADMIN"],
+  permissions: permissionsForRoles(["ADMIN"]),
+  isStaff: true,
+};
 const round2 = (n: number) => Math.round(n * 100) / 100;
-
 /**
  * Cobro de pedidos con Mercado Pago (Checkout Pro).
  *
@@ -76,7 +84,7 @@ export class PaymentService {
         order.paymentStatus === "APPROVED" ? "El pedido ya está pagado" : "Tenés un pago en revisión para este pedido",
       );
     }
-    const total = round2(Number(order.totalPrice));
+    const total = round2(Number(order.totalPrice) + Number(order.shippingCost ?? 0));
     if (!(total > 0)) throw new ConflictError("El pedido no tiene importe a cobrar");
 
     const cfg = mpConfig();
@@ -120,7 +128,7 @@ export class PaymentService {
       pref = await mpRequest("/checkout/preferences", {
         method: "POST",
         body,
-        idempotencyKey: crypto.randomUUID(),
+        idempotencyKey: `order-${order.id}-total-${total.toFixed(2)}-${expiresAt.getTime()}`,
       });
     } catch (err: any) {
       throw new ExternalServiceError("Mercado Pago", err.message);
@@ -192,6 +200,193 @@ export class PaymentService {
     return this.orderService.getOrder(orderId, actor);
   }
 
+  /** Reintegra el pago completo, cancela la orden y avisa al cliente por email. */
+  async refundFullOrder(orderId: number, noteValue: unknown, actor: Actor) {
+    this.ensureConfigured();
+    const note = typeof noteValue === "string" ? noteValue.trim() : "";
+    if (!note || note.length > 2000) {
+      throw new ValidationError("Indicá qué productos faltan (máximo 2000 caracteres)");
+    }
+
+    const visibleOrder: any = await this.orderService.getOrder(orderId, actor);
+    if (visibleOrder.paymentType !== "MERCADOPAGO") {
+      throw new ConflictError("El reintegro automático solo está disponible para pagos con Mercado Pago");
+    }
+    if (!visibleOrder.paymentId || !visibleOrder.user?.email) {
+      throw new ConflictError("La orden no tiene un pago y un email de cliente válidos para reintegrar");
+    }
+    if (visibleOrder.status === "DELIVERED") {
+      throw new ConflictError("No se puede cancelar una orden ya entregada");
+    }
+    if (!visibleOrder.refundEmailSentAt) {
+      if (!isBrandedEmailConfigured()) {
+        throw new BadRequestError("Configurá RESEND_API_KEY y RESEND_FROM_EMAIL para enviar el aviso al cliente");
+      }
+    }
+
+    const order: any = await this.orderRepository.withTransaction(async (tx: any) => {
+      await tx.$executeRaw`SELECT id FROM "Order" WHERE id = ${orderId} FOR UPDATE`;
+      const current = await tx.order.findUnique({
+        where: { id: orderId },
+        include: { user: true },
+      });
+      if (!current) throw new NotFoundError("Order not found");
+      if (current.paymentType !== "MERCADOPAGO" || !current.paymentId || !current.user?.email) {
+        throw new ConflictError("La orden no tiene un pago y un email de cliente válidos para reintegrar");
+      }
+      if (current.status === "DELIVERED") {
+        throw new ConflictError("No se puede cancelar una orden ya entregada");
+      }
+      if (current.refundNote && current.refundNote !== note) {
+        throw new ConflictError("El reintegro ya se inició con otra nota");
+      }
+      const refundAlreadyApproved = current.refundStatus === "APPROVED";
+      if (!refundAlreadyApproved && current.paymentStatus !== "APPROVED") {
+        throw new ConflictError("Solo se pueden reintegrar pagos aprobados de Mercado Pago");
+      }
+      if (!refundAlreadyApproved && !current.refundStatus) {
+        await tx.order.update({
+          where: { id: orderId },
+          data: { refundStatus: "IN_PROGRESS", refundNote: note },
+        });
+      }
+      return current;
+    });
+
+    let refund: any = {
+      id: order.refundId,
+      status: order.refundStatus?.toLowerCase(),
+      amount: order.refundAmount,
+    };
+    if (order.refundStatus !== "APPROVED") {
+      try {
+        refund = order.refundId
+          ? await mpRequest(
+              `/v1/payments/${encodeURIComponent(order.paymentId)}/refunds/${encodeURIComponent(order.refundId)}`,
+            )
+          : await mpRequest(`/v1/payments/${encodeURIComponent(order.paymentId)}/refunds`, {
+              method: "POST",
+              body: {},
+              idempotencyKey: `order-${orderId}-refund-full-${order.paymentId}`,
+            });
+      } catch (error: any) {
+        await this.orderRepository.updateOrderFields(orderId, { refundStatus: "FAILED" });
+        throw new ExternalServiceError("Mercado Pago", error.message);
+      }
+    }
+
+    const refundStatus = String(refund?.status ?? "").toUpperCase();
+    if (!refund?.id || !["APPROVED", "PENDING"].includes(refundStatus)) {
+      await this.orderRepository.updateOrderFields(orderId, {
+        refundId: refund?.id ? String(refund.id) : null,
+        refundStatus: "FAILED",
+        refundAmount: Number.isFinite(Number(refund?.amount)) ? Number(refund.amount) : null,
+      });
+      throw new ConflictError("Mercado Pago no pudo aprobar el reintegro total");
+    }
+
+    const latestOrder: any = await this.orderService.getOrder(orderId, actor);
+    if (latestOrder.status !== "CANCELLED") {
+      await this.orderService.updateOrder(orderId, { status: "CANCELLED" } as any, actor);
+    }
+    await this.orderRepository.updateOrderFields(orderId, {
+      refundId: String(refund.id),
+      refundStatus,
+      refundAmount: Number(refund.amount ?? order.totalPrice + Number(order.shippingCost ?? 0)),
+      refundedAt: refundStatus === "APPROVED" ? new Date() : null,
+      ...(refundStatus === "APPROVED" ? { paymentStatus: "REFUNDED" } : {}),
+    });
+
+    let emailSent = Boolean(order.refundEmailSentAt);
+    let emailError: string | null = null;
+    if (!emailSent) {
+      try {
+        const { resendApiKey, resendFromEmail } = mpConfig();
+        const { siteUrl, logoUrl } = emailBrandingConfig();
+        const result = await this.sendRefundEmail({
+          apiKey: resendApiKey,
+          from: resendFromEmail,
+          to: order.user.email,
+          customerName: order.user.name ?? "",
+          orderId,
+          amount: Number(refund.amount ?? order.totalPrice + Number(order.shippingCost ?? 0)),
+          note: order.refundNote ?? note,
+          refundPending: refundStatus === "PENDING",
+          siteUrl,
+          logoUrl,
+        });
+        await this.orderRepository.updateOrderFields(orderId, {
+          refundEmailId: result.id,
+          refundEmailSentAt: new Date(),
+        });
+        emailSent = true;
+      } catch (error: any) {
+        emailError = error.message;
+      }
+    }
+
+    return {
+      order: await this.orderService.getOrder(orderId, actor),
+      refundStatus,
+      refundedAmount: Number(refund.amount ?? order.totalPrice + Number(order.shippingCost ?? 0)),
+      emailSent,
+      emailError,
+    };
+  }
+
+  private async sendRefundEmail(input: {
+    apiKey: string;
+    from: string;
+    to: string;
+    customerName: string;
+    orderId: number;
+    amount: number;
+    note: string;
+    refundPending: boolean;
+    siteUrl: string;
+    logoUrl: string;
+  }): Promise<{ id: string }> {
+    const greeting = input.customerName ? `Hola ${input.customerName},` : "Hola,";
+    const subject = `Actualización de tu pedido #${input.orderId}`;
+    const statusText = input.refundPending
+      ? "El reintegro total fue solicitado y está pendiente de confirmación por Mercado Pago."
+      : "Mercado Pago confirmó el reintegro total.";
+    const { html, text } = renderBrandedEmail(
+      {
+        subject,
+        preheader: "Tenemos novedades sobre tu pedido y su reintegro.",
+        greeting,
+        heading: `Una actualización de tu pedido #${input.orderId}`,
+        paragraphs: [
+          `No podremos completar tu pedido porque faltan estos productos: ${input.note}`,
+          statusText,
+          `Importe reintegrado: $${input.amount.toFixed(2)} ARS.`,
+        ],
+        action: {
+          label: "Ver mi pedido",
+          url: new URL(`/mi-cuenta/pedidos/${input.orderId}`, input.siteUrl).toString(),
+        },
+      },
+      input.logoUrl,
+    );
+
+    const response = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${input.apiKey}`,
+        "Content-Type": "application/json",
+        "Idempotency-Key": `refund-order-${input.orderId}`,
+      },
+      body: JSON.stringify({ from: input.from, to: [input.to], subject, text, html }),
+      signal: AbortSignal.timeout(15000),
+    });
+    const body: any = await response.json().catch(() => ({}));
+    if (!response.ok || typeof body.id !== "string") {
+      throw new ExternalServiceError("Resend", body?.message ?? `HTTP ${response.status}`);
+    }
+    return { id: body.id };
+  }
+
   /** Aplica un pago (ya obtenido de la API de Mercado Pago) a su orden. Idempotente. */
   private async applyPayment(payment: any) {
     const orderId = Number(payment?.external_reference);
@@ -223,12 +418,17 @@ export class PaymentService {
         paymentId,
         paymentStatusDetail: payment.status_detail ?? null,
       };
+      if (mapped === "REFUNDED") {
+        fields.refundStatus = "APPROVED";
+        fields.refundedAt = new Date();
+      }
 
       if (mapped === "APPROVED") {
         const paid = Number(payment.transaction_amount);
-        if (payment.currency_id !== "ARS" || !(paid + 0.01 >= Number(order.totalPrice))) {
+        const orderTotal = Number(order.totalPrice) + Number(order.shippingCost ?? 0);
+        if (payment.currency_id !== "ARS" || !(paid + 0.01 >= orderTotal)) {
           // No debería pasar (el importe lo fija la preferencia): lo dejamos para revisión manual
-          console.error(`[payment] orden ${orderId}: pago ${paymentId} por ${payment.currency_id} ${paid} ≠ total ${order.totalPrice}`);
+          console.error(`[payment] orden ${orderId}: pago ${paymentId} por ${payment.currency_id} ${paid} ≠ total ${orderTotal}`);
           fields.paymentStatus = "IN_PROCESS";
           fields.paymentStatusDetail = "amount_mismatch";
         } else {

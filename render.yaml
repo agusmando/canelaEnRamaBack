@@ -66,3 +66,7 @@ services:
         value: "48"
       - key: MP_ALLOW_CASH
         value: "false"
+      - key: RESEND_API_KEY
+        sync: false
+      - key: RESEND_FROM_EMAIL
+        sync: false

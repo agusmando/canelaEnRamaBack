@@ -73,7 +73,8 @@ export class ReviewService extends GenericServiceImpl<ReviewDto, CreateReviewDto
       where.rating = rating;
     }
 
-    if (actor.isStaff) {
+    const canManageContent = actor.permissions.includes("content.edit");
+    if (canManageContent) {
       if (query.status) {
         const status = String(query.status).toUpperCase();
         if (!REVIEW_STATUSES.includes(status as any)) {
@@ -106,7 +107,7 @@ export class ReviewService extends GenericServiceImpl<ReviewDto, CreateReviewDto
       page,
       perPage,
     });
-    const view = actor.isStaff ? "staff" : "public";
+    const view = canManageContent ? "staff" : "public";
     return { ...result, entityList: result.entityList.map((r: any) => this.present(r, view)) };
   }
 
@@ -234,7 +235,7 @@ export class ReviewService extends GenericServiceImpl<ReviewDto, CreateReviewDto
 
   async remove(id: number, actor: Actor) {
     const review: any = await this.reviewRepository.findFull(id);
-    if (!review || (!actor.isStaff && review.userSuperTokensId !== actor.userId)) {
+    if (!review || (!actor.permissions.includes("content.edit") && review.userSuperTokensId !== actor.userId)) {
       throw new NotFoundError();
     }
     await this.reviewRepository.deleteReview(id);

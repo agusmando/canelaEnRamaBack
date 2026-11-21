@@ -3,7 +3,7 @@ export class BaseResponse<T> {
   message: string;
   response: T | {};
 
-  constructor(statusCode = 200, message = "", response = {}) {
+  constructor(statusCode = 200, message = "", response: T | {} = {}) {
     this.statusCode = statusCode;
     this.message = message;
     this.response = response;

@@ -16,7 +16,6 @@ export class ProductMapper {
       dbProduct.description ?? "",
       dbProduct.active,
       dbProduct.brandId ?? 0,
-      dbProduct.Brand ? dbProduct.Brand : undefined,
       dbProduct.categoryId,
       variants,
       dbProduct.finalPrice,

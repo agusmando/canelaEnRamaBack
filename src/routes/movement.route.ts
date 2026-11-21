@@ -1,12 +1,14 @@
 import express from "express";
 import { MovementController } from "../controllers/movement.controller.js";
-import { isAuthenticated, requirePermission } from "../middleware/auth.middleware.js";
+import { requirePermission, requirePermissionToWrite } from "../middleware/auth.middleware.js";
 const router = express.Router();
 
 const movementController = new MovementController();
 
-router.use(isAuthenticated);
-router.use(requirePermission("stock.manage"));
+
+// Ver: cualquier staff. Registrar: stock.manage.
+router.use(requirePermission("dashboard.access"));
+router.use(requirePermissionToWrite("stock.manage"));
 
 router.post("/bulk", movementController.createBulk.bind(movementController));
 router

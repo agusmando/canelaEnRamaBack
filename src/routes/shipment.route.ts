@@ -9,8 +9,7 @@ import {
 
 const router = express.Router();
 const shipmentController = new ShipmentController();
-
-const staff = [isAuthenticated, requirePermission("orders.manage")];
+const staff = requirePermission("orders.manage");
 const user = [isAuthenticated, attachRoles];
 
 router.get("/meta", shipmentController.meta.bind(shipmentController));
@@ -21,7 +20,6 @@ router.get(
   requirePermissionForStaff("orders.manage"),
   shipmentController.findByOrder.bind(shipmentController),
 );
-
 router
   .route("/")
   .get(...staff, shipmentController.findAll.bind(shipmentController))

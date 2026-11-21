@@ -1,31 +1,35 @@
 import express from "express";
 import { CategoryController } from "../controllers/category.controller.js";
-import { isAuthenticated, requirePermission } from "../middleware/auth.middleware.js";
+import { attachRoles, optionalSession, requirePermission } from "../middleware/auth.middleware.js";
+import { hideCostForPublic, hideProductsForPublic } from "../middleware/publicView.js";
+
+// Sin sesión de staff no se exponen proveedores ni costos de los productos incluidos.
+const publicView = [optionalSession, attachRoles, hideCostForPublic, hideProductsForPublic];
 const router = express.Router();
 
 const categoryController = new CategoryController();
 
-const manageMasters = [isAuthenticated, requirePermission("masters.edit")];
+const manageMasters = requirePermission("masters.edit");
 
 router
   .route("/")
-  .get(categoryController.findAll.bind(categoryController))
+  .get(...publicView, categoryController.findAll.bind(categoryController))
   .post(
     ...manageMasters,
-    categoryController.create.bind(categoryController)
+    categoryController.create.bind(categoryController),
   );
 router
   .route("/:id")
-  .get(categoryController.findOne.bind(categoryController))
+  .get(...publicView, categoryController.findOne.bind(categoryController))
   .put(
     ...manageMasters,
-    categoryController.update.bind(categoryController)
+    categoryController.update.bind(categoryController),
   );
 router
   .route("/:id/active/")
   .delete(
     ...manageMasters,
-    categoryController.deactivate.bind(categoryController)
+    categoryController.deactivate.bind(categoryController),
   )
   .put(
     ...manageMasters,

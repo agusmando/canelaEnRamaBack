@@ -1,3 +1,4 @@
+import { catalogSearch } from "./catalog-search.service.js";
 import { CreateProductVariantDto } from "../dto/product-variant/create-product-variant.dto.js";
 import { ProductVariantDto } from "../dto/product-variant/product-variant.dto.js";
 import { UpdateProductVariantDto } from "../dto/product-variant/update-product-variant.dto.js";
@@ -34,6 +35,18 @@ export class ProductVariantService extends GenericServiceImpl<
     this.productVariantRepository = productVariantRepository;
     this.stockRepository = stockRepository;
     this.imageService = imageService;
+  }
+
+  /**
+   * Listado. Con `?q=` busca como la tienda (sin acentos, todas las palabras en
+   * cualquier orden, ordenado por relevancia); el resto de los filtros se suma.
+   */
+  async getListedElements(filters: any, paginate = false, currentPage = 1, amountPerPage = 10, detalle = false) {
+    const q = String(filters?.q ?? "").trim();
+    if (!q) return super.getListedElements(filters, paginate, currentPage, amountPerPage, detalle);
+    const { q: _q, ...rest } = filters;
+    const ids = await catalogSearch.variantIds(q);
+    return this.repository.searchRanked(rest, ids, paginate, currentPage, amountPerPage, detalle);
   }
 
   /**
@@ -117,26 +130,7 @@ export class ProductVariantService extends GenericServiceImpl<
         }
 
         // 3. Stock
-        const targetStock = toNumber(data.currentStock);
-        const increment = toNumber(data.stockIncrement);
-        if (targetStock !== undefined && increment !== undefined) {
-          throw new ValidationError("Enviar currentStock o stockIncrement, no ambos");
-        }
-        if (targetStock !== undefined) {
-          await this.stockRepository.setStockLevel(id, targetStock, tx);
-        } else if (increment) {
-          const isMix = (updated.hasComponents?.length ?? 0) > 0;
-          if (increment > 0 && isMix) {
-            await this.stockRepository.processMixProduction(id, increment, tx);
-          } else {
-            await this.stockRepository.createStockMovement(
-              id,
-              increment,
-              increment < 0 ? "OUT" : "IN",
-              tx,
-            );
-          }
-        }
+        await this.applyStockChange(id, data, (updated.hasComponents?.length ?? 0) > 0, tx);
 
         // 4. Imágenes a eliminar (solo DB; Cloudinary después del commit)
         removedPublicIds = await this.imageService.removeImagesDb(data.removeImages, id, tx);
@@ -232,5 +226,22 @@ export class ProductVariantService extends GenericServiceImpl<
   /** Variante lista para vender (con producto, ofertas e imágenes). */
   async findForSale(id: number, tx?: any) {
     return this.productVariantRepository.findForSale(id, tx);
+  }
+
+  private async applyStockChange(id: number, data: any, isMix: boolean, tx: any) {
+    const targetStock = toNumber(data.currentStock);
+    const increment = toNumber(data.stockIncrement);
+    if (targetStock !== undefined && increment !== undefined) {
+      throw new ValidationError("Enviar currentStock o stockIncrement, no ambos");
+    }
+    if (targetStock !== undefined) {
+      await this.stockRepository.setStockLevel(id, targetStock, tx);
+    } else if (increment) {
+      if (increment > 0 && isMix) {
+        await this.stockRepository.processMixProduction(id, increment, tx);
+      } else {
+        await this.stockRepository.createStockMovement(id, increment, increment < 0 ? "OUT" : "IN", tx);
+      }
+    }
   }
 }

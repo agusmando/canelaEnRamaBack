@@ -2,6 +2,9 @@ import cloudinary from "cloudinary";
 import streamifier from "streamifier";
 import dotenv from "dotenv";
 import { prisma } from "../config/prisma/client.js";
+import { getLogger } from "../config/logger.js";
+
+const log = getLogger("cloudinary");
 dotenv.config();
 
 cloudinary.v2.config({
@@ -28,7 +31,7 @@ export class ImageRepository {
         opts,
         (error: any, result: any) => {
           if (error) {
-            console.error("cloudinary upload error:", error);
+            log.error({ folder, err: { message: error?.message, http_code: error?.http_code } }, "Cloudinary: falló la subida");
             return reject(error);
           }
           resolve(result);

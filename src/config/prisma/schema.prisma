@@ -27,6 +27,9 @@ model Product {
 
   // Medidas (Esto define qué es físicamente)
   measure Measure  @default(KG)
+  // Producto de productores locales (sin marca comercial). En la tienda se
+  // muestra "Productor local" en lugar de la marca.
+  isLocal Boolean  @default(false)
   offers  Offer[]
   reviews Review[]
 }
@@ -66,6 +69,8 @@ model ProductVariant {
   reviews    Review[]
 
   availableWeb       Boolean @default(true)
+  // Productor local solo para esta variante. null = igual que el producto.
+  isLocal            Boolean?
 }
 
 enum Measure {
@@ -286,14 +291,14 @@ model Image {
 }
 
 model User {
-  id            Int      @id @default(autoincrement())
-  supertokensId String   @unique // vínculo con SuperTokens
+  id            Int          @id @default(autoincrement())
+  supertokensId String       @unique // vínculo con SuperTokens
   email         String?
   name          String?
   avatarUrl     String?
-  role          UserRole @default(CONSUMER)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  role          UserRole     @default(CONSUMER)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
   cart          Cart?
   orders        Order[]
   reviews       Review[]
@@ -378,16 +383,21 @@ model Order {
   totalPrice  Float
   totalItems  Int
   paymentType String
-  shippingMethod   ShipmentMethod?
-  shippingCost     Float          @default(0)
-  shippingProvider String?
-  shippingZone     String?
+  // WEB = tienda online; COUNTER = venta de mostrador cargada desde el panel
+  channel     OrderChannel @default(WEB)
 
   estimatedReadyAt DateTime? // Fecha estimada de entrega/retiro
   // PENDING (recién creada, esperando confirmación/pago) -> PROCESSING -> SHIPPED -> DELIVERED
   status           OrderStatus @default(PENDING)
   orderItems       OrderItem[]
   shipment         Shipment?
+
+  // Envío elegido en el checkout. `totalPrice` es solo productos: lo cobrado es
+  // totalPrice + shippingCost (así las estadísticas separan ventas de envíos).
+  shippingMethod   ShipmentMethod @default(PICKUP)
+  shippingCost     Float          @default(0)
+  shippingProvider String? // "own" (tarifa por zona) | "uber" | ...
+  shippingZone     String? // departamento usado para cotizar
 
   // Cobro online (Mercado Pago). Para efectivo/transferencia/etc. queda en PENDING
   // y el staff gestiona el cobro a mano.
@@ -396,15 +406,37 @@ model Order {
   paymentId           String? // id del pago en Mercado Pago
   paymentPreferenceId String? // última preferencia (checkout) creada
   paidAt              DateTime?
-  refundId            String?
+  refundId            String?          @unique
   refundStatus        String?
   refundAmount        Float?
   refundNote          String?
   refundedAt          DateTime?
   refundEmailId       String?
   refundEmailSentAt   DateTime?
+  // Lo que efectivamente cobró Mercado Pago y lo que ya se devolvió (dato de
+  // Mercado Pago: incluye reintegros hechos desde su panel).
+  paidAmount          Float?
+  refundedAmount      Float         @default(0)
+  refunds             Refund[]
 
   @@index([paymentType, paymentStatus, status])
+  @@index([channel])
+}
+
+/// Reintegro (total o parcial) de un pago de Mercado Pago hecho desde el panel.
+model Refund {
+  id         Int      @id @default(autoincrement())
+  orderId    Int
+  order      Order    @relation(fields: [orderId], references: [id])
+  paymentId  String // pago de Mercado Pago reintegrado
+  mpRefundId String   @unique
+  amount     Float
+  status     String // estado del reintegro en Mercado Pago (approved, in_process, ...)
+  reason     String?
+  createdBy  String? // supertokensId del usuario del staff
+  createdAt  DateTime @default(now())
+
+  @@index([orderId])
 }
 
 enum PaymentStatus {
@@ -415,6 +447,11 @@ enum PaymentStatus {
   CANCELLED
   REFUNDED
   CHARGED_BACK
+}
+
+enum OrderChannel {
+  WEB
+  COUNTER
 }
 
 enum OrderStatus {
@@ -472,6 +509,10 @@ model Shipment {
   postalCode          String?
   notes               String?
   cost                Float          @default(0)
+  provider            String? // "own" | "uber" | ...
+  providerDeliveryId  String? // id del envío en el proveedor (p. ej. Uber Direct)
+  providerStatus      String? // último estado informado por el proveedor
+  zone                String? // departamento de destino
   estimatedDeliveryAt DateTime?
   shippedAt           DateTime?
   deliveredAt         DateTime?

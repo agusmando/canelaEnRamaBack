@@ -1,6 +1,13 @@
 // src/utils/prismaUpdateEntityBuilder.ts
 
+/** true / false / null. Acepta "", "null" e "inherit" como null (FormData manda strings). */
+export const parseNullableBoolean = (val: any): boolean | null => {
+  if (val === null || val === undefined || val === "" || val === "null" || val === "inherit") return null;
+  return val === true || val === "true" || val === 1 || val === "1";
+};
+
 const parseScalar = (map: any, val: any) => {
+  if (map.parseNullableBoolean) return parseNullableBoolean(val);
   if (val === null || val === undefined) return val;
   if (map.parseInt) return parseInt(val, 10);
   if (map.parseFloat) return parseFloat(val);

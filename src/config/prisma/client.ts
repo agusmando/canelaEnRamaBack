@@ -1,4 +1,5 @@
 import { Prisma, PrismaClient } from "@prisma/client";
+import { getLogger } from "../logger.js";
 
 /**
  * Único PrismaClient de la aplicación.
@@ -16,8 +17,20 @@ const logLevels = (process.env.PRISMA_LOG ?? "warn,error")
 
 const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
 
-export const prisma: PrismaClient =
-  globalForPrisma.prisma ?? new PrismaClient({ log: logLevels });
+const createClient = () => {
+  // Los logs de Prisma pasan por el logger de la app (JSON en Render, con reqId)
+  const client = new PrismaClient({ log: logLevels.map((level) => ({ emit: "event" as const, level })) });
+  const log = getLogger("prisma");
+  if (logLevels.includes("query")) {
+    client.$on("query" as never, (e: Prisma.QueryEvent) => log.debug({ query: e.query, ms: e.duration }, "query"));
+  }
+  if (logLevels.includes("info")) client.$on("info" as never, (e: Prisma.LogEvent) => log.info({ target: e.target }, e.message));
+  if (logLevels.includes("warn")) client.$on("warn" as never, (e: Prisma.LogEvent) => log.warn({ target: e.target }, e.message));
+  if (logLevels.includes("error")) client.$on("error" as never, (e: Prisma.LogEvent) => log.error({ target: e.target }, e.message));
+  return client;
+};
+
+export const prisma: PrismaClient = globalForPrisma.prisma ?? createClient();
 
 if (process.env.NODE_ENV !== "production") {
   globalForPrisma.prisma = prisma; // evita múltiples clientes con tsx watch

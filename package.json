@@ -5,13 +5,16 @@
   "main": "index.js",
   "type": "module",
   "scripts": {
-    "test": "node --import tsx --test test/**/*.test.ts",
-    "test:watch": "node --import tsx --test --watch test/**/*.test.ts",
+    "test": "npm run test:legacy && vitest run",
+    "test:legacy": "node --import tsx --test test/*.test.ts",
+    "test:watch": "vitest",
     "dev": "tsx watch src/server.ts",
     "build": "npx prisma generate --schema=./src/config/prisma/schema.prisma && tsc",
     "start": "node dist/server.js",
     "seed:images": "tsx scripts/seed-images.ts",
-    "prisma:validate": "npx prisma validate --schema=./src/config/prisma/schema.prisma"
+    "seed:stock": "tsx scripts/seed-stock.ts",
+    "prisma:validate": "npx prisma validate --schema=./src/config/prisma/schema.prisma",
+    "typecheck": "tsc --noEmit -p ."
   },
   "repository": {
     "type": "git",
@@ -28,11 +31,14 @@
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.3",
     "@types/multer": "^2.0.0",
+    "@types/nodemailer": "^8.0.2",
     "@types/streamifier": "^0.1.2",
     "@types/uuid": "^10.0.0",
     "node-fetch": "^3.3.2",
     "nodemon": "^3.1.11",
-    "tsx": "^4.21.0"
+    "pino-pretty": "^13.2.0",
+    "tsx": "^4.21.0",
+    "vitest": "^3.2.4"
   },
   "dependencies": {
     "@prisma/client": "^6.7.0",
@@ -41,6 +47,9 @@
     "dotenv": "^17.2.3",
     "express": "^5.1.0",
     "multer": "^2.0.2",
+    "nodemailer": "^10.5.0",
+    "pino": "^9.14.0",
+    "pino-http": "^10.5.0",
     "prisma": "^6.7.0",
     "streamifier": "^0.1.1",
     "supertokens-node": "^24.0.0",

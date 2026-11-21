@@ -2,7 +2,9 @@ export const productVariantSearchQueryMapping = {
   ofuscatedId: { field: "id", type: "number" }, // Not supposed to be used directly
   ofuscatedProductId: { field: "product", type: "number" }, // Not supposed to be used directly
   ofuscatedProduct: { field: "product", type: "object", childField: "name", expand: ["Category", "offers"] },
-  name: { field: "name", type: "string" },    
+  name: { field: "name", type: "string" },
+  // Texto libre: cada palabra debe aparecer en el nombre de la variante o del producto
+  search: { type: "textSearch", paths: [["name"], ["product", "name"]] },
   ofuscatedProfitMargin: { field: "profitMargin", type: "number" }, // Not supposed to be used directly
   ofuscatedMeasure: { field: "contentMeasure", type: "string" }, // Not supposed to be used directly
   ofuscatedPackagingOptions: { field: "packagingOptions", type: "string" }, // Not supposed to be used directly

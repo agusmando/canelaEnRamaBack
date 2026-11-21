@@ -1,12 +1,12 @@
 name: CI
 
 on:
-  pull_request:
   push:
-    branches: [main]
+    branches: [main, develop, dev-agus]
+  pull_request:
 
 jobs:
-  build:
+  test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -14,8 +14,10 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      - run: npm ci
+      - run: npm ci --no-audit --no-fund
       - run: npm run prisma:validate
+      - run: npx prisma generate --schema=src/config/prisma/schema.prisma
+      - run: npm run typecheck
       - run: npm test
       # prisma generate + tsc
       - run: npm run build

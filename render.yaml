@@ -18,6 +18,9 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
+      # Logs (Render → Logs). "debug" agrega las llamadas a Mercado Pago/Uber con su duración
+      - key: LOG_LEVEL
+        value: info
       # Base de datos (Supabase de PRODUCCIÓN)
       - key: DATABASE_URL
         sync: false
@@ -56,6 +59,50 @@ services:
         sync: false
       - key: MP_WEBHOOK_SECRET
         sync: false
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: SMTP_FROM_EMAIL
+        sync: false
+      - key: SMTP_FROM_NAME
+        value: Canela en Rama
+      # Opcional: si está, los mails salen por la API de Brevo en vez de SMTP
+      - key: BREVO_API_KEY
+        sync: false
+      - key: DASHBOARD_URL
+        sync: false
+      # Dashboard de SuperTokens (/api/auth/dashboard): apagado en prod. "on" para usarlo un rato.
+      - key: SUPERTOKENS_DASHBOARD
+        value: "off"
+      # Emails que pueden modificar en ese dashboard (el resto, solo lectura)
+      - key: SUPERTOKENS_DASHBOARD_ADMINS
+        sync: false
+      # Una sola cuenta por persona (email + Google). Activar antes en el core
+      # de SuperTokens (Account Linking, función paga) y recién ahí poner "on".
+      - key: ACCOUNT_LINKING
+        value: "off"
+      # Limpieza de carritos de invitado abandonados (días)
+      - key: CART_GUEST_TTL_DAYS
+        value: "30"
+      - key: CART_EMPTY_TTL_DAYS
+        value: "7"
+      - key: SHIPPING_PICKUP_STREET
+        value: Colombia 1268
+      - key: SHIPPING_PICKUP_CITY
+        value: Godoy Cruz
+      - key: SHIPPING_PICKUP_PHONE
+        sync: false
+      - key: UBER_DIRECT_CUSTOMER_ID
+        sync: false
+      - key: UBER_DIRECT_CLIENT_ID
+        sync: false
+      - key: UBER_DIRECT_CLIENT_SECRET
+        sync: false
       - key: WEB_URL
         value: https://canelaenrama.com.ar
       - key: API_PUBLIC_URL
@@ -69,4 +116,88 @@ services:
       - key: RESEND_API_KEY
         sync: false
       - key: RESEND_FROM_EMAIL
+        sync: false
+
+  # ------------------------------------------------------------------ DEV
+  # Rama `develop` → https://api-dev.canelaenrama.com.ar, con su propia base
+  # (Supabase "canela-dev") y su propio core de SuperTokens. Plan free: se
+  # duerme sin tráfico y no tiene pre-deploy, así que las migraciones corren
+  # al arrancar el contenedor.
+  - type: web
+    name: canela-en-rama-api-dev
+    runtime: docker
+    plan: free
+    region: virginia
+    branch: develop
+    autoDeploy: true
+    dockerfilePath: ./Dockerfile
+    dockerCommand: sh -c "npx prisma migrate deploy --schema=src/config/prisma/schema.prisma && node dist/server.js"
+    healthCheckPath: /api/health
+    numInstances: 1
+    envVars:
+      - key: NODE_ENV
+        value: production
+      # En dev, todo el detalle (incluye cada llamada a Mercado Pago)
+      - key: LOG_LEVEL
+        value: debug
+      - key: DATABASE_URL
+        sync: false
+      - key: DIRECT_URL
+        sync: false
+      - key: SUPERTOKENS_CONNECTION_URI
+        sync: false
+      - key: SUPERTOKENS_API_KEY
+        sync: false
+      - key: API_DOMAIN
+        value: https://api-dev.canelaenrama.com.ar
+      - key: WEBSITE_DOMAIN
+        value: https://dev.canelaenrama.com.ar
+      - key: CORS_ORIGINS
+        value: https://dev.canelaenrama.com.ar,https://admin-dev.canelaenrama.com.ar,http://localhost:5173,http://localhost:5174
+      - key: DASHBOARD_URL
+        value: https://admin-dev.canelaenrama.com.ar
+      - key: SUPERTOKENS_DASHBOARD
+        value: "on"
+      # En el core dev las funciones pagas se activan gratis: activar Account
+      # Linking ahí y después pasar a "on" (antes, rompe los logins)
+      - key: ACCOUNT_LINKING
+        value: "off"
+      - key: WEB_URL
+        value: https://dev.canelaenrama.com.ar
+      - key: API_PUBLIC_URL
+        value: https://api-dev.canelaenrama.com.ar
+      # Cloudinary: misma cuenta, otra carpeta conviene (o una cuenta free aparte)
+      - key: CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
+      # Mercado Pago: credenciales de PRUEBA (TEST-...) y usuarios de prueba
+      - key: MP_ACCESS_TOKEN
+        sync: false
+      - key: MP_WEBHOOK_SECRET
+        sync: false
+      - key: MP_ORDER_TTL_HOURS
+        value: "2"
+      - key: GOOGLE_PLACES_API_KEY
+        sync: false
+      - key: GOOGLE_PLACE_QUERY
+        value: Canela en Rama, Colombia 1268, Godoy Cruz, Mendoza
+      - key: GOOGLE_PLACES_LANGUAGE
+        value: es
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: SMTP_FROM_NAME
+        value: Canela en Rama (DEV)
+      - key: SMTP_FROM_EMAIL
+        sync: false
+      # El plan free bloquea los puertos SMTP: en dev los mails salen por la API de Brevo
+      - key: BREVO_API_KEY
         sync: false

@@ -15,6 +15,7 @@ export const productSearchQueryMapping = {
   description: { field: "description", type: "string" },
   ofuscatedMeasure: { field: "measure", type: "string" },
   active: { field: "active", type: "boolean" },
+  isLocal: { field: "isLocal", type: "boolean" },
   category: { field: "Category", type: "object", childField: "name"},
   tags: { field: "Tags", type: "relationArray", childField: "name" },
   brand: { field: "Brand", type: "object", childField: "name" },

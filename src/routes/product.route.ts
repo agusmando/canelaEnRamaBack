@@ -1,20 +1,14 @@
 import express from "express";
 import { ProductController } from "../controllers/product.controller.js";
-import {
-  attachRoles,
-  isAuthenticated,
-  optionalSession,
-  requirePermission,
-} from "../middleware/auth.middleware.js";
+import { attachRoles, optionalSession, requirePermission } from "../middleware/auth.middleware.js";
 import { cloudinaryUpload, upload } from "../middleware/fileUploader.js";
-import { hideCostForPublic } from "../middleware/publicView.js";
+import { hideCostForPublic, webOnlyForPublic } from "../middleware/publicView.js";
 
 const router = express.Router();
 const productController = new ProductController();
-
-const publicView = [optionalSession, attachRoles, hideCostForPublic];
-const editCatalog = [isAuthenticated, requirePermission("catalog.edit")];
-const deleteCatalog = [isAuthenticated, requirePermission("catalog.delete")];
+const publicView = [optionalSession, attachRoles, hideCostForPublic, webOnlyForPublic("product")];
+const editCatalog = requirePermission("catalog.edit");
+const deleteCatalog = requirePermission("catalog.delete");
 
 router
   .route("/")

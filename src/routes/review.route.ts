@@ -9,17 +9,14 @@ import {
 
 const router = express.Router();
 const reviewController = new ReviewController();
-
-const staff = [isAuthenticated, requirePermission("content.edit")];
+const staff = requirePermission("content.edit");
 const user = [isAuthenticated, attachRoles];
-// Público, pero el staff logueado ve todos los estados
 const publicView = [optionalSession, attachRoles];
 
-router.get("/summary", reviewController.summary.bind(reviewController));
-router.get("/stats", ...staff, reviewController.stats.bind(reviewController));
+router.get("/summary", ...publicView, reviewController.summary.bind(reviewController));
+router.get("/stats", ...requirePermission("dashboard.access"), reviewController.stats.bind(reviewController));
 router.get("/mine", ...user, reviewController.mine.bind(reviewController));
 router.get("/eligible", ...user, reviewController.eligible.bind(reviewController));
-
 router
   .route("/")
   .get(...publicView, reviewController.findAll.bind(reviewController))

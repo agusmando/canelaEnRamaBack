@@ -4,7 +4,7 @@ export class CreateMovementDto {
   quantity: number;
   /** IN | OUT | ADJUSTMENT | RETURN. PRODUCTION se genera solo al producir mixes. */
   type: string;
-  /** Fecha opcional del movimiento (ISO); si se omite se usa la fecha actual. */
+  /** Fecha del movimiento (ISO), por defecto ahora; no puede ser futura ni tener más de un año. */
   createdAt?: string;
   constructor(productVariantId: number, quantity: number, type: string, createdAt?: string) {
     this.productVariantId = productVariantId;

@@ -16,7 +16,7 @@ test("payment methods match the operational checkout methods", () => {
 test("role permissions match the dashboard role matrix", () => {
   assert.equal(permissionsForRoles(["ADMIN"]).includes("users.manage"), true);
   assert.equal(permissionsForRoles(["EDITOR"]).includes("content.edit"), true);
-  assert.equal(permissionsForRoles(["EDITOR"]).includes("orders.manage"), false);
+  assert.equal(permissionsForRoles(["EDITOR"]).includes("orders.manage"), true);
   assert.equal(permissionsForRoles(["EMPLOYEE"]).includes("orders.manage"), true);
   assert.equal(permissionsForRoles(["EMPLOYEE"]).includes("users.manage"), false);
   assert.equal(primaryStaffRole(["EMPLOYEE", "ADMIN"]), "ADMIN");

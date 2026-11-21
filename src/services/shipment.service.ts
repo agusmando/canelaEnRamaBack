@@ -1,4 +1,4 @@
-import { randomInt } from "node:crypto";
+import { newTrackingCode } from "../utils/trackingCode.js";
 import { GenericServiceImpl } from "./generic-impl.service.js";
 import {
   CreateShipmentDto,
@@ -16,6 +16,7 @@ import { ORDER_TRANSITIONS } from "./order.service.js";
 import { ValidationError } from "../errors/application/ValidationError.js";
 import { NotFoundError } from "../errors/application/NotFoundError.js";
 import { ConflictError } from "../errors/application/ConflictError.js";
+import { orderMails, type OrderMailKind } from "./order-mail.service.js";
 import type { Actor } from "../middleware/auth.middleware.js";
 
 export const FINAL_SHIPMENT_STATUSES: ShipmentStatus[] = ["DELIVERED", "RETURNED", "CANCELLED"];
@@ -47,7 +48,7 @@ export const SHIPMENT_TRANSITIONS: Record<ShipmentMethod, Partial<Record<Shipmen
 };
 
 /** Descripción por defecto de cada evento (la ve el cliente). */
-const DEFAULT_EVENT_TEXT: Record<ShipmentStatus, string> = {
+export const DEFAULT_EVENT_TEXT: Record<ShipmentStatus, string> = {
   PENDING: "Recibimos tu pedido",
   PREPARING: "Estamos preparando tu pedido",
   READY_FOR_PICKUP: "Tu pedido está listo para retirar",
@@ -59,10 +60,6 @@ const DEFAULT_EVENT_TEXT: Record<ShipmentStatus, string> = {
   CANCELLED: "Envío cancelado",
 };
 
-// Sin caracteres ambiguos (0/O, 1/I/L)
-const CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
-const newTrackingCode = () =>
-  "CER-" + Array.from({ length: 8 }, () => CODE_ALPHABET[randomInt(CODE_ALPHABET.length)]).join("");
 
 const TEXT_FIELDS = [
   "carrier",
@@ -161,7 +158,9 @@ export class ShipmentService extends GenericServiceImpl<
       throw new ValidationError(`status debe ser uno de ${SHIPMENT_STATUSES.join(", ")}`);
     }
 
-    return this.shipmentRepository.withTransaction(async (tx) => {
+    // Se completa dentro de la transacción y el mail sale después de confirmarla
+    const pending: { mail?: { kind: OrderMailKind; orderId: number } } = {};
+    const result = await this.shipmentRepository.withTransaction(async (tx) => {
       const shipment: any = await this.shipmentRepository.getById(id, tx);
       if (!shipment) throw new NotFoundError("Envío no encontrado");
       await this.shipmentRepository.lockOrder(shipment.orderId, tx);
@@ -205,8 +204,18 @@ export class ShipmentService extends GenericServiceImpl<
         await this.orderRepository.updateOrderFields(shipment.orderId, { status: targetOrderStatus }, tx);
       }
 
+      // Aviso al cliente: listo para retirar, o en camino (una vez, al salir del local)
+      const onTheWay = ["SHIPPED", "OUT_FOR_DELIVERY"];
+      if (status === "READY_FOR_PICKUP") pending.mail = { kind: "ready", orderId: shipment.orderId };
+      else if (shipment.method === "DELIVERY" && onTheWay.includes(status) && !onTheWay.includes(shipment.status)) {
+        pending.mail = { kind: "onTheWay", orderId: shipment.orderId };
+      } else if (status === "FAILED_ATTEMPT") pending.mail = { kind: "failedAttempt", orderId: shipment.orderId };
+      else if (status === "DELIVERED") pending.mail = { kind: "delivered", orderId: shipment.orderId };
+
       return updated;
     });
+    if (pending.mail) orderMails.notify(pending.mail.kind, pending.mail.orderId);
+    return result;
   }
 
   /** Envío de una orden: el cliente solo ve el de sus propias órdenes. */

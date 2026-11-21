@@ -1,3 +1,4 @@
+import { webVariantWhere } from "../utils/webVisibility.js";
 import { CartDto } from "../dto/cart/cart.dto.js";
 import { CreateCartDto } from "../dto/cart/create-cart.dto.js";
 import { UpdateCartDto } from "../dto/cart/update-cart.dto.js";
@@ -6,6 +7,8 @@ import { StoreProcedureError } from "../errors/infra/StoreProcedureError.js";
 import { translatePrismaError } from "../errors/infra/translatePrismaError.js";
 
 const CART_INCLUDE = {
+  // Para identificar al dueño en el dashboard (un cliente solo ve su propio carrito)
+  user: { select: { email: true, name: true } },
   items: {
     orderBy: [{ createdAt: "asc" as const }, { selectedBulkOption: "asc" as const }],
     include: {
@@ -109,6 +112,32 @@ export class CartRepository extends GenericRepositoryImpl<CartDto, CreateCartDto
     return (tx ?? this.prisma).cartItem.deleteMany({ where: { cartId } });
   }
 
+  /**
+   * Borra carritos de invitado abandonados: vacíos sin actividad en `emptyDays`
+   * días, o con productos sin actividad en `guestDays`. Los carritos de usuarios
+   * registrados nunca se borran (hay uno por usuario y la tienda lo espera).
+   */
+  async deleteStaleGuestCarts({ guestDays, emptyDays }: { guestDays: number; emptyDays: number }) {
+    const now = Date.now();
+    const guestCutoff = new Date(now - guestDays * 86_400_000);
+    const emptyCutoff = new Date(now - emptyDays * 86_400_000);
+    return this.withTransaction(async (tx: any) => {
+      const stale = await tx.cart.findMany({
+        where: {
+          userSuperTokensId: null,
+          OR: [{ updatedAt: { lt: guestCutoff } }, { updatedAt: { lt: emptyCutoff }, items: { none: {} } }],
+        },
+        select: { id: true },
+        take: 5000,
+      });
+      const ids = stale.map((c: { id: number }) => c.id);
+      if (!ids.length) return 0;
+      await tx.cartItem.deleteMany({ where: { cartId: { in: ids } } });
+      const { count } = await tx.cart.deleteMany({ where: { id: { in: ids }, userSuperTokensId: null } });
+      return count;
+    });
+  }
+
   async touch(cartId: number, tx?: any) {
     return (tx ?? this.prisma).cart.update({
       where: { id: cartId },
@@ -117,6 +146,15 @@ export class CartRepository extends GenericRepositoryImpl<CartDto, CreateCartDto
   }
 
   /** packagingOptions de varias variantes, para resolver la presentación por defecto. */
+  /** Ids (de los pedidos) que se pueden vender en la web: variante y producto activos y "Disponible en la web". */
+  async webSellableIds(variantIds: number[], tx?: any): Promise<Set<number>> {
+    const rows = await (tx ?? this.prisma).productVariant.findMany({
+      where: { id: { in: [...new Set(variantIds.map(Number))] }, ...webVariantWhere },
+      select: { id: true },
+    });
+    return new Set(rows.map((r: any) => r.id));
+  }
+
   async packagingOf(variantIds: number[], tx?: any): Promise<Map<number, number[]>> {
     const rows = await (tx ?? this.prisma).productVariant.findMany({
       where: { id: { in: [...new Set(variantIds.map(Number))] } },

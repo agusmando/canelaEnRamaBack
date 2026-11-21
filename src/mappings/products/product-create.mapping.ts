@@ -3,6 +3,7 @@ export const productCreateMapping = {
   categoryId: { parseInt: true }, // Si envías el ID directamente en el body
   brandId: { parseInt: true },
   active: { parseBoolean: true },
+  isLocal: { parseBoolean: true },
 
   // Relaciones simples (Conectar)
   Category: { relation: true, connectField: "id" }, 

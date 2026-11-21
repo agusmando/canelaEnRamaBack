@@ -5,6 +5,10 @@ import { UpdateOrderDto } from "../dto/order/update-order.dto.js";
 import { translatePrismaError } from "../errors/infra/translatePrismaError.js";
 
 const ORDER_INCLUDE = {
+  refunds: {
+    orderBy: { createdAt: "asc" as const },
+    select: { id: true, amount: true, status: true, reason: true, createdAt: true },
+  },
   shipment: {
     include: { events: { orderBy: [{ createdAt: "asc" as const }, { id: "asc" as const }] } },
   },
@@ -18,7 +22,10 @@ const ORDER_INCLUDE = {
           contentMeasure: true,
           packagingOptions: true,
           images: true,
-          product: { select: { id: true, name: true } },
+          // Para "Volver a comprar" en la tienda: solo lo que sigue a la venta en la web
+          active: true,
+          availableWeb: true,
+          product: { select: { id: true, name: true, active: true } },
         },
       },
     },
@@ -46,7 +53,8 @@ export class OrderRepository extends GenericRepositoryImpl<
   }
 
   async listByUser(userSuperTokensId: string, page = 1, perPage = 10) {
-    const where = { userSuperTokensId };
+    // Las ventas de mostrador quedan a nombre del empleado: no son sus pedidos
+    const where = { userSuperTokensId, channel: "WEB" as const };
     const [totalElements, entityList] = await Promise.all([
       this.prisma.order.count({ where }),
       this.prisma.order.findMany({
@@ -106,6 +114,27 @@ export class OrderRepository extends GenericRepositoryImpl<
       return await (tx ?? this.prisma).orderItem.update({
         where: { id: Number(itemId) },
         data,
+      });
+    } catch (error) {
+      throw translatePrismaError(error);
+    }
+  }
+
+  /** Registra un reintegro de Mercado Pago (idempotente por mpRefundId). */
+  async saveRefund(data: {
+    orderId: number;
+    paymentId: string;
+    mpRefundId: string;
+    amount: number;
+    status: string;
+    reason: string | null;
+    createdBy: string | null;
+  }) {
+    try {
+      return await this.prisma.refund.upsert({
+        where: { mpRefundId: data.mpRefundId },
+        update: { status: data.status },
+        create: data,
       });
     } catch (error) {
       throw translatePrismaError(error);

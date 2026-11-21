@@ -1,6 +1,6 @@
 ALTER TYPE "UserRole" ADD VALUE IF NOT EXISTS 'EDITOR';
 
-CREATE TABLE "UserAddress" (
+CREATE TABLE IF NOT EXISTS "UserAddress" (
     "id" SERIAL NOT NULL,
     "userSuperTokensId" TEXT NOT NULL,
     "recipientName" TEXT NOT NULL,
@@ -19,7 +19,7 @@ CREATE TABLE "UserAddress" (
     CONSTRAINT "UserAddress_pkey" PRIMARY KEY ("id")
 );
 
-CREATE TABLE "ShippingZone" (
+CREATE TABLE IF NOT EXISTS "ShippingZone" (
     "id" SERIAL NOT NULL,
     "name" TEXT NOT NULL,
     "price" DOUBLE PRECISION NOT NULL,
@@ -32,17 +32,21 @@ CREATE TABLE "ShippingZone" (
     CONSTRAINT "ShippingZone_pkey" PRIMARY KEY ("id")
 );
 
-CREATE UNIQUE INDEX "UserAddress_userSuperTokensId_key" ON "UserAddress"("userSuperTokensId");
-CREATE UNIQUE INDEX "ShippingZone_name_key" ON "ShippingZone"("name");
-CREATE INDEX "ShippingZone_active_sortOrder_idx" ON "ShippingZone"("active", "sortOrder");
+CREATE UNIQUE INDEX IF NOT EXISTS "UserAddress_userSuperTokensId_key" ON "UserAddress"("userSuperTokensId");
+CREATE UNIQUE INDEX IF NOT EXISTS "ShippingZone_name_key" ON "ShippingZone"("name");
+CREATE INDEX IF NOT EXISTS "ShippingZone_active_sortOrder_idx" ON "ShippingZone"("active", "sortOrder");
 
-ALTER TABLE "UserAddress"
-ADD CONSTRAINT "UserAddress_userSuperTokensId_fkey"
-FOREIGN KEY ("userSuperTokensId") REFERENCES "User"("supertokensId")
-ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'UserAddress_userSuperTokensId_fkey') THEN
+    ALTER TABLE "UserAddress" DROP CONSTRAINT "UserAddress_userSuperTokensId_fkey";
+  END IF;
+  ALTER TABLE "UserAddress" ADD CONSTRAINT "UserAddress_userSuperTokensId_fkey"
+    FOREIGN KEY ("userSuperTokensId") REFERENCES "User"("supertokensId")
+    ON DELETE CASCADE ON UPDATE CASCADE;
+END $$;
 
 ALTER TABLE "Order"
-ADD COLUMN "shippingMethod" "ShipmentMethod",
-ADD COLUMN "shippingCost" DOUBLE PRECISION NOT NULL DEFAULT 0,
-ADD COLUMN "shippingProvider" TEXT,
-ADD COLUMN "shippingZone" TEXT;
+ADD COLUMN IF NOT EXISTS "shippingMethod" "ShipmentMethod" NOT NULL DEFAULT 'PICKUP',
+ADD COLUMN IF NOT EXISTS "shippingCost" DOUBLE PRECISION NOT NULL DEFAULT 0,
+ADD COLUMN IF NOT EXISTS "shippingProvider" TEXT,
+ADD COLUMN IF NOT EXISTS "shippingZone" TEXT;

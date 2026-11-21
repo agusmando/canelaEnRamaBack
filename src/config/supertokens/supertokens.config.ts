@@ -1,7 +1,6 @@
 import dotenv from "dotenv";
 import supertokens from "supertokens-node";
 import Session from "supertokens-node/recipe/session";
-import AccountLinking from "supertokens-node/recipe/accountlinking";
 import EmailPassword from "supertokens-node/recipe/emailpassword";
 import EmailVerification from "supertokens-node/recipe/emailverification";
 import ThirdParty from "supertokens-node/recipe/thirdparty";
@@ -9,11 +8,34 @@ import Dashboard from "supertokens-node/recipe/dashboard"; // Usa el paquete de 
 import UserRoles from "supertokens-node/recipe/userroles"; // Usa el paquete de backend aquí
 import UserMetadata from "supertokens-node/recipe/usermetadata";
 import { prisma } from "../prisma/client.js";
-import {
-  isBrandedEmailConfigured,
-  sendEmailVerification,
-  sendPasswordSetupEmail,
-} from "../../services/email.service.js";
+import { passwordResetEmailDelivery } from "./email.js";
+import { accountRecipes, NOT_ALLOWED_REASON } from "./account-linking.js";
+import { getLogger, errInfo } from "../logger.js";
+
+const log = getLogger("auth");
+
+/** userContext de EmailPassword.signUp para no mandar el mail de verificación (ej. invitaciones). */
+export type SignUpContext = { skipVerificationEmail?: boolean };
+
+/**
+ * Crea o completa el User de la base. Con account linking, `id` puede ser el de
+ * una cuenta que ya existía (la persona entró con otro método): solo se
+ * completan los datos que falten, no se pisa lo que cargó en su perfil.
+ */
+async function upsertUser(id: string, data: { email?: string; name?: string; avatarUrl?: string }) {
+  const existing = await prisma.user.findUnique({ where: { supertokensId: id } });
+  if (!existing) {
+    await prisma.user.create({
+      data: { supertokensId: id, email: data.email ?? "", name: data.name?.trim() ?? "", avatarUrl: data.avatarUrl ?? "" },
+    });
+    return;
+  }
+  const update: Record<string, string> = {};
+  if (!existing.email && data.email) update.email = data.email;
+  if (!existing.name?.trim() && data.name?.trim()) update.name = data.name.trim();
+  if (!existing.avatarUrl && data.avatarUrl) update.avatarUrl = data.avatarUrl;
+  if (Object.keys(update).length) await prisma.user.update({ where: { supertokensId: id }, data: update });
+}
 
 dotenv.config();
 export const initSupertokens = () =>
@@ -35,77 +57,57 @@ export const initSupertokens = () =>
       websiteBasePath: "/auth",
     },
     recipeList: [
-      Dashboard.init(),
+      // SUPERTOKENS_DASHBOARD_ADMINS="a@x.com,b@x.com": solo esos emails pueden MODIFICAR
+      // desde el dashboard de SuperTokens; el resto lo ve en solo lectura.
+      // Sin definir: cualquier usuario del dashboard puede modificar.
+      Dashboard.init({
+        admins: process.env.SUPERTOKENS_DASHBOARD_ADMINS
+          ? process.env.SUPERTOKENS_DASHBOARD_ADMINS.split(",").map((e) => e.trim()).filter(Boolean)
+          : undefined,
+      }),
       UserRoles.init(),
       UserMetadata.init(),
-      EmailVerification.init({
-        mode: "OPTIONAL",
-        ...(isBrandedEmailConfigured()
-          ? { emailDelivery: { service: { sendEmail: sendEmailVerification } } }
-          : {}),
-      }),
-      AccountLinking.init({
-        shouldDoAutomaticAccountLinking: async (newAccountInfo, user) => {
-          if (
-            !user ||
-            newAccountInfo.recipeId !== "thirdparty" ||
-            newAccountInfo.thirdParty?.id !== "google" ||
-            !newAccountInfo.email ||
-            !user.loginMethods.some(
-              (method) =>
-                method.recipeId === "emailpassword" &&
-                method.email?.toLowerCase() === newAccountInfo.email?.toLowerCase(),
-            )
-          ) {
-            return { shouldAutomaticallyLink: false };
-          }
-
-          const existingAccount = await prisma.user.findUnique({
-            where: { supertokensId: user.id },
-            select: { role: true },
-          });
-          const isInvitedStaff =
-            existingAccount?.role === "ADMIN" ||
-            existingAccount?.role === "EDITOR" ||
-            existingAccount?.role === "EMPLOYEE";
-          if (!isInvitedStaff) return { shouldAutomaticallyLink: false };
-          return { shouldAutomaticallyLink: true, shouldRequireVerification: true };
-        },
-      }),
+      // Verificación de email + vinculación segura (el email debe estar
+      // verificado en ambos métodos; el core puede desactivar linking por env).
+      ...accountRecipes(),
       EmailPassword.init({
-        ...(isBrandedEmailConfigured()
-          ? { emailDelivery: { service: { sendEmail: sendPasswordSetupEmail } } }
-          : {}),
-        // ... otras configuraciones ...
+        // Mail de recuperar contraseña (SMTP propio, en español). Ver email.ts.
+        emailDelivery: passwordResetEmailDelivery(),
         override: {
           functions: (original) => ({
             ...original,
             async signUp(input) {
               const response = await original.signUp(input);
-
               if (response.status === "OK") {
                 const email = response.user.emails[0];
-                const fullName = "";
-                const avatarUrl = "";
-
-                // Aquí agregas tu lógica para guardar los datos en la base de datos
-                await prisma.user.upsert({
-                  where: { supertokensId: response.user.id },
-                  update: {
+                await upsertUser(response.user.id, { email });
+                // Mail de "confirmá tu email": hace falta para poder vincular Google
+                const skip = (input.userContext as SignUpContext | undefined)?.skipVerificationEmail;
+                if (!skip) {
+                  EmailVerification.sendEmailVerificationEmail(
+                    input.tenantId,
+                    response.user.id,
+                    response.recipeUserId,
                     email,
-                    name: fullName,
-                    avatarUrl,
-                  },
-                  create: {
-                    supertokensId: response.user.id,
-                    email,
-                    name: fullName,
-                    avatarUrl,
-                  },
-                });
+                  ).catch((err: any) => log.warn(errInfo(err), "No se pudo mandar el mail de verificación"));
+                }
               }
-
               return response;
+            },
+          }),
+          apis: (original) => ({
+            ...original,
+            async signUpPOST(input) {
+              const res = await original.signUpPOST!(input);
+              return res.status === "SIGN_UP_NOT_ALLOWED" ? { ...res, reason: NOT_ALLOWED_REASON.signUp } : res;
+            },
+            async signInPOST(input) {
+              const res = await original.signInPOST!(input);
+              return res.status === "SIGN_IN_NOT_ALLOWED" ? { ...res, reason: NOT_ALLOWED_REASON.signIn } : res;
+            },
+            async generatePasswordResetTokenPOST(input) {
+              const res = await original.generatePasswordResetTokenPOST!(input);
+              return res.status === "PASSWORD_RESET_NOT_ALLOWED" ? { ...res, reason: NOT_ALLOWED_REASON.passwordReset } : res;
             },
           }),
         },
@@ -125,40 +127,33 @@ export const initSupertokens = () =>
             ...original,
             async signInUp(input) {
               const response = await original.signInUp(input);
-
               if (response.status === "OK") {
-                const rawInfo =
-                  response.rawUserInfoFromProvider.fromUserInfoAPI;
-
-                const email = response.user.emails[0];
-                const firstName = rawInfo?.given_name || "";
-                const lastName = rawInfo?.family_name || "";
-                const fullName = firstName + " " + lastName;
-                const avatarUrl = rawInfo?.picture || "";
-
-                await prisma.user.upsert({
-                  where: { supertokensId: response.user.id },
-                  update: {
-                    email,
-                    name: firstName + " " + lastName,
-                    avatarUrl,
-                  },
-                  create: {
-                    supertokensId: response.user.id,
-                    email,
-                    name: fullName,
-                    avatarUrl,
-                  },
+                const rawInfo = response.rawUserInfoFromProvider.fromUserInfoAPI;
+                const name = `${rawInfo?.given_name || ""} ${rawInfo?.family_name || ""}`.trim();
+                // Con account linking, response.user.id es el de la cuenta principal
+                await upsertUser(response.user.id, {
+                  email: response.user.emails[0],
+                  name,
+                  avatarUrl: rawInfo?.picture || "",
                 });
               }
-
               return response;
+            },
+          }),
+          apis: (original) => ({
+            ...original,
+            async signInUpPOST(input) {
+              const res = await original.signInUpPOST!(input);
+              return res.status === "SIGN_IN_UP_NOT_ALLOWED" ? { ...res, reason: NOT_ALLOWED_REASON.thirdParty } : res;
             },
           }),
         },
       }),
       Session.init({
-        exposeAccessTokenToFrontendInCookieBasedAuth: true,
-      }), // initializes session features
+        // Solo tokens en header (Authorization: Bearer). Al no aceptar cookies de
+        // sesión, un sitio ajeno no puede hacer requests autenticadas en nombre
+        // del usuario: CSRF queda descartado por diseño.
+        getTokenTransferMethod: () => "header",
+      }),
     ],
   });

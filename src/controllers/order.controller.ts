@@ -27,6 +27,16 @@ export class OrderController extends GenericControllerImpl<
     }
   }
 
+  /** POST /order/counter — venta de mostrador (staff): queda entregada y cobrada. */
+  async createCounterSale(req: any, res: any, next: any) {
+    try {
+      const response = await this.orderService.createCounterSale(req.body, getActor(req).userId!);
+      res.status(201).json(new BaseResponse(201, "Counter sale created", response));
+    } catch (error) {
+      next(error);
+    }
+  }
+
   /** GET /order/mine — órdenes del usuario logueado (paginado). */
   async findMine(req: any, res: any, next: any) {
     try {

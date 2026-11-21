@@ -1,44 +1,49 @@
 import express from "express";
 import { BrandController } from "../controllers/brand.controller.js";
-import { isAuthenticated, requirePermission } from "../middleware/auth.middleware.js";
+import { attachRoles, optionalSession, requirePermission } from "../middleware/auth.middleware.js";
+import { hideCostForPublic, hideProductsForPublic } from "../middleware/publicView.js";
+
+// Sin sesión de staff no se exponen proveedores ni costos de los productos incluidos.
+const publicView = [optionalSession, attachRoles, hideCostForPublic, hideProductsForPublic];
 const router = express.Router();
 
 const brandController = new BrandController();
 
-const manageMasters = [isAuthenticated, requirePermission("masters.edit")];
+const manageMasters = requirePermission("masters.edit");
+const deleteCatalog = requirePermission("catalog.delete");
 
 router
   .route("/")
-  .get(brandController.findAll.bind(brandController))
+  .get(...publicView, brandController.findAll.bind(brandController))
   .post(
     ...manageMasters,
-    brandController.create.bind(brandController)
+    brandController.create.bind(brandController),
   );
 router
   .route("/:id")
-  .get(brandController.findOne.bind(brandController))
+  .get(...publicView, brandController.findOne.bind(brandController))
   .put(
     ...manageMasters,
-    brandController.update.bind(brandController)
+    brandController.update.bind(brandController),
   );
 router
   .route("/:id/products")
   .put(
-    ...manageMasters,
-    brandController.addBrandProducts.bind(brandController)
+    ...deleteCatalog,
+    brandController.addBrandProducts.bind(brandController),
   )
   .delete(
-    ...manageMasters,
+    ...deleteCatalog,
     brandController.removeBrandProducts.bind(brandController)
-  )
+  );
 router
   .route("/:id/active/")
   .delete(
-    ...manageMasters,
+    ...requirePermission("masters.edit"),
     brandController.deactivate.bind(brandController)
   )
   .put(
-    ...manageMasters,
+    ...requirePermission("masters.edit"),
     brandController.activate.bind(brandController)
   );
 

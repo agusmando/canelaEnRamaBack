@@ -1,14 +1,13 @@
 import { BaseResponse } from "../utils/responseFormat.js";
 import { getActor } from "../middleware/auth.middleware.js";
 import { NotFoundError } from "../errors/application/NotFoundError.js";
-import { ValidationError } from "../errors/application/ValidationError.js";
-import { STAFF_ROLES, primaryStaffRole, type StaffRole } from "../config/rbac.js";
+import { primaryRole } from "../config/rbac.js";
 import { UserService } from "../services/user.service.js";
 
 export class UserController {
   constructor(protected readonly userService = new UserService()) {}
 
-  /** GET /user/me */
+  /** GET /user/me — incluye roles y permisos para que el dashboard arme el menú. */
   async getMe(req: any, res: any, next: any) {
     try {
       const actor = getActor(req);
@@ -17,7 +16,7 @@ export class UserController {
       res.status(200).json(
         new BaseResponse(200, "User found", {
           ...user,
-          role: primaryStaffRole(actor.roles) ?? "CONSUMER",
+          role: primaryRole(actor.roles) ?? "CONSUMER",
           roles: actor.roles,
           permissions: actor.permissions,
         }),
@@ -43,38 +42,36 @@ export class UserController {
     }
   }
 
-  /** GET /user — listado paginado para gestión. */
-  async findAll(req: any, res: any, next: any) {
+  /** GET /user?search=&role=&currentPage=&amountPerPage= */
+  async list(req: any, res: any, next: any) {
     try {
-      const allowedRoles = ["STAFF", "ADMIN", "EDITOR", "EMPLOYEE", "CUSTOMER"];
-      const role = req.query.role as string | undefined;
-      if (role && !allowedRoles.includes(role)) throw new ValidationError("Filtro de rol inválido");
-      const result = await this.userService.list(
-        Number(req.query.currentPage ?? 1),
-        Number(req.query.amountPerPage ?? 20),
-        typeof req.query.search === "string" ? req.query.search : "",
-        role as "STAFF" | "ADMIN" | "EDITOR" | "EMPLOYEE" | "CUSTOMER" | undefined,
+      const { content, page, perPage, total, counts } = await this.userService.list({
+        search: req.query.search,
+        role: req.query.role,
+        page: req.query.currentPage,
+        perPage: req.query.amountPerPage,
+      });
+      res.status(200).json(
+        new BaseResponse(200, "Usuarios", {
+          content,
+          pagination: { page, amountPerPage: perPage, totalAmount: total },
+          counts,
+        }),
       );
-      res.status(200).json(new BaseResponse(200, "Users obtained successfully", result));
     } catch (error) {
       next(error);
     }
   }
 
-  /** GET /user/roles — roles de staff y permisos efectivos. */
-  async findRoles(_req: any, res: any, next: any) {
-    try {
-      const roles = await this.userService.listRoles();
-      res.status(200).json(new BaseResponse(200, "Roles obtained successfully", roles));
-    } catch (error) {
-      next(error);
-    }
+  roles(_req: any, res: any) {
+    res.status(200).json(new BaseResponse(200, "Roles", this.userService.roleCatalog()));
   }
 
   async detail(req: any, res: any, next: any) {
     try {
-      const user = await this.userService.detail(req.params.supertokensId);
-      res.status(200).json(new BaseResponse(200, "User found", user));
+      res.status(200).json(
+        new BaseResponse(200, "Usuario", await this.userService.detail(req.params.supertokensId)),
+      );
     } catch (error) {
       next(error);
     }
@@ -82,14 +79,12 @@ export class UserController {
 
   async setRole(req: any, res: any, next: any) {
     try {
-      const role = req.body?.role;
-      if (role !== null && (typeof role !== "string" || !STAFF_ROLES.includes(role as StaffRole))) {
-        throw new ValidationError("role debe ser ADMIN, EDITOR, EMPLOYEE o null");
-      }
-      const actorId = getActor(req).userId;
-      if (!actorId) throw new NotFoundError("User not found");
-      const user = await this.userService.setRole(req.params.supertokensId, role as StaffRole | null, actorId);
-      res.status(200).json(new BaseResponse(200, "User role updated", user));
+      const user = await this.userService.setRole(
+        getActor(req),
+        req.params.supertokensId,
+        req.body?.role ?? null,
+      );
+      res.status(200).json(new BaseResponse(200, "Rol actualizado", user));
     } catch (error) {
       next(error);
     }
@@ -97,8 +92,8 @@ export class UserController {
 
   async revokeSessions(req: any, res: any, next: any) {
     try {
-      const result = await this.userService.revokeSessions(req.params.supertokensId);
-      res.status(200).json(new BaseResponse(200, "User sessions revoked", result));
+      const result = await this.userService.revokeSessions(getActor(req), req.params.supertokensId);
+      res.status(200).json(new BaseResponse(200, "Sesiones cerradas", result));
     } catch (error) {
       next(error);
     }
@@ -106,8 +101,9 @@ export class UserController {
 
   async invite(req: any, res: any, next: any) {
     try {
-      const result = await this.userService.invite(req.body ?? {});
-      res.status(201).json(new BaseResponse(201, "User invitation created", result));
+      const result = await this.userService.invite(getActor(req), req.body ?? {});
+      const status = result.created ? 201 : 200;
+      res.status(status).json(new BaseResponse(status, "Invitación lista", result));
     } catch (error) {
       next(error);
     }

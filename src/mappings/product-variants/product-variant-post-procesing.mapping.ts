@@ -18,7 +18,10 @@ export const productVariantPostProcessingMapping = (
   if (!variant) return variant;
   const v: any = variant;
   const finalPrice = computeFinalPrice(variant);
+  // Productor local: la variante manda; si no lo define, el producto (si vino incluido)
+  const local = v.isLocal ?? (v.product ? !!v.product.isLocal : undefined);
+  const extra = local === undefined ? {} : { local };
   const offersLoaded = Array.isArray(v.offers) || Array.isArray(productOffers) || Array.isArray(v.product?.offers);
-  if (!offersLoaded) return { ...variant, finalPrice } as any;
-  return { ...variant, finalPrice, ...pricing.variantOffer(v, productOffers) } as any;
+  if (!offersLoaded) return { ...variant, finalPrice, ...extra } as any;
+  return { ...variant, finalPrice, ...extra, ...pricing.variantOffer(v, productOffers) } as any;
 };

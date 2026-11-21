@@ -1,12 +1,14 @@
 import express from "express";
 import { OfferController } from "../controllers/offer.controller.js";
-import { isAuthenticated, requirePermission } from "../middleware/auth.middleware.js";
+import { requirePermission, requirePermissionToWrite } from "../middleware/auth.middleware.js";
 const router = express.Router();
 
 const offerController = new OfferController();
 
-router.use(isAuthenticated);
-router.use(requirePermission("offers.edit"));
+
+// Ver: cualquier staff. Modificar: offers.edit.
+router.use(requirePermission("dashboard.access"));
+router.use(requirePermissionToWrite("offers.edit"));
 
 router
   .route("/")

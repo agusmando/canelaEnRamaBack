@@ -1,3 +1,4 @@
+import { catalogSearch } from "./catalog-search.service.js";
 import { CreateProductDto } from "./../dto/products/create-product.dto.js";
 import { ProductDto } from "../dto/products/product.dto.js";
 import { UpdateProductDto } from "../dto/products/update-product.dto.js";
@@ -54,6 +55,18 @@ export class ProductService extends GenericServiceImpl<
     this.productVariantRepository = productVariantRepository;
     this.stockRepository = stockRepository;
     this.imageService = imageService;
+  }
+
+  /**
+   * Listado. Con `?q=` busca como la tienda (sin acentos, todas las palabras en
+   * cualquier orden, ordenado por relevancia); el resto de los filtros se suma.
+   */
+  async getListedElements(filters: any, paginate = false, currentPage = 1, amountPerPage = 10, detalle = false) {
+    const q = String(filters?.q ?? "").trim();
+    if (!q) return super.getListedElements(filters, paginate, currentPage, amountPerPage, detalle);
+    const { q: _q, ...rest } = filters;
+    const ids = await catalogSearch.productIds(q);
+    return this.repository.searchRanked(rest, ids, paginate, currentPage, amountPerPage, detalle);
   }
 
   async createProduct(rawData: CreateProductDto, uploadedFiles: any[]): Promise<ProductDto> {

@@ -1,11 +1,6 @@
 import express from "express";
 import { CartController } from "../controllers/cart.controller.js";
-import {
-  attachRoles,
-  isAuthenticated,
-  optionalSession,
-  requirePermission,
-} from "../middleware/auth.middleware.js";
+import { attachRoles, optionalSession, requirePermission } from "../middleware/auth.middleware.js";
 
 const router = express.Router();
 const cartController = new CartController();
@@ -14,7 +9,7 @@ const maybeUser = [optionalSession, attachRoles];
 
 router
   .route("/")
-  .get(isAuthenticated, requirePermission("orders.manage"), cartController.findAll.bind(cartController))
+  .get(...requirePermission("orders.manage"), cartController.findAll.bind(cartController))
   .post(...maybeUser, cartController.create.bind(cartController));
 router.get("/me", ...maybeUser, cartController.findMine.bind(cartController));
 router

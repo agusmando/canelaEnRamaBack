@@ -37,7 +37,7 @@ export class ReviewController extends GenericControllerImpl<ReviewDto, CreateRev
 
   async summary(req: any, res: any, next: any) {
     try {
-      const response = await this.reviewService.summary(req.query.productId);
+      const response = await this.reviewService.summary(req.query.productId, getActor(req));
       res.status(200).json(new BaseResponse(200, "Review summary", response));
     } catch (error) {
       next(error);

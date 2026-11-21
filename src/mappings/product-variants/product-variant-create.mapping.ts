@@ -17,6 +17,8 @@ export const productVariantCreateMapping = {
   // Booleans
   active: { parseBoolean: true },
   availableWeb: { parseBoolean: true },
+  // Productor local: true / false / null ("igual que el producto")
+  isLocal: { parseNullableBoolean: true },
 
   // Relaciones Anidadas dentro de la variante
   product: { relation: true, connectField: "id", allowCreate: false },

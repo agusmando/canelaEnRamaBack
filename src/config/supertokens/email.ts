@@ -1,0 +1,152 @@
+import { SMTPService } from "supertokens-node/recipe/emailpassword/emaildelivery";
+import { SMTPService as VerificationSMTPService } from "supertokens-node/recipe/emailverification/emaildelivery";
+import { emailLayout, escapeHtml, mailSender, sendMail, smtpSettings } from "../mailer.js";
+import { getLogger } from "../logger.js";
+
+const log = getLogger("auth");
+
+/**
+ * Mails de SuperTokens (recuperar contraseña, invitación al panel, confirmar
+ * email) con nuestro texto y enviados por el mismo canal que el resto
+ * (Brevo o SMTP, ver config/mailer.ts).
+ *
+ * Sin canal configurado se devuelve `undefined` y SuperTokens usa su servicio
+ * por defecto (mail genérico en inglés): sirve para probar, no para producción.
+ */
+
+/**
+ * Settings para el SMTPService de SuperTokens. Solo se usan para construirlo:
+ * el envío real lo hace `sendRaw` (override de sendRawEmail), así que con
+ * Brevo no hace falta SMTP.
+ */
+function serviceSettings() {
+  const from = mailSender();
+  if (!from) return null;
+  const smtp = smtpSettings();
+  return {
+    host: smtp?.host ?? "localhost",
+    port: smtp?.port ?? 587,
+    secure: smtp?.secure ?? false,
+    authUsername: smtp?.user,
+    password: smtp?.password ?? "",
+    from,
+  };
+}
+
+/** Envía por nuestro canal; si falla, tira para que SuperTokens lo reporte. */
+async function sendRaw(input: { toEmail: string; subject: string; body: string }) {
+  const ok = await sendMail({ to: input.toEmail, subject: input.subject, html: input.body });
+  if (!ok) throw new Error(`No se pudo mandar "${input.subject}" a ${input.toEmail}`);
+}
+
+
+/** Datos de la invitación al panel: el mismo enlace de "elegir contraseña" con otro texto. */
+export type InviteContext = { invite: { roleLabel: string; dashboardUrl?: string; /** ya puede entrar con Google */ google?: boolean } };
+
+function passwordResetHtml(link: string, invite?: InviteContext["invite"]) {
+  const href = escapeHtml(link);
+  const title = invite ? "Te invitamos al panel" : "Recuperá tu contraseña";
+  const intro = invite
+    ? invite.google
+      ? `Te dieron acceso al panel de administración de Canela en Rama como <strong>${escapeHtml(invite.roleLabel)}</strong>.
+              Podés entrar con <strong>Google</strong> con este mismo email. Si además querés entrar con contraseña,
+              tocá el botón para elegirla (el enlace vence en 1 hora).`
+      : `Te dieron acceso al panel de administración de Canela en Rama como <strong>${escapeHtml(invite.roleLabel)}</strong>.
+              Tocá el botón para elegir tu contraseña. El enlace vence en 1 hora; si venció, pedí uno nuevo con
+              "¿Olvidaste tu contraseña?".`
+    : `Recibimos un pedido para cambiar la contraseña de tu cuenta. Tocá el botón para elegir una nueva.
+              El enlace vence en 1 hora y se puede usar una sola vez.`;
+  const button = invite ? "Elegir contraseña" : "Cambiar contraseña";
+  const footer = invite
+    ? invite.google
+      ? `Entrá al panel${invite.dashboardUrl ? ` en <a href="${escapeHtml(invite.dashboardUrl)}" style="color:#cc3b1d">${escapeHtml(invite.dashboardUrl)}</a>` : ""} con «Continuar con Google» o con tu email y contraseña.`
+      : invite.dashboardUrl
+      ? `Después entrá al panel en <a href="${escapeHtml(invite.dashboardUrl)}" style="color:#cc3b1d">${escapeHtml(invite.dashboardUrl)}</a> con tu email y la contraseña nueva.`
+      : "Después entrá al panel con tu email y la contraseña nueva."
+    : "Si no fuiste vos, ignorá este mail: tu contraseña no cambia.";
+  return `<!doctype html>
+<html lang="es">
+  <body style="margin:0;padding:0;background:#faebe8;font-family:Arial,Helvetica,sans-serif;color:#282828">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="padding:32px 16px">
+      <tr><td align="center">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background:#ffffff;border-radius:16px;padding:32px">
+          <tr><td>
+            <p style="margin:0 0 24px;font-size:22px;font-weight:bold;color:#cc3b1d">Canela en Rama</p>
+            <h1 style="margin:0 0 12px;font-size:20px">${title}</h1>
+            <p style="margin:0 0 24px;font-size:15px;line-height:1.5">
+              ${intro}
+            </p>
+            <p style="margin:0 0 24px">
+              <a href="${href}" style="display:inline-block;background:#cc3b1d;color:#ffffff;text-decoration:none;font-weight:bold;padding:12px 24px;border-radius:10px">
+                ${button}
+              </a>
+            </p>
+            <p style="margin:0 0 8px;font-size:13px;color:#666">Si el botón no funciona, copiá este enlace en el navegador:</p>
+            <p style="margin:0 0 24px;font-size:13px;word-break:break-all"><a href="${href}" style="color:#cc3b1d">${href}</a></p>
+            <p style="margin:0;font-size:13px;color:#666">
+              ${footer}
+            </p>
+          </td></tr>
+        </table>
+      </td></tr>
+    </table>
+  </body>
+</html>`;
+}
+
+export function passwordResetEmailDelivery() {
+  const settings = serviceSettings();
+  if (!settings) {
+    if (process.env.NODE_ENV === "production") {
+      log.warn("SMTP no configurado: el mail de recuperar contraseña usa el servicio genérico de SuperTokens");
+    }
+    return undefined;
+  }
+
+  return {
+    service: new SMTPService({
+      smtpSettings: settings,
+      override: (original) => ({
+        ...original,
+        sendRawEmail: sendRaw,
+        getContent: async (input) => {
+          const invite = (input.userContext as Partial<InviteContext> | undefined)?.invite;
+          return {
+            toEmail: input.user.email,
+            subject: invite ? "Tu acceso al panel · Canela en Rama" : "Recuperá tu contraseña · Canela en Rama",
+            isHtml: true,
+            body: passwordResetHtml(input.passwordResetLink, invite),
+          };
+        },
+      }),
+    }),
+  };
+}
+
+/** Mail de "confirmá tu email" (verificación), mismo SMTP y misma estética. */
+export function emailVerificationEmailDelivery() {
+  const settings = serviceSettings();
+  if (!settings) return undefined;
+  return {
+    service: new VerificationSMTPService({
+      smtpSettings: settings,
+      override: (original) => ({
+        ...original,
+        sendRawEmail: sendRaw,
+        getContent: async (input) => ({
+          toEmail: input.user.email,
+          subject: "Confirmá tu email · Canela en Rama",
+          isHtml: true,
+          body: emailLayout({
+            title: "Confirmá tu email",
+            body: `<p style="margin:0 0 16px;font-size:15px;line-height:1.5">Tocá el botón para confirmar que este email es tuyo. Así podés entrar a tu cuenta también con Google y recuperarla si te olvidás la contraseña.</p>
+            <p style="margin:0 0 8px;font-size:13px;color:#666">Si el botón no funciona, copiá este enlace en el navegador:</p>
+            <p style="margin:0;font-size:13px;word-break:break-all"><a href="${escapeHtml(input.emailVerifyLink)}" style="color:#cc3b1d">${escapeHtml(input.emailVerifyLink)}</a></p>`,
+            button: { label: "Confirmar email", href: input.emailVerifyLink },
+            footer: "Si no creaste una cuenta en Canela en Rama, ignorá este mail.",
+          }),
+        }),
+      }),
+    }),
+  };
+}

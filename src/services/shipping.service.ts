@@ -1,7 +1,13 @@
-import { BadRequestError } from "../errors/application/BadRequestError.js";
+import { prisma as sharedPrisma } from "../config/prisma/client.js";
+import { isUberConfigured, uberCancelDelivery, uberCreateDelivery, uberGetDelivery } from "../config/uber.js";
+import { ConflictError } from "../errors/application/ConflictError.js";
 import { NotFoundError } from "../errors/application/NotFoundError.js";
-import { ValidationError } from "../errors/application/ValidationError.js";
-import { prisma, type DbClient } from "../config/prisma/client.js";
+import { ExternalServiceError } from "../errors/infra/ExternalServiceError.js";
+import { FINAL_SHIPMENT_STATUSES, ShipmentService } from "./shipment.service.js";
+import { dropoffAddress, pickupInfo } from "./shipping-quote.service.js";
+import { errInfo, getLogger } from "../config/logger.js";
+
+const log = getLogger("shipping");
 
 export const DEFAULT_SHIPPING_DEPARTMENTS = [
   "Godoy Cruz",
@@ -14,6 +20,7 @@ export const DEFAULT_SHIPPING_DEPARTMENTS = [
 
 export type ShippingQuoteZone = { name: string; price: number; etaMinutes: number | null };
 
+/** Compatibilidad para consumidores que validan una tarifa propia sin llamar al proveedor. */
 export function quoteShippingZone(zone: ShippingQuoteZone | null, requestedZone: string | null) {
   if (!requestedZone) {
     return {
@@ -51,214 +58,187 @@ export function quoteShippingZone(zone: ShippingQuoteZone | null, requestedZone:
   };
 }
 
-const PICKUP = {
-  name: "Canela en Rama",
-  address: "Colombia 1268, Godoy Cruz, Mendoza",
+/** Estado de Uber Direct → estado del envío. `canceled` no mueve el envío (se puede volver a pedir). */
+const UBER_STATUS: Record<string, string | null> = {
+  pending: "PREPARING",
+  pickup: "PREPARING",
+  pickup_complete: "SHIPPED",
+  dropoff: "OUT_FOR_DELIVERY",
+  delivered: "DELIVERED",
+  returned: "RETURNED",
+  canceled: null,
 };
 
-const MAX_TEXT_LENGTH = 300;
-const cleanText = (value: unknown, field: string, required = false, max = MAX_TEXT_LENGTH) => {
-  if (value === undefined || value === null) {
-    if (required) throw new ValidationError(`${field} es obligatorio`);
-    return null;
-  }
-  if (typeof value !== "string") throw new ValidationError(`${field} debe ser texto`);
-  const text = value.trim();
-  if (required && !text) throw new ValidationError(`${field} es obligatorio`);
-  if (text.length > max) throw new ValidationError(`${field} no puede superar ${max} caracteres`);
-  return text || null;
+const UBER_TEXT: Record<string, string> = {
+  pending: "Buscando repartidor",
+  pickup: "El repartidor va camino al local",
+  pickup_complete: "El repartidor retiró tu pedido",
+  dropoff: "Tu pedido está en camino",
+  delivered: "Pedido entregado",
+  returned: "El pedido volvió al local",
+  canceled: "El envío con el repartidor fue cancelado",
 };
 
-export type ShippingZoneInput = {
-  name?: unknown;
-  price?: unknown;
-  etaMinutes?: unknown;
-  active?: unknown;
-  sortOrder?: unknown;
-};
+/** Camino normal de un envío a domicilio, para avanzar paso a paso hasta el estado del proveedor. */
+const DELIVERY_PATH = ["PENDING", "PREPARING", "SHIPPED", "OUT_FOR_DELIVERY", "DELIVERED"];
 
-export type UserAddressInput = {
-  recipientName?: unknown;
-  phone?: unknown;
-  street?: unknown;
-  number?: unknown;
-  apartment?: unknown;
-  zone?: unknown;
-  city?: unknown;
-  postalCode?: unknown;
-  notes?: unknown;
-};
-
+/**
+ * Despacho con proveedores de mensajería (Uber Direct). El staff pide el
+ * repartidor desde el dashboard cuando el pedido está listo.
+ */
 export class ShippingService {
-  async config(db: DbClient = prisma) {
-    const [activeZones, allZones] = await Promise.all([
-      db.shippingZone.findMany({
-        where: { active: true },
-        orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
-        select: { name: true, price: true, etaMinutes: true },
-      }),
-      db.shippingZone.findMany({
-        orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
-        select: { name: true },
-      }),
-    ]);
-    const departments = [
-      ...DEFAULT_SHIPPING_DEPARTMENTS,
-      ...allZones.map((zone) => zone.name).filter((name) =>
-        !DEFAULT_SHIPPING_DEPARTMENTS.some((department) => department.toLocaleLowerCase("es") === name.toLocaleLowerCase("es")),
-      ),
-    ];
-    return {
-      zones: activeZones,
-      departments,
-      providers: { uber: false },
-      pickup: PICKUP,
-      methods: ["DELIVERY", "PICKUP"],
-      deliveryEnabled: true,
-      pickupEnabled: true,
-      carrierTrackingSupported: true,
-    };
+  constructor(
+    private readonly shipments = new ShipmentService(),
+    private readonly prisma: any = sharedPrisma,
+  ) {}
+
+  providers() {
+    return { uber: isUberConfigured() };
   }
 
-  async listZones(db: DbClient = prisma) {
-    return db.shippingZone.findMany({ orderBy: [{ sortOrder: "asc" }, { id: "asc" }] });
-  }
-
-  async createZone(input: ShippingZoneInput, db: DbClient = prisma) {
-    const data = this.parseZone(input, true);
-    await this.ensureUniqueZoneName(data.name, undefined, db);
-    return db.shippingZone.create({ data });
-  }
-
-  async updateZone(id: number, input: ShippingZoneInput, db: DbClient = prisma) {
-    const current = await db.shippingZone.findUnique({ where: { id } });
-    if (!current) throw new NotFoundError("Zona de envío no encontrada");
-    const data = this.parseZone(input, false);
-    if (data.name) await this.ensureUniqueZoneName(data.name, id, db);
-    if (!Object.keys(data).length) return current;
-    return db.shippingZone.update({ where: { id }, data });
-  }
-
-  async getAddress(userId: string, db: DbClient = prisma) {
-    return db.userAddress.findUnique({ where: { userSuperTokensId: userId } });
-  }
-
-  async saveAddress(userId: string, input: UserAddressInput, db: DbClient = prisma) {
-    if (!userId) throw new BadRequestError("Se requiere una sesión para guardar el domicilio");
-    const recipientName = cleanText(input.recipientName, "recipientName", true, 120)!;
-    const phone = cleanText(input.phone, "phone", true, 60)!;
-    if (phone.replace(/\D/g, "").length < 6) throw new ValidationError("phone debe tener al menos 6 dígitos");
-    const street = cleanText(input.street, "street", true, 160)!;
-    const number = cleanText(input.number, "number", true, 40)!;
-    const zoneInput = cleanText(input.zone, "zone", true, 120)!;
-    const zone = await db.shippingZone.findFirst({
-      where: { name: { equals: zoneInput, mode: "insensitive" } },
-      select: { name: true },
+  private async load(id: number) {
+    const shipment = await this.prisma.shipment.findUnique({
+      where: { id },
+      include: { order: { include: { orderItems: true } } },
     });
-    const normalizedZone =
-      zone?.name ??
-      DEFAULT_SHIPPING_DEPARTMENTS.find((name) => name.toLocaleLowerCase("es") === zoneInput.toLocaleLowerCase("es"));
-    if (!normalizedZone) throw new ValidationError("zone no es un departamento de envío válido");
+    if (!shipment) throw new NotFoundError("Envío no encontrado");
+    return shipment;
+  }
 
-    return db.userAddress.upsert({
-      where: { userSuperTokensId: userId },
-      create: {
-        userSuperTokensId: userId,
-        recipientName,
-        phone,
-        street,
-        number,
-        apartment: cleanText(input.apartment, "apartment"),
-        zone: normalizedZone,
-        city: cleanText(input.city, "city", false, 120),
-        postalCode: cleanText(input.postalCode, "postalCode", false, 30),
-        notes: cleanText(input.notes, "notes"),
-      },
-      update: {
-        recipientName,
-        phone,
-        street,
-        number,
-        apartment: cleanText(input.apartment, "apartment"),
-        zone: normalizedZone,
-        city: cleanText(input.city, "city", false, 120),
-        postalCode: cleanText(input.postalCode, "postalCode", false, 30),
-        notes: cleanText(input.notes, "notes"),
+  /** Pide un repartidor a Uber Direct para el envío. */
+  async dispatch(id: number) {
+    if (!isUberConfigured()) {
+      throw new ConflictError("Uber Direct no está configurado (faltan UBER_DIRECT_CUSTOMER_ID / CLIENT_ID / CLIENT_SECRET)");
+    }
+    const s = await this.load(id);
+    if (s.method !== "DELIVERY") throw new ConflictError("Solo los envíos a domicilio se despachan con repartidor");
+    if (FINAL_SHIPMENT_STATUSES.includes(s.status)) throw new ConflictError(`El envío ya está ${s.status}`);
+    if (s.providerDeliveryId && s.providerStatus !== "canceled") {
+      throw new ConflictError("El envío ya tiene un repartidor solicitado");
+    }
+    if (!s.address || !s.phone) throw new ConflictError("Al envío le falta dirección o teléfono");
+
+    const pickup = pickupInfo();
+    const items = (s.order?.orderItems ?? [])
+      .filter((it: any) => !["CANCELLED", "RETURNED"].includes(it.status) && it.quantity > 0)
+      .map((it: any) => ({
+        name: [it.productNameSnapshot, it.variantNameSnapshot].filter(Boolean).join(" - "),
+        quantity: it.selectedBulkOption ? it.quantity : 1,
+      }));
+
+    let delivery;
+    try {
+      delivery = await uberCreateDelivery({
+        externalId: `order-${s.orderId}`,
+        pickup: pickup.address,
+        pickupName: pickup.name,
+        pickupPhone: pickup.phone,
+        dropoff: dropoffAddress({ street: s.address, number: "", city: s.city, province: s.province, postalCode: s.postalCode, zone: s.zone }),
+        dropoffName: s.recipientName || "Cliente",
+        dropoffPhone: s.phone,
+        dropoffNotes: s.notes,
+        items: items.length ? items : [{ name: `Pedido #${s.orderId}`, quantity: 1 }],
+        value: Number(s.order?.totalPrice) || undefined,
+      });
+    } catch (err: any) {
+      log.error({ shipmentId: id, orderId: s.orderId, ...errInfo(err) }, `No se pudo pedir repartidor de Uber para el envío ${id}`);
+      throw new ExternalServiceError("Uber Direct", err.message);
+    }
+    log.info(
+      { shipmentId: id, orderId: s.orderId, deliveryId: delivery.id, uberStatus: delivery.status, fee: delivery.fee, event: "uber_dispatched" },
+      `Repartidor de Uber pedido para la orden ${s.orderId}`,
+    );
+
+    await this.prisma.shipment.update({
+      where: { id },
+      data: {
+        provider: "uber",
+        carrier: "Uber Direct",
+        providerDeliveryId: delivery.id,
+        providerStatus: delivery.status,
+        carrierTrackingCode: delivery.id,
+        carrierTrackingUrl: delivery.trackingUrl,
       },
     });
+    await this.advanceTo(id, UBER_STATUS[delivery.status] ?? "PREPARING", "Pedimos un repartidor para tu pedido");
+    return this.shipments.findOne(id);
   }
 
-  async quote(userId: string, rawValue: unknown, db: DbClient = prisma) {
-    if (typeof rawValue !== "string" && typeof rawValue !== "number") {
-      throw new ValidationError("value debe ser un importe numérico mayor o igual a cero");
+  /** Consulta el estado en Uber y lo refleja en el envío (con su historial). */
+  async sync(id: number) {
+    const s = await this.load(id);
+    if (s.provider !== "uber" || !s.providerDeliveryId) throw new ConflictError("El envío no tiene un repartidor de Uber");
+    let delivery;
+    try {
+      delivery = await uberGetDelivery(s.providerDeliveryId);
+    } catch (err: any) {
+      throw new ExternalServiceError("Uber Direct", err.message);
     }
-    const value = Number(rawValue);
-    if (!Number.isFinite(value) || value < 0) {
-      throw new ValidationError("value debe ser un importe numérico mayor o igual a cero");
-    }
-    if (!userId) throw new BadRequestError("Se requiere una sesión para cotizar el envío");
-    const address = await db.userAddress.findUnique({ where: { userSuperTokensId: userId } });
-    if (!address) return quoteShippingZone(null, null);
-
-    const zone = await db.shippingZone.findFirst({
-      where: { name: { equals: address.zone, mode: "insensitive" }, active: true },
-    });
-    return quoteShippingZone(zone, address.zone);
+    await this.applyProviderStatus(s, delivery.status, delivery.trackingUrl);
+    return this.shipments.findOne(id);
   }
 
-  private parseZone(input: ShippingZoneInput, required: true): {
-    name: string;
-    price: number;
-    etaMinutes: number | null;
-    active?: boolean;
-    sortOrder: number;
-  };
-  private parseZone(input: ShippingZoneInput, required: false): {
-    name?: string;
-    price?: number;
-    etaMinutes?: number | null;
-    active?: boolean;
-    sortOrder?: number;
-  };
-  private parseZone(input: ShippingZoneInput, required: boolean) {
-    const data: { name?: string; price?: number; etaMinutes?: number | null; active?: boolean; sortOrder?: number } = {};
-    if (input.name !== undefined || required) data.name = cleanText(input.name, "name", true, 120)!;
-    if (input.price !== undefined || required) {
-      const price = Number(input.price);
-      if (!Number.isFinite(price) || price < 0) throw new ValidationError("price debe ser un número mayor o igual a cero");
-      data.price = Math.round(price * 100) / 100;
+  async cancel(id: number) {
+    const s = await this.load(id);
+    if (s.provider !== "uber" || !s.providerDeliveryId) throw new ConflictError("El envío no tiene un repartidor de Uber");
+    try {
+      const delivery = await uberCancelDelivery(s.providerDeliveryId);
+      await this.applyProviderStatus(s, delivery.status || "canceled", delivery.trackingUrl);
+      log.info({ shipmentId: id, orderId: s.orderId, deliveryId: s.providerDeliveryId }, `Repartidor de Uber cancelado (envío ${id})`);
+    } catch (err: any) {
+      throw new ExternalServiceError("Uber Direct", err.message);
     }
-    if (input.etaMinutes !== undefined || required) {
-      if (input.etaMinutes === null || input.etaMinutes === "") {
-        data.etaMinutes = null;
-      } else {
-        const etaMinutes = Number(input.etaMinutes);
-        if (!Number.isInteger(etaMinutes) || etaMinutes <= 0) {
-          throw new ValidationError("etaMinutes debe ser un entero mayor a cero o null");
-        }
-        data.etaMinutes = etaMinutes;
-      }
-    }
-    if (input.active !== undefined) {
-      if (typeof input.active !== "boolean") throw new ValidationError("active debe ser booleano");
-      data.active = input.active;
-    }
-    if (input.sortOrder !== undefined || required) {
-      const sortOrder = input.sortOrder === undefined ? 0 : Number(input.sortOrder);
-      if (!Number.isInteger(sortOrder) || sortOrder < 0) throw new ValidationError("sortOrder debe ser un entero mayor o igual a cero");
-      data.sortOrder = sortOrder;
-    }
-    return data;
+    return this.shipments.findOne(id);
   }
 
-  private async ensureUniqueZoneName(name: string, excludedId: number | undefined, db: DbClient) {
-    const existing = await db.shippingZone.findFirst({
+  /** Sincroniza todos los envíos de Uber en curso (lo llama un timer del servidor). */
+  async syncActive() {
+    if (!isUberConfigured()) return 0;
+    const active = await this.prisma.shipment.findMany({
       where: {
-        name: { equals: name, mode: "insensitive" },
-        ...(excludedId === undefined ? {} : { NOT: { id: excludedId } }),
+        provider: "uber",
+        providerDeliveryId: { not: null },
+        status: { notIn: FINAL_SHIPMENT_STATUSES },
+        NOT: { providerStatus: "canceled" },
       },
       select: { id: true },
     });
-    if (existing) throw new ValidationError("Ya existe una zona con ese nombre");
+    for (const { id } of active) {
+      await this.sync(id).catch((err) => log.warn({ shipmentId: id, ...errInfo(err) }, `No se pudo sincronizar el envío ${id}`));
+    }
+    return active.length;
+  }
+
+  private async applyProviderStatus(s: any, providerStatus: string, trackingUrl: string | null) {
+    if (providerStatus !== s.providerStatus || (trackingUrl && trackingUrl !== s.carrierTrackingUrl)) {
+      await this.prisma.shipment.update({
+        where: { id: s.id },
+        data: { providerStatus, ...(trackingUrl ? { carrierTrackingUrl: trackingUrl } : {}) },
+      });
+    }
+    if (providerStatus === s.providerStatus) return;
+    const target = UBER_STATUS[providerStatus];
+    log.info(
+      { shipmentId: s.id, orderId: s.orderId, uberStatus: { from: s.providerStatus, to: providerStatus }, shipmentStatus: target ?? s.status },
+      `Envío ${s.id}: Uber ${s.providerStatus ?? "-"} → ${providerStatus}`,
+    );
+    if (target) await this.advanceTo(s.id, target, UBER_TEXT[providerStatus]);
+  }
+
+  /** Avanza el envío hasta `target` pasando por los estados intermedios permitidos. */
+  private async advanceTo(id: number, target: string, description?: string) {
+    const current: any = await this.prisma.shipment.findUnique({ where: { id }, select: { status: true } });
+    if (!current || current.status === target || FINAL_SHIPMENT_STATUSES.includes(current.status)) return;
+
+    const from = DELIVERY_PATH.indexOf(current.status);
+    const to = DELIVERY_PATH.indexOf(target);
+    const steps = from >= 0 && to > from ? DELIVERY_PATH.slice(from + 1, to + 1) : [target];
+    for (const status of steps) {
+      await this.shipments.addEvent(id, {
+        status,
+        description: status === target ? description : undefined,
+        location: undefined,
+      } as any);
+    }
   }
 }

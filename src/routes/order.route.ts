@@ -9,13 +9,17 @@ import {
 
 const router = express.Router();
 const orderController = new OrderController();
-
 const user = [isAuthenticated, attachRoles];
 
 router
   .route("/")
-  .get(isAuthenticated, requirePermission("orders.manage"), orderController.findAll.bind(orderController))
+  .get(...requirePermission("orders.manage"), orderController.findAll.bind(orderController))
   .post(...user, orderController.create.bind(orderController));
+router.post(
+  "/counter",
+  ...requirePermission("orders.manage"),
+  orderController.createCounterSale.bind(orderController),
+);
 router.get("/mine", ...user, orderController.findMine.bind(orderController));
 router
   .route("/:id")

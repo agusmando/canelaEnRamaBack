@@ -1,12 +1,14 @@
 import express from "express";
 import { SupplierController } from "../controllers/supplier.controller.js";
-import { isAuthenticated, requirePermission } from "../middleware/auth.middleware.js";
+import { requirePermission, requirePermissionToWrite } from "../middleware/auth.middleware.js";
 const router = express.Router();
 
 const supplierController = new SupplierController();
 
-router.use(isAuthenticated);
-router.use(requirePermission("masters.edit"));
+
+// Ver: cualquier staff. Modificar: masters.edit.
+router.use(requirePermission("dashboard.access"));
+router.use(requirePermissionToWrite("masters.edit"));
 
 router
   .route("/")
@@ -20,6 +22,8 @@ router
   .route("/:id/brands")
   .put(supplierController.addSupplierBrands.bind(supplierController))
   .delete(supplierController.removeSupplierBrands.bind(supplierController));
+// Pasa marcas a otro proveedor: { brandsId: [{ id }], toSupplierId }
+router.post("/:id/brands/transfer", supplierController.transferSupplierBrands.bind(supplierController));
 router
   .route("/:id/active/")
   .delete(supplierController.deactivate.bind(supplierController))

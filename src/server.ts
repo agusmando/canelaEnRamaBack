@@ -76,11 +76,11 @@ setTimeout(expireUnpaid, 60 * 1000);
 const shipping = new ShippingService();
 const shippingTimer = setInterval(job("shipping-sync", () => shipping.syncActive()), 5 * 60 * 1000);
 
-// Cada 6 h: borra carritos de invitado abandonados (vacíos > 7 días, con productos > 30 días)
+// Cada 6 h: borra carritos vacíos (> 7 días) y carritos de invitado con productos (> 30 días)
 const carts = new CartService();
 const cleanCarts = job("cart-cleanup", async () => {
-  const n = await carts.deleteStaleGuestCarts();
-  if (n) getLogger("cart").info({ deleted: n }, `${n} carritos de invitado abandonados eliminados`);
+  const n = await carts.deleteStaleCarts();
+  if (n) getLogger("cart").info({ deleted: n }, `${n} carritos abandonados eliminados`);
   return n;
 });
 // Solo en producción (o con CART_CLEANUP=on): en desarrollo no se borran datos.

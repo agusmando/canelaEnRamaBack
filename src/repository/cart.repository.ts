@@ -113,28 +113,44 @@ export class CartRepository extends GenericRepositoryImpl<CartDto, CreateCartDto
   }
 
   /**
-   * Borra carritos de invitado abandonados: vacíos sin actividad en `emptyDays`
-   * días, o con productos sin actividad en `guestDays`. Los carritos de usuarios
-   * registrados nunca se borran (hay uno por usuario y la tienda lo espera).
+   * Borra carritos vacíos de cualquier dueño tras `emptyDays`, y carritos de
+   * invitado con productos tras `guestDays`. Los carritos registrados con
+   * productos se conservan.
    */
-  async deleteStaleGuestCarts({ guestDays, emptyDays }: { guestDays: number; emptyDays: number }) {
+  async deleteStaleCarts({ guestDays, emptyDays }: { guestDays: number; emptyDays: number }) {
     const now = Date.now();
     const guestCutoff = new Date(now - guestDays * 86_400_000);
     const emptyCutoff = new Date(now - emptyDays * 86_400_000);
     return this.withTransaction(async (tx: any) => {
-      const stale = await tx.cart.findMany({
+      const staleGuests = await tx.cart.findMany({
         where: {
           userSuperTokensId: null,
-          OR: [{ updatedAt: { lt: guestCutoff } }, { updatedAt: { lt: emptyCutoff }, items: { none: {} } }],
+          updatedAt: { lt: guestCutoff },
         },
         select: { id: true },
         take: 5000,
       });
-      const ids = stale.map((c: { id: number }) => c.id);
-      if (!ids.length) return 0;
-      await tx.cartItem.deleteMany({ where: { cartId: { in: ids } } });
-      const { count } = await tx.cart.deleteMany({ where: { id: { in: ids }, userSuperTokensId: null } });
-      return count;
+      const staleEmpty = await tx.cart.findMany({
+        where: { updatedAt: { lt: emptyCutoff }, items: { none: {} } },
+        select: { id: true },
+        take: 5000,
+      });
+
+      const guestIds = staleGuests.map((cart: { id: number }) => cart.id);
+      const emptyIds = staleEmpty.map((cart: { id: number }) => cart.id);
+      if (guestIds.length) {
+        await tx.cartItem.deleteMany({ where: { cartId: { in: guestIds } } });
+      }
+
+      const deletedGuests = guestIds.length
+        ? await tx.cart.deleteMany({ where: { id: { in: guestIds }, userSuperTokensId: null } })
+        : { count: 0 };
+      const deletedEmpty = emptyIds.length
+        ? await tx.cart.deleteMany({
+            where: { id: { in: emptyIds }, updatedAt: { lt: emptyCutoff }, items: { none: {} } },
+          })
+        : { count: 0 };
+      return deletedGuests.count + deletedEmpty.count;
     });
   }
 

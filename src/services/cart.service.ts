@@ -168,11 +168,11 @@ export class CartService extends GenericServiceImpl<CartDto, CreateCartDto, Upda
     };
   }
 
-  /** Limpieza periódica de carritos de invitado abandonados (la llama un timer del servidor). */
-  async deleteStaleGuestCarts() {
+  /** Limpieza periódica de carritos abandonados (la llama un timer del servidor). */
+  async deleteStaleCarts() {
     const guestDays = Number(process.env.CART_GUEST_TTL_DAYS) || 30;
     const emptyDays = Number(process.env.CART_EMPTY_TTL_DAYS) || 7;
-    return this.cartRepository.deleteStaleGuestCarts({ guestDays, emptyDays });
+    return this.cartRepository.deleteStaleCarts({ guestDays, emptyDays });
   }
 
   async clearCart(cartId: number, tx?: any) {

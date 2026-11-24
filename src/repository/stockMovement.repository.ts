@@ -61,6 +61,13 @@ export class StockMovementRepository extends GenericRepositoryImpl<
     return Number(rows?.[0]?.stock);
   }
 
+  async latestMovementForVariant(variantId: number, tx: any) {
+    return tx.stockMovement.findFirst({
+      where: { productVariantId: Number(variantId) },
+      orderBy: { id: "desc" },
+    });
+  }
+
   /** Fija el stock a un valor absoluto (registra ADJUSTMENT por la diferencia). */
   async setStockLevel(variantId: number, target: number, tx?: any): Promise<number> {
     const rows = await this.callSp<{ stock: number }[]>(

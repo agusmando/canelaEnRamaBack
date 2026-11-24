@@ -60,22 +60,23 @@ export class StockMovementService extends GenericServiceImpl<
     return { variantId, quantity, type, createdAt };
   }
 
-  async create(data: CreateMovementDto): Promise<any> {
+  async create(data: CreateMovementDto): Promise<MovementDto & { currentStock: number }> {
     const movement = this.parseManual(data);
-    const currentStock = await this.stockRepository.createStockMovement(
-      movement.variantId,
-      movement.quantity,
-      movement.type,
-      undefined,
-      movement.createdAt,
-    );
-    return {
-      productVariantId: movement.variantId,
-      quantity: movement.quantity,
-      type: movement.type,
-      createdAt: movement.createdAt ?? new Date(),
-      currentStock,
-    };
+    return this.stockRepository.withTransaction(async (tx) => {
+      await this.stockRepository.lockVariants([movement.variantId], tx);
+      const currentStock = await this.stockRepository.createStockMovement(
+        movement.variantId,
+        movement.quantity,
+        movement.type,
+        tx,
+        movement.createdAt,
+      );
+      const createdMovement = await this.stockRepository.latestMovementForVariant(movement.variantId, tx);
+      if (!createdMovement) {
+        throw new Error("No se pudo recuperar el movimiento de stock recién registrado");
+      }
+      return { ...createdMovement, currentStock };
+    });
   }
 
   /** Todos los movimientos o ninguno; filas repetidas de una variante se aplican en orden. */

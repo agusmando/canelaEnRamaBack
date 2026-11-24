@@ -21,14 +21,18 @@ import bannerRoutes from "./banner.route.js";
 import paymentRoutes from "./payment.route.js";
 import rolesRoutes from "./roles.route.js";
 import shippingRoutes from "./shipping.route.js";
+import catalogRoutes from "./catalog.route.js";
+import { invalidateCatalogOnWrite } from "../services/catalog.service.js";
 import { invalidateCatalogSearchOnWrite } from "../services/catalog-search.service.js";
 
 router.get("/health", (_req, res) => {
   res.status(200).json({ status: "ok" });
 });
 
-// Cambios en el catálogo renuevan el índice de la búsqueda (?q=)
-router.use(["/product", "/tag", "/category", "/brand"], invalidateCatalogSearchOnWrite);
+// Cambios en el catálogo renuevan el índice de la búsqueda (?q=) y el del catálogo (/catalog)
+router.use(["/product", "/tag", "/category", "/brand"], invalidateCatalogSearchOnWrite, invalidateCatalogOnWrite);
+
+router.use("/catalog", catalogRoutes);
 
 // Las rutas más específicas van ANTES: si no, "/order/item" matchea "/order/:id"
 router.use("/product/variant", productVariantRoutes);

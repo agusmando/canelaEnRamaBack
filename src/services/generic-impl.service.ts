@@ -1,6 +1,7 @@
 import type GenericServiceInterface from "./generic-service.interface.js";
 import { GenericRepositoryImpl, type SearchResult } from "../repository/generic.repository.js";
 import { NotFoundError } from "../errors/application/NotFoundError.js";
+import { cached, stableStringify } from "../utils/ttlCache.js";
 
 /**
  * Servicio CRUD genérico.
@@ -23,6 +24,14 @@ export class GenericServiceImpl<T, U, V> implements GenericServiceInterface<T, U
         : repositoryOrModel;
   }
 
+  /**
+   * Caché del listado: 0 = sin caché (default). Las subclases de catálogos
+   * públicos lo activan con `listCacheTtlMs` + `listCachePrefix`; las
+   * escrituras del mismo dominio la invalidan (`invalidateCacheOnWrite`).
+   */
+  protected listCacheTtlMs = 0;
+  protected listCachePrefix = "";
+
   /** Listado con filtros. Una lista vacía NO es un error: devuelve []. */
   async getListedElements(
     filters: any,
@@ -31,7 +40,10 @@ export class GenericServiceImpl<T, U, V> implements GenericServiceInterface<T, U
     amountPerPage: number = 10,
     detalle: boolean = false,
   ): Promise<SearchResult<T>> {
-    return this.repository.search(filters, paginate, currentPage, amountPerPage, detalle);
+    const run = () => this.repository.search(filters, paginate, currentPage, amountPerPage, detalle);
+    if (!this.listCacheTtlMs || !this.listCachePrefix) return run();
+    const key = `${this.listCachePrefix}:${stableStringify({ filters, paginate, currentPage, amountPerPage, detalle })}`;
+    return cached(key, this.listCacheTtlMs, run);
   }
 
   async findOne(id: number): Promise<T> {

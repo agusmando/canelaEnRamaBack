@@ -17,6 +17,10 @@ export class BrandService extends GenericServiceImpl<
     super(brandRepository);
   }
 
+  /** Marcas: listado cacheado (cambian raro; las escrituras lo invalidan). */
+  protected override listCacheTtlMs = 5 * 60 * 1000;
+  protected override listCachePrefix = "brand";
+
   async addRemoveProducts(
     brandId: number,
     productData: UpdateBrandProductDto,

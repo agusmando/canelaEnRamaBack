@@ -14,6 +14,7 @@ import { ProductRepository } from "../repository/product.repository.js";
 import { ProductVariantRepository } from "../repository/product-variant.repository.js";
 import { StockMovementRepository } from "../repository/stockMovement.repository.js";
 import { ImageService } from "./image.service.js";
+import { cached, stableStringify } from "../utils/ttlCache.js";
 
 /** Con multipart/form-data los arrays/objetos llegan como string JSON. */
 const parseJsonField = <T>(value: T | string | undefined): T | undefined => {
@@ -60,8 +61,14 @@ export class ProductService extends GenericServiceImpl<
   /**
    * Listado. Con `?q=` busca como la tienda (sin acentos, todas las palabras en
    * cualquier orden, ordenado por relevancia); el resto de los filtros se suma.
+   * Cacheado 60 s: es el listado público más pesado (catálogo completo de la web).
    */
   async getListedElements(filters: any, paginate = false, currentPage = 1, amountPerPage = 10, detalle = false) {
+    const key = `product:${stableStringify({ filters, paginate, currentPage, amountPerPage, detalle })}`;
+    return cached(key, 60_000, () => this.listElements(filters, paginate, currentPage, amountPerPage, detalle));
+  }
+
+  private async listElements(filters: any, paginate = false, currentPage = 1, amountPerPage = 10, detalle = false) {
     const q = String(filters?.q ?? "").trim();
     if (!q) return super.getListedElements(filters, paginate, currentPage, amountPerPage, detalle);
     const { q: _q, ...rest } = filters;

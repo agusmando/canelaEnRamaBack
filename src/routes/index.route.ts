@@ -24,13 +24,23 @@ import shippingRoutes from "./shipping.route.js";
 import catalogRoutes from "./catalog.route.js";
 import { invalidateCatalogOnWrite } from "../services/catalog.service.js";
 import { invalidateCatalogSearchOnWrite } from "../services/catalog-search.service.js";
+import { invalidateCacheOnWrite } from "../utils/ttlCache.js";
 
 router.get("/health", (_req, res) => {
   res.status(200).json({ status: "ok" });
 });
 
-// Cambios en el catálogo renuevan el índice de la búsqueda (?q=) y el del catálogo (/catalog)
-router.use(["/product", "/tag", "/category", "/brand"], invalidateCatalogSearchOnWrite, invalidateCatalogOnWrite);
+// Cambios en el catálogo renuevan el índice de la búsqueda (?q=), el del
+// catálogo (/catalog) y el caché de listados. Las ofertas también: cambian
+// precios y "en oferta" de los productos.
+router.use(
+  ["/product", "/tag", "/category", "/brand", "/offer"],
+  invalidateCatalogSearchOnWrite,
+  invalidateCatalogOnWrite,
+  invalidateCacheOnWrite("product:", "category:", "tag:", "brand:"),
+);
+// Los banners públicos se sirven cacheados 60 s.
+router.use("/banner", invalidateCacheOnWrite("banner:"));
 
 router.use("/catalog", catalogRoutes);
 

@@ -12,6 +12,7 @@ import { BannerRepository } from "../repository/banner.repository.js";
 import { ValidationError } from "../errors/application/ValidationError.js";
 import { NotFoundError } from "../errors/application/NotFoundError.js";
 import { ConflictError } from "../errors/application/ConflictError.js";
+import { cached } from "../utils/ttlCache.js";
 
 type UploadedFile = { public_id: string; secure_url: string };
 export type BannerFiles = { desktopImage?: UploadedFile[]; mobileImage?: UploadedFile[] } | undefined;
@@ -59,7 +60,9 @@ export class BannerService extends GenericServiceImpl<BannerDto, BannerInput, Ba
         throw new ValidationError(`placement debe ser uno de ${BANNER_PLACEMENTS.join(", ")}`);
       }
     }
-    return (await this.bannerRepository.listLive(filter)).map(present);
+    return cached(`banner:public:${filter ?? "all"}`, 60_000, async () =>
+      (await this.bannerRepository.listLive(filter)).map(present),
+    );
   }
 
   async getListedElements(filters: any, paginate = false, currentPage = 1, amountPerPage = 10) {

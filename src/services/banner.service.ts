@@ -82,6 +82,7 @@ export class BannerService extends GenericServiceImpl<BannerDto, BannerInput, Ba
       if (mobile) Object.assign(data, { mobileImageUrl: mobile.secure_url, mobileImagePublicId: mobile.public_id });
       this.validateComplete(data);
       await this.validateAnnouncementLimit(data);
+      await this.validateRecommendationLimit(data);
       if (data.position === undefined) data.position = await this.bannerRepository.nextPosition(data.placement);
       return present(await this.bannerRepository.createBanner(data));
     } catch (error) {
@@ -113,6 +114,7 @@ export class BannerService extends GenericServiceImpl<BannerDto, BannerInput, Ba
       const merged = { ...current, ...data };
       this.validateComplete(merged);
       await this.validateAnnouncementLimit(merged, id);
+      await this.validateRecommendationLimit(merged, id);
       if (merged.size !== (data.size ?? current.size)) data.size = merged.size;
       updated = await this.bannerRepository.updateBanner(id, data);
     } catch (error) {
@@ -154,6 +156,15 @@ export class BannerService extends GenericServiceImpl<BannerDto, BannerInput, Ba
     const count = await this.bannerRepository.countLiveAnnouncementBars(excludeId);
     if (count >= 1) {
       throw new ConflictError("Solo puede haber una barra de anuncio activa y vigente");
+    }
+  }
+
+  /** Las recomendaciones de la portada son exactamente 4 tarjetas. */
+  private async validateRecommendationLimit(banner: Record<string, any>, excludeId?: number) {
+    if (banner.placement !== "HOME_RECOMMENDATION") return;
+    const count = await this.bannerRepository.countByPlacement("HOME_RECOMMENDATION", excludeId);
+    if (count >= 4) {
+      throw new ConflictError("Las recomendaciones tienen 4 tarjetas: editá o eliminá una para crear otra");
     }
   }
 
@@ -241,6 +252,9 @@ export class BannerService extends GenericServiceImpl<BannerDto, BannerInput, Ba
     }
     if (b.placement === "HOME_RECOMMENDATION") {
       if (!b.size) throw new ValidationError("Elegí el tamaño del tile (SQUARE o WIDE)");
+      if (!b.headline) throw new ValidationError(`"${spec.label}" requiere un título`);
+      if (!b.text) throw new ValidationError(`"${spec.label}" requiere un subtítulo`);
+      if (!b.linkUrl) throw new ValidationError(`"${spec.label}" requiere un link`);
     } else if (b.size) {
       b.size = null; // el tamaño solo aplica a recomendaciones
     }

@@ -72,12 +72,12 @@ const PICKUP_SHIPMENT_TRANSITIONS: Record<string, string[]> = {
 
 /** El cliente solo puede cancelar mientras nadie empezó a preparar la orden. */
 const CUSTOMER_CANCELLABLE = ["PENDING"];
-const CLOSED_ITEM_STATUSES = ["CANCELLED", "RETURNED"];
+const CLOSED_ITEM_STATUSES = ["CANCELLED", "RETURNED", "OUT_OF_STOCK"];
 
 type Fulfillment = {
   finalSize: number | null;
   finalQty: number;
-  status: "FULFILLED" | "PARTIALLY_RETURNED" | "CANCELLED";
+  status: "FULFILLED" | "PARTIALLY_RETURNED" | "OUT_OF_STOCK";
   units: number;
 };
 
@@ -295,7 +295,7 @@ export class OrderService extends GenericServiceImpl<OrderDto, CreateOrderDto, U
         selectedBulkOption: fulfillment.finalSize,
       });
 
-      if (fulfillment.status !== "CANCELLED" && fulfillment.units > 0) {
+      if (fulfillment.units > 0) {
         await this.stockRepository.createStockMovement(variant.id, -fulfillment.units, "OUT", tx);
         totalPrice += quote.totalPriceSnapshot;
       }
@@ -314,7 +314,7 @@ export class OrderService extends GenericServiceImpl<OrderDto, CreateOrderDto, U
       });
     }
 
-    if (orderItems.every((i) => i.status === "CANCELLED")) {
+    if (orderItems.every((i) => CLOSED_ITEM_STATUSES.includes(i.status))) {
       throw new ConflictError("No hay stock disponible para ninguno de los productos de la orden");
     }
 
@@ -394,6 +394,8 @@ export class OrderService extends GenericServiceImpl<OrderDto, CreateOrderDto, U
 
     let cancelled = false;
     let change: Record<string, any> | null = null;
+    // Ítems tocados por editItem: el mail "updated" lista solo esos
+    const editedItemIds: number[] = [];
     // Aviso al cliente, se decide dentro de la transacción y sale después del commit
     let mail: OrderMailKind | null = null;
     const updated = await this.orderRepository.withTransaction(async (tx) => {
@@ -445,7 +447,7 @@ export class OrderService extends GenericServiceImpl<OrderDto, CreateOrderDto, U
         }
       } else {
         for (const change of data.editItem ?? []) {
-          await this.applyItemChange(order, change, fields, tx);
+          await this.applyItemChange(order, change, fields, tx, editedItemIds);
         }
         if (data.status) fields.status = data.status;
       }
@@ -528,7 +530,7 @@ export class OrderService extends GenericServiceImpl<OrderDto, CreateOrderDto, U
     }
     // (se asigna dentro del callback: TS lo estrecha a null)
     const pendingMail = mail as OrderMailKind | null;
-    if (pendingMail) orderMails.notify(pendingMail, id);
+    if (pendingMail) orderMails.notify(pendingMail, id, { itemIds: editedItemIds });
     return updated;
   }
 
@@ -544,9 +546,15 @@ export class OrderService extends GenericServiceImpl<OrderDto, CreateOrderDto, U
     if (changed === "CANCELLED") return "cancelled";
     if (changed === "SHIPPED") return order.shippingMethod === "DELIVERY" ? "onTheWay" : "ready";
     if (changed === "DELIVERED") return "delivered";
-    // La tienda sacó productos sin stock o los puso a la espera de reposición
+    // La tienda tocó productos que le cambian algo al cliente: sacó líneas,
+    // las devolvió (total o parcial) o las puso a la espera de reposición
     const affectsCustomer = changes.some(
-      (c) => c.status === "CANCELLED" || c.status === "AWAITING_STOCK" || !!c.awaitingStockAt,
+      (c) =>
+        c.status === "CANCELLED" ||
+        c.status === "RETURNED" ||
+        c.status === "AWAITING_STOCK" ||
+        c.quantity != null ||
+        !!c.awaitingStockAt,
     );
     return actor.isStaff && affectsCustomer ? "updated" : null;
   }
@@ -568,6 +576,7 @@ export class OrderService extends GenericServiceImpl<OrderDto, CreateOrderDto, U
     change: UpdateOrderItemDto,
     orderFields: Record<string, any>,
     tx: any,
+    editedItemIds: number[],
   ) {
     const item = order.orderItems.find((i: any) =>
       change.id ? i.id === Number(change.id) : i.productVariantId === Number(change.productVariantId),
@@ -580,6 +589,7 @@ export class OrderService extends GenericServiceImpl<OrderDto, CreateOrderDto, U
     if (CLOSED_ITEM_STATUSES.includes(item.status)) {
       throw new ConflictError(`El ítem ${item.id} ya está ${item.status}`);
     }
+    editedItemIds.push(item.id);
 
     // Cierre total de la línea
     if (change.status === "CANCELLED" || change.status === "RETURNED") {
@@ -652,7 +662,7 @@ export class OrderService extends GenericServiceImpl<OrderDto, CreateOrderDto, U
       .filter((n: number) => n > 0)
       .sort((a: number, b: number) => a - b);
 
-    if (stock <= 0) return { finalSize: null, finalQty: 0, status: "CANCELLED", units: 0 };
+    if (stock <= 0) return { finalSize: null, finalQty: 0, status: "OUT_OF_STOCK", units: 0 };
 
     if (packaging.length === 0) {
       const qty = Math.min(stock, requested);
@@ -682,7 +692,7 @@ export class OrderService extends GenericServiceImpl<OrderDto, CreateOrderDto, U
       return { finalSize: size, finalQty: maxSame, status: "PARTIALLY_RETURNED", units: maxSame * size };
     }
     const fallback = packaging.find((s) => s <= stock);
-    if (!fallback) return { finalSize: null, finalQty: 0, status: "CANCELLED", units: 0 };
+    if (!fallback) return { finalSize: null, finalQty: 0, status: "OUT_OF_STOCK", units: 0 };
     const qty = Math.floor(stock / fallback);
     return { finalSize: fallback, finalQty: qty, status: "PARTIALLY_RETURNED", units: qty * fallback };
   }

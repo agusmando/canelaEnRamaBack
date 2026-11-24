@@ -49,6 +49,8 @@ model ProductVariant {
   packagingOptions Float[]
   requestTime      String  @default("")
   stockThreshold   Int     @default(0)
+  // Generada en la DB: stock <= 0 o bajo el umbral (filtro "stock bajo" del dashboard)
+  stockLow         Boolean @default(dbgenerated())
   roundingOption   Int     @default(10)
 
   // Relación con el padre
@@ -486,6 +488,7 @@ enum OrderItemStatus {
   FULFILLED // Disponible y asignado
   AWAITING_STOCK // Sin stock, esperando reposición
   PARTIALLY_RETURNED // Parcialmente regresado
+  OUT_OF_STOCK // No había stock al confirmar el pedido
   CANCELLED // El cliente o el local lo quitaron
   RETURNED // El cliente lo regresa
 }

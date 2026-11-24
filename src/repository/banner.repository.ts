@@ -67,6 +67,14 @@ export class BannerRepository extends GenericRepositoryImpl<BannerDto, BannerInp
     return this.run(() => this.prisma.banner.findUnique({ where: { id: Number(id) } }));
   }
 
+  countByPlacement(placement: string, excludeId?: number) {
+    return this.run(() =>
+      this.prisma.banner.count({
+        where: { placement: placement as any, ...(excludeId ? { id: { not: excludeId } } : {}) },
+      }),
+    );
+  }
+
   countLiveAnnouncementBars(excludeId?: number) {
     const now = new Date();
     return this.run(() =>

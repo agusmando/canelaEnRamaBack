@@ -192,7 +192,7 @@ export class PricingService {
     status?: string;
     productVariant?: { contentMeasure?: string | null } | null;
   }): number {
-    if (item.status === "CANCELLED" || item.status === "RETURNED") return 0;
+    if (item.status === "CANCELLED" || item.status === "RETURNED" || item.status === "OUT_OF_STOCK") return 0;
     const stockUnits = item.selectedBulkOption
       ? item.quantity * item.selectedBulkOption
       : item.quantity;

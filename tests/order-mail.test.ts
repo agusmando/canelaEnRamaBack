@@ -13,8 +13,8 @@ const order = {
   user: { name: "Ana <script> Pérez", email: "ana@example.com" },
   shipment: { address: "San Martín 1234", city: "Godoy Cruz", trackingCode: "CER-ABC123", carrier: null, carrierTrackingUrl: null },
   orderItems: [
-    { productNameSnapshot: "Nueces", variantNameSnapshot: "Mariposa", quantity: 2, selectedBulkOption: 500, unitPriceSnapshot: 5000, discountAppliedSnapshot: 0, status: "FULFILLED", productVariant: { contentMeasure: "KG" } },
-    { productNameSnapshot: "Té", variantNameSnapshot: "", quantity: 1, selectedBulkOption: null, unitPriceSnapshot: 1000, discountAppliedSnapshot: 0, status: "CANCELLED", productVariant: { contentMeasure: "U" } },
+    { id: 1, productNameSnapshot: "Nueces", variantNameSnapshot: "Mariposa", quantity: 2, selectedBulkOption: 500, unitPriceSnapshot: 5000, discountAppliedSnapshot: 0, status: "FULFILLED", productVariant: { contentMeasure: "KG" } },
+    { id: 2, productNameSnapshot: "Té", variantNameSnapshot: "", quantity: 1, selectedBulkOption: null, unitPriceSnapshot: 1000, discountAppliedSnapshot: 0, status: "CANCELLED", productVariant: { contentMeasure: "U" } },
   ],
 };
 
@@ -51,21 +51,70 @@ describe("mails de pedido", () => {
     expect(buildOrderMail("delivered", { ...order, shippingMethod: "PICKUP" }).subject).toContain("Retiraste");
   });
 
-  it("cambios en el pedido lista lo que se sacó y lo que espera reposición", () => {
+  it("cambios en el pedido lista lo que se sacó, lo devuelto y lo que espera reposición", () => {
     const m = buildOrderMail("updated", {
       ...order,
       estimatedReadyAt: "2026-12-01T15:00:00Z",
       orderItems: [
         ...order.orderItems,
-        { ...order.orderItems[0], productNameSnapshot: "Almendras", status: "AWAITING_STOCK", awaitingStockAt: "2026-12-01T15:00:00Z" },
+        { ...order.orderItems[0], id: 3, productNameSnapshot: "Almendras", status: "AWAITING_STOCK", awaitingStockAt: "2026-12-01T15:00:00Z" },
+        { ...order.orderItems[0], id: 4, productNameSnapshot: "Coco", status: "RETURNED" },
       ],
     });
     expect(m.subject).toContain("#42");
-    expect(m.html).toContain("Sin stock");
+    expect(m.html).toContain("Los sacamos del pedido");
     expect(m.html).toContain("Té");
+    expect(m.html).toContain("Los devolvimos");
+    expect(m.html).toContain("Coco");
     expect(m.html).toContain("Esperando reposición");
     expect(m.html).toContain("Almendras");
     expect(m.html).toContain("diciembre");
+  });
+
+  it("cambios en el pedido con itemIds solo lista los ítems tocados", () => {
+    const m = buildOrderMail(
+      "updated",
+      {
+        ...order,
+        orderItems: [
+          order.orderItems[0],
+          { ...order.orderItems[1], status: "PARTIALLY_RETURNED", quantity: 1 },
+          { ...order.orderItems[0], id: 3, productNameSnapshot: "Almendras", status: "AWAITING_STOCK", awaitingStockAt: "2026-12-01T15:00:00Z" },
+        ],
+      },
+      { itemIds: [2] },
+    );
+    expect(m.html).toContain("Cantidad reducida");
+    expect(m.html).toContain("Té");
+    // Las otras líneas no aparecen en la sección de cambios (sí en la tabla final)
+    expect(m.html).not.toContain("Esperando reposición");
+    expect(m.html).not.toContain("Los sacamos del pedido");
+  });
+
+  it("pedido recibido explica el ajuste por stock (sin stock y cantidad reducida)", () => {
+    const m = buildOrderMail("received", {
+      ...order,
+      orderItems: [
+        order.orderItems[0],
+        { ...order.orderItems[0], id: 5, productNameSnapshot: "Almendras", status: "OUT_OF_STOCK", quantity: 0 },
+        { ...order.orderItems[0], id: 6, productNameSnapshot: "Coco", status: "PARTIALLY_RETURNED", quantity: 1 },
+      ],
+    });
+    expect(m.html).toContain("Sin stock, lo sacamos del pedido");
+    expect(m.html).toContain("Almendras");
+    expect(m.html).toContain("Ajustamos la cantidad al stock disponible");
+    expect(m.html).toContain("Coco");
+    // La línea cancelada no aparece en la tabla de ítems
+    expect(m.html).not.toContain("Té");
+  });
+
+  it("mail de pago acreditado también explica el ajuste por stock", () => {
+    const m = buildOrderMail("paid", {
+      ...order,
+      paymentType: "MERCADOPAGO",
+      orderItems: [{ ...order.orderItems[0], status: "OUT_OF_STOCK", quantity: 0 }],
+    });
+    expect(m.html).toContain("Sin stock, lo sacamos del pedido");
   });
 
   it("reintegro: monto y si fue total o parcial", () => {

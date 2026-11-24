@@ -120,7 +120,7 @@ export class ShippingService {
 
     const pickup = pickupInfo();
     const items = (s.order?.orderItems ?? [])
-      .filter((it: any) => !["CANCELLED", "RETURNED"].includes(it.status) && it.quantity > 0)
+      .filter((it: any) => !["CANCELLED", "RETURNED", "OUT_OF_STOCK"].includes(it.status) && it.quantity > 0)
       .map((it: any) => ({
         name: [it.productNameSnapshot, it.variantNameSnapshot].filter(Boolean).join(" - "),
         quantity: it.selectedBulkOption ? it.quantity : 1,

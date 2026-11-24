@@ -15,7 +15,7 @@ const log = getLogger("mail");
  *   onTheWay  en camino (envío a domicilio)
  *   failedAttempt  el repartidor no pudo entregarlo
  *   delivered entregado / retirado
- *   updated   la tienda cambió productos del pedido (sin stock o a la espera de reposición)
+ *   updated   la tienda cambió productos del pedido (devoluciones, sin stock o a la espera de reposición)
  *   refunded  reintegro (total o parcial) por Mercado Pago
  *   cancelled pedido cancelado (por la tienda, por el cliente o por falta de pago)
  */
@@ -30,8 +30,8 @@ export type OrderMailKind =
   | "refunded"
   | "cancelled";
 
-/** Datos extra de algunos mails (p. ej. el monto reintegrado). */
-export type OrderMailExtra = { amount?: number };
+/** Datos extra de algunos mails (p. ej. el monto reintegrado o los ítems tocados). */
+export type OrderMailExtra = { amount?: number; itemIds?: number[] };
 
 const PAYMENT_LABEL: Record<string, string> = {
   DEBIT: "Tarjeta de débito",
@@ -67,7 +67,7 @@ export const itemLabel = (it: {
 
 /** Total de la línea a partir de los snapshots (mismo cálculo que PricingService.lineTotal). */
 export const itemTotal = (it: any) => {
-  if (it.status === "CANCELLED" || it.status === "RETURNED") return 0;
+  if (it.status === "CANCELLED" || it.status === "RETURNED" || it.status === "OUT_OF_STOCK") return 0;
   const units = it.selectedBulkOption ? it.quantity * it.selectedBulkOption : it.quantity;
   const priceUnits = it.productVariant?.contentMeasure === "KG" ? units / 1000 : units;
   return round2(Math.max(0, it.unitPriceSnapshot * priceUnits - Number(it.discountAppliedSnapshot ?? 0)));
@@ -79,7 +79,7 @@ const p = (html: string) => `<p style="margin:0 0 16px;font-size:15px;line-heigh
 
 function itemsTable(order: any) {
   const rows = (order.orderItems ?? [])
-    .filter((it: any) => it.status !== "CANCELLED" && it.status !== "RETURNED")
+    .filter((it: any) => it.status !== "CANCELLED" && it.status !== "RETURNED" && it.status !== "OUT_OF_STOCK")
     .map(
       (it: any) => `<tr>
         <td style="padding:6px 0;font-size:14px">${escapeHtml(it.productNameSnapshot)}${
@@ -115,16 +115,55 @@ function deliveryText(order: any) {
 const dateLabel = (d: string | Date) =>
   new Date(d).toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "long", timeZone: "America/Argentina/Buenos_Aires" });
 
-/** Líneas sin stock (canceladas por la tienda) y a la espera de reposición. */
-function changesList(order: any) {
+/**
+ * Ajuste por stock al confirmar el pedido: líneas que quedaron afuera por no
+ * haber stock y líneas con la cantidad reducida a lo disponible.
+ */
+function stockChanges(order: any) {
+  const items = order.orderItems ?? [];
   const line = (it: any) =>
     `${escapeHtml(it.productNameSnapshot)}${it.variantNameSnapshot ? ` · ${escapeHtml(it.variantNameSnapshot)}` : ""}`;
-  const cancelled = (order.orderItems ?? []).filter((it: any) => it.status === "CANCELLED");
-  const waiting = (order.orderItems ?? []).filter((it: any) => it.status === "AWAITING_STOCK");
+  const removed = items.filter((it: any) => it.status === "OUT_OF_STOCK");
+  const reduced = items.filter((it: any) => it.status === "PARTIALLY_RETURNED");
+  let html = "";
+  if (removed.length) {
+    html += p(`<strong>Sin stock, lo sacamos del pedido</strong> (no se cobra):<br>${removed.map(line).join("<br>")}`);
+  }
+  if (reduced.length) {
+    html += p(
+      `<strong>Ajustamos la cantidad al stock disponible</strong>:<br>${reduced
+        .map((it: any) => `${line(it)} <span style="color:#666">(quedó en ${escapeHtml(itemLabel(it))})</span>`)
+        .join("<br>")}`,
+    );
+  }
+  return html;
+}
+
+/** Líneas que la tienda tocó en esta actualización (o todas las pendientes si no se indica). */
+function changesList(order: any, itemIds?: number[]) {
+  const line = (it: any) =>
+    `${escapeHtml(it.productNameSnapshot)}${it.variantNameSnapshot ? ` · ${escapeHtml(it.variantNameSnapshot)}` : ""}`;
+  const all = order.orderItems ?? [];
+  const items = itemIds?.length ? all.filter((it: any) => itemIds.includes(it.id)) : all;
+  const interesting = items.filter((it: any) =>
+    ["CANCELLED", "RETURNED", "PARTIALLY_RETURNED", "AWAITING_STOCK"].includes(it.status),
+  );
+  const cancelled = interesting.filter((it: any) => it.status === "CANCELLED");
+  const returned = interesting.filter((it: any) => it.status === "RETURNED");
+  const adjusted = interesting.filter((it: any) => it.status === "PARTIALLY_RETURNED");
+  const waiting = interesting.filter((it: any) => it.status === "AWAITING_STOCK");
   let html = "";
   if (cancelled.length) {
+    html += p(`<strong>Los sacamos del pedido</strong> (no se cobran):<br>${cancelled.map(line).join("<br>")}`);
+  }
+  if (returned.length) {
+    html += p(`<strong>Los devolvimos</strong>:<br>${returned.map(line).join("<br>")}`);
+  }
+  if (adjusted.length) {
     html += p(
-      `<strong>Sin stock, los sacamos del pedido</strong> (no se cobran):<br>${cancelled.map(line).join("<br>")}`,
+      `<strong>Cantidad reducida</strong>:<br>${adjusted
+        .map((it: any) => `${line(it)} <span style="color:#666">(quedó en ${escapeHtml(itemLabel(it))})</span>`)
+        .join("<br>")}`,
     );
   }
   if (waiting.length) {
@@ -154,6 +193,7 @@ export function buildOrderMail(kind: OrderMailKind, order: any, extra: OrderMail
           body:
             hi +
             p("Ya lo estamos preparando. Te avisamos por mail cuando esté listo.") +
+            stockChanges(order) +
             itemsTable(order) +
             p(`<strong>Pago:</strong> ${escapeHtml(payment)}.<br><strong>Entrega:</strong> ${deliveryText(order)}`),
           button: orderLink,
@@ -167,6 +207,7 @@ export function buildOrderMail(kind: OrderMailKind, order: any, extra: OrderMail
           body:
             hi +
             p("Mercado Pago nos confirmó el pago. Ya estamos preparando tu pedido y te avisamos cuando esté listo.") +
+            stockChanges(order) +
             itemsTable(order) +
             p(`<strong>Entrega:</strong> ${deliveryText(order)}`),
           button: orderLink,
@@ -237,7 +278,7 @@ export function buildOrderMail(kind: OrderMailKind, order: any, extra: OrderMail
           body:
             hi +
             p("Te contamos los cambios en tu pedido:") +
-            changesList(order) +
+            changesList(order, extra.itemIds) +
             (order.estimatedReadyAt ? p(`Fecha estimada en que va a estar listo: <strong>${escapeHtml(dateLabel(order.estimatedReadyAt))}</strong>.`) : "") +
             p("Así queda el pedido:") +
             itemsTable(order),

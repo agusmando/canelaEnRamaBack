@@ -39,7 +39,8 @@ export const BANNER_PLACEMENT_SPECS: BannerPlacementSpec[] = [
   {
     key: "HOME_RECOMMENDATION",
     label: "Recomendaciones (home)",
-    description: "Grilla de la sección 'Nuestras recomendaciones': tiles cuadrados y anchos.",
+    description:
+      "Las 4 tarjetas de 'Nuestras recomendaciones' de la portada: cada una con título, subtítulo, imagen y link. Las posiciones sin tarjeta muestran la imagen por defecto.",
     desktop: null,
     mobile: null,
     sizes: { SQUARE: { width: 600, height: 600 }, WIDE: { width: 1200, height: 420 } },

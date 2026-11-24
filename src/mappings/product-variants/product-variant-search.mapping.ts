@@ -15,6 +15,8 @@ export const productVariantSearchQueryMapping = {
   currentStock: { field: "currentStock", type: "number" },
   stockThreshold: { field: "currentStock", operation: "gte", type: "numberRange" },
   maxStock: { field: "currentStock", operation: "lte", type: "numberRange" },
+  // ?lowStock=true -> stockLow (columna generada: sin stock o bajo el umbral)
+  lowStock: { field: "stockLow", type: "boolean" },
   ofuscatedComponentOf: {
     field: "isComponentOf",
     type: "relationArray",

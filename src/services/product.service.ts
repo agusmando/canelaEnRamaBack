@@ -117,7 +117,7 @@ export class ProductService extends GenericServiceImpl<
             if (isMix) {
               await this.stockRepository.processMixProduction(variant.id, stock, tx);
             } else {
-              await this.stockRepository.createStockMovement(variant.id, stock, "IN", tx);
+              await this.stockRepository.createStockMovement(variant.id, stock, "IN", tx, null, "Stock inicial");
             }
           }
         }
@@ -160,7 +160,7 @@ export class ProductService extends GenericServiceImpl<
         for (const [idx, variant] of added.entries()) {
           const stock = Number(data.addVariants?.[idx]?.currentStock) || 0;
           if (stock > 0) {
-            await this.stockRepository.createStockMovement(variant.id, stock, "IN", tx);
+            await this.stockRepository.createStockMovement(variant.id, stock, "IN", tx, null, "Stock inicial");
           }
         }
       }

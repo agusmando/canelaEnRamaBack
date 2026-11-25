@@ -19,6 +19,16 @@ export type PriceQuote = {
    * carrito): `missing` está en la misma unidad que cuenta la oferta.
    */
   offerHint?: { label: string; missing: number; unit: "pack" | "unit" | "kg" } | null;
+  /**
+   * Parámetros de la oferta vigente elegida (se guarda en OrderItem.offerParams).
+   * Permite recotizar el descuento si la cantidad de la línea cambia.
+   */
+  offerSnapshot?: {
+    discountType: string;
+    discountValue: number | null;
+    discountQuantity: number | null;
+    quantityToGet: number | null;
+  } | null;
 };
 
 /** Ofertas cuyo descuento depende de la cantidad llevada. */
@@ -142,7 +152,52 @@ export class PricingService {
       offerTypeSnapshot: offerType,
       priceUnits,
       offerHint,
+      offerSnapshot: offer
+        ? {
+            discountType: offer.discountType,
+            discountValue: offer.discountValue ?? null,
+            discountQuantity: offer.discountQuantity ?? null,
+            quantityToGet: offer.quantityToGet ?? null,
+          }
+        : null,
     };
+  }
+
+  /**
+   * Descuento de una línea de orden para una cantidad distinta de la original
+   * (devolución parcial). Usa los parámetros de la oferta guardados en
+   * `offerParams` para respetar la lógica de la oferta (las por cantidad no son
+   * lineales). Sin snapshot (órdenes viejas) prorratea linealmente.
+   */
+  lineDiscountForQuantity(
+    item: {
+      unitPriceSnapshot: number;
+      discountAppliedSnapshot?: number | null;
+      quantity: number;
+      selectedBulkOption?: number | null;
+      offerParams?: unknown;
+      productVariant?: { contentMeasure?: string | null } | null;
+    },
+    newQty: number,
+  ): number {
+    const measure = item.productVariant?.contentMeasure;
+    const stockUnits = item.selectedBulkOption ? newQty * item.selectedBulkOption : newQty;
+    const priceUnits = stockUnitsToPriceUnits(stockUnits, measure);
+    const unitPrice = Number(item.unitPriceSnapshot) || 0;
+    const listTotal = unitPrice * priceUnits;
+
+    const params = item.offerParams as OfferDto | null | undefined;
+    if (params?.discountType) {
+      try {
+        const offerCount = item.selectedBulkOption ? newQty : priceUnits;
+        const result = this.offerService.applyOffer(unitPrice, offerCount, params);
+        return round2(Math.max(0, listTotal - result.unitAfter * priceUnits));
+      } catch {
+        // params corruptos: cae al prorrateo lineal
+      }
+    }
+    const oldQty = Number(item.quantity) || 1;
+    return round2(((Number(item.discountAppliedSnapshot) || 0) * newQty) / oldQty);
   }
 
   /**

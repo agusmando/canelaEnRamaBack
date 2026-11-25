@@ -14,6 +14,8 @@ export class CreateOrderDto {
   shippingZone?: string | null;
   /** Checkout: usa las líneas del carrito del usuario y lo vacía. */
   fromCart?: boolean;
+  /** Cupón de descuento (se valida y descuenta del subtotal de productos). */
+  discountCode?: string;
 
   constructor(
     userSuperTokensId: string,

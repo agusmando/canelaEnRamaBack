@@ -13,10 +13,12 @@ import { ConflictError } from "../errors/application/ConflictError.js";
 import { ForbidenError } from "../errors/domain/auth/ForbidenError.js";
 import type { Actor } from "../middleware/auth.middleware.js";
 import { CartService } from "./cart.service.js";
+import { DiscountCodeService } from "./discount-code.service.js";
 import { ShipmentRepository } from "../repository/shipment.repository.js";
 import { isMercadoPagoConfigured } from "../config/mercadopago.js";
 import { streetLine, ShippingQuoteService, type ShippingQuote } from "./shipping-quote.service.js";
 import { orderMails, type OrderMailKind } from "./order-mail.service.js";
+import { orderChargeTotal } from "../utils/pricing.js";
 import { newTrackingCode } from "../utils/trackingCode.js";
 import { getLogger } from "../config/logger.js";
 
@@ -94,6 +96,7 @@ export class OrderService extends GenericServiceImpl<OrderDto, CreateOrderDto, U
     private readonly cartService = new CartService(),
     private readonly shipmentRepository = new ShipmentRepository(),
     private readonly shippingQuotes = new ShippingQuoteService(),
+    private readonly discountCodeService = new DiscountCodeService(),
   ) {
     super(orderRepository);
   }
@@ -143,7 +146,7 @@ export class OrderService extends GenericServiceImpl<OrderDto, CreateOrderDto, U
         items: order.orderItems?.length,
         event: "order_created",
       },
-      `Orden ${order.id} creada (${order.paymentType}, $${Number(order.totalPrice) + (Number(order.shippingCost) || 0)})`,
+      `Orden ${order.id} creada (${order.paymentType}, $${orderChargeTotal(order)})`,
     );
   }
 
@@ -255,6 +258,8 @@ export class OrderService extends GenericServiceImpl<OrderDto, CreateOrderDto, U
     let estimatedReadyAt: Date | undefined;
     let totalPrice = 0;
     const orderItems: any[] = [];
+    // Unidades descontadas por variante: al crear la orden se les anota el pedido.
+    const soldCounts = new Map<number, number>();
 
     // Secuencial: cada línea ve el stock ya descontado por las anteriores
     for (const item of data.orderItems) {
@@ -297,6 +302,7 @@ export class OrderService extends GenericServiceImpl<OrderDto, CreateOrderDto, U
 
       if (fulfillment.units > 0) {
         await this.stockRepository.createStockMovement(variant.id, -fulfillment.units, "OUT", tx);
+        soldCounts.set(variant.id, (soldCounts.get(variant.id) ?? 0) + 1);
         totalPrice += quote.totalPriceSnapshot;
       }
 
@@ -309,6 +315,7 @@ export class OrderService extends GenericServiceImpl<OrderDto, CreateOrderDto, U
         unitPriceSnapshot: quote.unitPriceSnapshot,
         discountAppliedSnapshot: quote.discountAppliedSnapshot,
         offerTypeSnapshot: quote.offerTypeSnapshot,
+        offerParams: quote.offerSnapshot ?? null,
         status: fulfillment.status,
         awaitingStockAt,
       });
@@ -317,6 +324,16 @@ export class OrderService extends GenericServiceImpl<OrderDto, CreateOrderDto, U
     if (orderItems.every((i) => CLOSED_ITEM_STATUSES.includes(i.status))) {
       throw new ConflictError("No hay stock disponible para ninguno de los productos de la orden");
     }
+
+    // Cupón de descuento sobre el subtotal de productos (después de ofertas).
+    // Si el código no sirve, placeOrder falla y no queda orden a medias.
+    const subtotal = Math.round(totalPrice * 100) / 100;
+    const coupon = await this.discountCodeService.resolveForOrder(
+      (data as any).discountCode,
+      subtotal,
+      userId,
+      tx,
+    );
 
     const delivery = shipping.method === "DELIVERY" ? shipping : null;
     const order = await this.orderRepository.createOrder(
@@ -334,9 +351,39 @@ export class OrderService extends GenericServiceImpl<OrderDto, CreateOrderDto, U
         shippingCost: delivery ? delivery.quote.price : 0,
         shippingProvider: delivery?.quote.provider ?? null,
         shippingZone: delivery?.quote.zone ?? null,
+        ...(coupon
+          ? {
+              couponCode: coupon.code,
+              couponDiscount: coupon.discount,
+              discountCodeId: coupon.id,
+              couponParams: coupon.params,
+            }
+          : {}),
       } as any,
       tx,
     );
+
+    // Las ventas se registran como OUT genérico: les dejamos la orden de origen.
+    // La variante está lockeada y sus movimientos más recientes son los de esta tx.
+    const saleNote = opts.counter
+      ? `Venta de mostrador · pedido #${order.id}`
+      : `Venta online · pedido #${order.id}`;
+    for (const [variantId, count] of soldCounts) {
+      const movements =
+        (await tx.stockMovement?.findMany({
+          where: { productVariantId: variantId, type: "OUT", note: null },
+          orderBy: { id: "desc" },
+          take: count,
+          select: { id: true },
+        })) ?? [];
+      if (movements.length) {
+        await tx.stockMovement.updateMany({
+          where: { id: { in: movements.map((m: any) => m.id) } },
+          data: { note: saleNote },
+        });
+      }
+    }
+
     if (!delivery) return order;
 
     // Envío a domicilio: el envío se crea ya con los datos del domicilio y el costo cobrado
@@ -468,6 +515,12 @@ export class OrderService extends GenericServiceImpl<OrderDto, CreateOrderDto, U
         0,
       );
       fields.totalPrice = Math.round(fields.totalPrice * 100) / 100;
+
+      // El cupón se reevalúa sobre el nuevo subtotal: un % baja, un monto fijo
+      // se topa al subtotal y si ya no se llega a la compra mínima no aplica.
+      if (order.couponCode && Number(fields.totalPrice) !== Number(order.totalPrice)) {
+        fields.couponDiscount = this.repriceCouponDiscount(order, fields.totalPrice);
+      }
       if (order.orderItems.every((it: any) => CLOSED_ITEM_STATUSES.includes(it.status))) {
         fields.status = "CANCELLED";
       }
@@ -517,6 +570,9 @@ export class OrderService extends GenericServiceImpl<OrderDto, CreateOrderDto, U
         ...(fields.status && fields.status !== order.status ? { status: { from: order.status, to: fields.status } } : {}),
         ...(Number(fields.totalPrice) !== Number(order.totalPrice) ? { totalPrice: { from: Number(order.totalPrice), to: fields.totalPrice } } : {}),
         ...(data.editItem?.length ? { editedItems: data.editItem.length } : {}),
+        ...(Number(fields.couponDiscount) !== Number(order.couponDiscount)
+          ? { couponDiscount: { from: Number(order.couponDiscount) || 0, to: Number(fields.couponDiscount) || 0 } }
+          : {}),
       };
       return this.orderRepository.updateOrderFields(id, fields, tx);
     });
@@ -564,11 +620,32 @@ export class OrderService extends GenericServiceImpl<OrderDto, CreateOrderDto, U
     if (CLOSED_ITEM_STATUSES.includes(item.status)) return;
     const units = stockUnitsOf(item);
     if (units > 0 && item.productVariantId) {
-      await this.stockRepository.createStockMovement(item.productVariantId, units, "RETURN", tx);
+      const note =
+        status === "CANCELLED"
+          ? `Cancelación · pedido #${order.id}`
+          : `Devolución · pedido #${order.id}`;
+      await this.stockRepository.createStockMovement(item.productVariantId, units, "RETURN", tx, null, note);
     }
     const updated = { status, quantity: 0, discountAppliedSnapshot: 0 };
     await this.orderRepository.updateItem(item.id, updated, tx);
     Object.assign(item, updated);
+  }
+
+  /**
+   * Recotiza el descuento del cupón sobre un nuevo subtotal de productos,
+   * con los parámetros guardados al momento de la compra (`couponParams`).
+   * Sin snapshot (órdenes viejas) conserva el descuento original.
+   */
+  private repriceCouponDiscount(order: any, subtotal: number): number {
+    const p = order.couponParams as any;
+    if (!p?.discountType) return Number(order.couponDiscount) || 0;
+    const base = Math.max(0, Number(subtotal) || 0);
+    const min = Number(p.minOrderAmount) || 0;
+    if (min > 0 && base < min) return 0;
+    let discount =
+      p.discountType === "PERCENTAGE" ? (base * Number(p.discountValue)) / 100 : Number(p.discountValue);
+    if (p.maxDiscountAmount != null) discount = Math.min(discount, Number(p.maxDiscountAmount));
+    return Math.round(Math.min(Math.max(0, discount), base) * 100) / 100;
   }
 
   private async applyItemChange(
@@ -615,10 +692,13 @@ export class OrderService extends GenericServiceImpl<OrderDto, CreateOrderDto, U
         returnedUnits,
         "RETURN",
         tx,
+        null,
+        `Devolución parcial · pedido #${order.id}`,
       );
-      // El descuento se prorratea a la cantidad que queda
-      itemData.discountAppliedSnapshot =
-        Math.round(((item.discountAppliedSnapshot ?? 0) * newQty * 100) / item.quantity) / 100;
+      // El descuento se recotiza para la nueva cantidad con los parámetros de la
+      // oferta original (3x2, "desde N", etc. no son lineales). Sin snapshot
+      // (órdenes viejas) prorratea.
+      itemData.discountAppliedSnapshot = this.pricingService.lineDiscountForQuantity(item, newQty);
       itemData.quantity = newQty;
       itemData.status = "PARTIALLY_RETURNED";
     }

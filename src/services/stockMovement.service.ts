@@ -45,6 +45,8 @@ export class StockMovementService extends GenericServiceImpl<
       throw new BadRequestError(`${prefix}un movimiento OUT debe tener cantidad negativa`);
     }
 
+    const note = String(data?.note ?? "").trim().slice(0, 200) || null;
+
     let createdAt: Date | null = null;
     if (data?.createdAt !== undefined && data.createdAt !== null && data.createdAt !== "") {
       createdAt = new Date(data.createdAt);
@@ -57,7 +59,7 @@ export class StockMovementService extends GenericServiceImpl<
         throw new ValidationError(`${prefix}la fecha no puede tener más de un año`);
       }
     }
-    return { variantId, quantity, type, createdAt };
+    return { variantId, quantity, type, createdAt, note };
   }
 
   async create(data: CreateMovementDto): Promise<MovementDto & { currentStock: number }> {
@@ -70,6 +72,7 @@ export class StockMovementService extends GenericServiceImpl<
         movement.type,
         tx,
         movement.createdAt,
+        movement.note,
       );
       const createdMovement = await this.stockRepository.latestMovementForVariant(movement.variantId, tx);
       if (!createdMovement) {
@@ -96,11 +99,13 @@ export class StockMovementService extends GenericServiceImpl<
             movement.type,
             tx,
             movement.createdAt,
+            movement.note,
           );
           results.push({
             productVariantId: movement.variantId,
             quantity: movement.quantity,
             type: movement.type,
+            note: movement.note,
             createdAt: movement.createdAt ?? new Date(),
             currentStock,
           });

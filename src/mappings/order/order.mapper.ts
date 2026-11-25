@@ -58,6 +58,9 @@ export class OrderMapper {
     dto.shippingCost = dbOrder.shippingCost;
     dto.shippingProvider = dbOrder.shippingProvider;
     dto.shippingZone = dbOrder.shippingZone;
+    dto.couponCode = dbOrder.couponCode;
+    dto.couponDiscount = dbOrder.couponDiscount ?? 0;
+    dto.discountCodeId = dbOrder.discountCodeId;
     return dto;
   }
 

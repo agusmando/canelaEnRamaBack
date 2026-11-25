@@ -12,6 +12,7 @@ import { permissionsForRoles } from "../config/rbac.js";
 import { ValidationError } from "../errors/application/ValidationError.js";
 import { NotFoundError } from "../errors/application/NotFoundError.js";
 import { emailBrandingConfig, isBrandedEmailConfigured, renderBrandedEmail } from "./email.service.js";
+import { orderChargeTotal } from "../utils/pricing.js";
 import { errInfo, getLogger } from "../config/logger.js";
 
 const log = getLogger("payment");
@@ -53,8 +54,8 @@ const round2 = (n: number) => Math.round(n * 100) / 100;
  *  4. Pago aprobado → paymentStatus APPROVED y la orden pasa a PROCESSING.
  *  5. Si nadie paga en MP_ORDER_TTL_HOURS, la orden se cancela y el stock vuelve.
  */
-/** Lo que paga el cliente: productos + envío. */
-const chargeTotal = (order: any) => round2(Number(order.totalPrice || 0) + Number(order.shippingCost || 0));
+/** Lo que paga el cliente: productos (con ofertas) − cupón + envío. */
+const chargeTotal = orderChargeTotal;
 
 export class PaymentService {
   constructor(
@@ -328,7 +329,7 @@ export class PaymentService {
     await this.orderRepository.updateOrderFields(orderId, {
       refundId: String(refund.id),
       refundStatus,
-      refundAmount: Number(refund.amount ?? order.totalPrice + Number(order.shippingCost ?? 0)),
+      refundAmount: Number(refund.amount ?? orderChargeTotal(order)),
       refundedAt: refundStatus === "APPROVED" ? new Date() : null,
       ...(refundStatus === "APPROVED" ? { paymentStatus: "REFUNDED" } : {}),
     });
@@ -345,7 +346,7 @@ export class PaymentService {
           to: order.user.email,
           customerName: order.user.name ?? "",
           orderId,
-          amount: Number(refund.amount ?? order.totalPrice + Number(order.shippingCost ?? 0)),
+          amount: Number(refund.amount ?? orderChargeTotal(order)),
           note: order.refundNote ?? note,
           refundPending: refundStatus === "PENDING",
           siteUrl,
@@ -364,7 +365,7 @@ export class PaymentService {
     return {
       order: await this.orderService.getOrder(orderId, actor),
       refundStatus,
-      refundedAmount: Number(refund.amount ?? order.totalPrice + Number(order.shippingCost ?? 0)),
+      refundedAmount: Number(refund.amount ?? orderChargeTotal(order)),
       emailSent,
       emailError,
     };

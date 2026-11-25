@@ -90,9 +90,15 @@ function itemsTable(order: any) {
     )
     .join("");
   const shipping = Number(order.shippingCost) || 0;
-  const total = round2(Number(order.totalPrice || 0) + shipping);
+  const coupon = Number(order.couponDiscount) || 0;
+  const total = round2(Number(order.totalPrice || 0) - coupon + shipping);
   return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:8px 0 16px;border-top:1px solid #eee;border-bottom:1px solid #eee">
       ${rows}
+      ${
+        coupon > 0 && order.couponCode
+          ? `<tr><td style="padding:6px 0;font-size:14px">Cupón ${escapeHtml(order.couponCode)}</td><td style="padding:6px 0;font-size:14px;text-align:right">−${money(coupon)}</td></tr>`
+          : ""
+      }
       ${
         order.shippingMethod === "DELIVERY"
           ? `<tr><td style="padding:6px 0;font-size:14px">Envío${order.shippingZone ? ` a ${escapeHtml(order.shippingZone)}` : ""}</td><td style="padding:6px 0;font-size:14px;text-align:right">${shipping ? money(shipping) : "Gratis"}</td></tr>`

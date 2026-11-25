@@ -82,7 +82,7 @@ export class ProductVariantService extends GenericServiceImpl<
           if (isMix) {
             await this.stockRepository.processMixProduction(created.id, initialStock, tx);
           } else {
-            await this.stockRepository.createStockMovement(created.id, initialStock, "IN", tx);
+            await this.stockRepository.createStockMovement(created.id, initialStock, "IN", tx, null, "Stock inicial");
           }
         }
         return this.productVariantRepository.getById(created.id, tx);
@@ -165,6 +165,12 @@ export class ProductVariantService extends GenericServiceImpl<
           throw new ValidationError("currentStock debe ser un entero mayor o igual a 0");
         }
         await this.stockRepository.setStockLevel(id, target, tx);
+        const mv = await tx.stockMovement.findFirst({
+          where: { productVariantId: id },
+          orderBy: { id: "desc" },
+          select: { id: true },
+        });
+        if (mv) await tx.stockMovement.update({ where: { id: mv.id }, data: { note: "Ajuste manual de stock" } });
       } else {
         const increment = Number(data.stockIncrement);
         if (!Number.isInteger(increment) || increment === 0) {
@@ -179,6 +185,8 @@ export class ProductVariantService extends GenericServiceImpl<
             increment,
             increment < 0 ? "OUT" : "IN",
             tx,
+            null,
+            "Ajuste manual de stock",
           );
         }
       }
@@ -236,11 +244,25 @@ export class ProductVariantService extends GenericServiceImpl<
     }
     if (targetStock !== undefined) {
       await this.stockRepository.setStockLevel(id, targetStock, tx);
+      // La SP genera el ADJUSTMENT sin nota: se la agregamos al movimiento recién creado.
+      const mv = await tx.stockMovement.findFirst({
+        where: { productVariantId: id },
+        orderBy: { id: "desc" },
+        select: { id: true },
+      });
+      if (mv) await tx.stockMovement.update({ where: { id: mv.id }, data: { note: "Ajuste manual de stock" } });
     } else if (increment) {
       if (increment > 0 && isMix) {
         await this.stockRepository.processMixProduction(id, increment, tx);
       } else {
-        await this.stockRepository.createStockMovement(id, increment, increment < 0 ? "OUT" : "IN", tx);
+        await this.stockRepository.createStockMovement(
+          id,
+          increment,
+          increment < 0 ? "OUT" : "IN",
+          tx,
+          null,
+          "Ajuste manual de stock",
+        );
       }
     }
   }

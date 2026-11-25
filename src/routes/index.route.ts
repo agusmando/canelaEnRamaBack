@@ -22,6 +22,7 @@ import paymentRoutes from "./payment.route.js";
 import rolesRoutes from "./roles.route.js";
 import shippingRoutes from "./shipping.route.js";
 import catalogRoutes from "./catalog.route.js";
+import discountCodeRoutes from "./discount-code.route.js";
 import { invalidateCatalogOnWrite } from "../services/catalog.service.js";
 import { invalidateCatalogSearchOnWrite } from "../services/catalog-search.service.js";
 import { invalidateCacheOnWrite } from "../utils/ttlCache.js";
@@ -64,6 +65,7 @@ router.use("/banner", bannerRoutes);
 router.use("/payment", paymentRoutes);
 router.use("/roles", rolesRoutes);
 router.use("/shipping", shippingRoutes);
+router.use("/discount-code", discountCodeRoutes);
 router.use("/shipment", shipmentRoutes);
 
 export default router;

@@ -51,3 +51,22 @@ export function effectiveBulkOption(
   const chosen = Number(selected);
   return chosen > 0 ? chosen : options[0];
 }
+
+const round2 = (n: number) => Math.round(n * 100) / 100;
+
+/**
+ * Total que paga el cliente por una orden: productos (con ofertas) menos el
+ * descuento del cupón, más el envío. Única fuente para Mercado Pago, mails y
+ * cualquier cálculo de "lo cobrado".
+ */
+export function orderChargeTotal(order: {
+  totalPrice?: number | null;
+  shippingCost?: number | null;
+  couponDiscount?: number | null;
+}): number {
+  return round2(
+    Math.max(0, Number(order.totalPrice) || 0) -
+      (Number(order.couponDiscount) || 0) +
+      (Number(order.shippingCost) || 0),
+  );
+}

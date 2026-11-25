@@ -94,6 +94,18 @@ export default function mappingSelector(entity: string) {
           (module) => module.offerUpdateMapping,
         ),
       };
+    case "discountCode":
+      return {
+        search: import("../mappings/discount-codes/discount-code-search.mapping.js").then(
+          (module) => module.discountCodeSearchQueryMapping,
+        ),
+        create: import("../mappings/discount-codes/discount-code-create.mapping.js").then(
+          (module) => module.discountCodeCreateMapping,
+        ),
+        update: import("../mappings/discount-codes/discount-code-update.mapping.js").then(
+          (module) => module.discountCodeUpdateMapping,
+        ),
+      };
     case "cart":
       return {
         search: import("../mappings/cart/cart-search.mapping.js").then(

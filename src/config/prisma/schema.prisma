@@ -136,6 +136,8 @@ model StockMovement {
   priceAtTime      Float           @default(0)
   // Útil para saber por qué cambió (Venta, Reabastecimiento, Merma, Devolución)
   type             MovementType
+  // Motivo legible: "Venta · pedido #123", nota libre en cargas manuales, etc.
+  note             String?
   createdAt        DateTime        @default(now())
   productVariant   ProductVariant? @relation(fields: [productVariantId], references: [id])
 }
@@ -421,8 +423,45 @@ model Order {
   refundedAmount      Float         @default(0)
   refunds             Refund[]
 
+  // Descuento por código promocional (checkout). `totalPrice` sigue siendo el
+  // total de productos con ofertas; lo cobrado es
+  // totalPrice - couponDiscount + shippingCost.
+  couponCode      String?
+  couponDiscount  Float            @default(0)
+  discountCodeId  Int?
+  // Parámetros del cupón al momento de la compra (discountType, discountValue,
+  // maxDiscountAmount, minOrderAmount): permite recotizar el descuento si el
+  // subtotal cambia por devoluciones/cancelaciones de ítems.
+  couponParams    Json?
+
   @@index([paymentType, paymentStatus, status])
   @@index([channel])
+  @@index([couponCode])
+}
+
+/// Cupón de descuento para todo el carrito (checkout). A diferencia de `Offer`,
+/// que rebaja productos sueltos, acá el cliente escribe el código.
+model DiscountCode {
+  id                Int              @id @default(autoincrement())
+  code              String           @unique // se normaliza a mayúsculas
+  description       String? // nota interna del staff (para qué se creó)
+  discountType      DiscountCodeType
+  discountValue     Float // porcentaje (0-100) o $ fijo
+  maxDiscountAmount Float? // tope del descuento en $ (sobre todo para PERCENTAGE)
+  minOrderAmount    Float            @default(0) // subtotal mínimo de productos
+  usageLimit        Int? // usos totales; null = ilimitado
+  perUserLimit      Int? // usos por cliente; null = ilimitado
+  usedCount         Int              @default(0)
+  startTime         DateTime
+  finishTime        DateTime
+  active            Boolean          @default(true)
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+}
+
+enum DiscountCodeType {
+  PERCENTAGE
+  FIXED
 }
 
 /// Reintegro (total o parcial) de un pago de Mercado Pago hecho desde el panel.
@@ -474,6 +513,10 @@ model OrderItem {
   unitPriceSnapshot       Float // El precio al que se vendió EXACTAMENTE ese día
   discountAppliedSnapshot Float  @default(0) // El descuento que se aplicó EXACTAMENTE ese dia
   offerTypeSnapshot       String @default("") // Ej: "BUY_ONE_GET_MORE"
+  // Parámetros de la oferta elegida al crear la línea (discountType, discountValue,
+  // discountQuantity, quantityToGet): permite recotizar el descuento si la cantidad
+  // cambia (devolución parcial), porque las ofertas por cantidad no son lineales.
+  offerParams             Json?
 
   quantity           Int
   status             OrderItemStatus @default(FULFILLED)

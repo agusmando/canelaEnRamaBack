@@ -27,6 +27,9 @@ export class OrderDto {
   shippingCost?: number;
   shippingProvider?: string | null;
   shippingZone?: string | null;
+  couponCode?: string | null;
+  couponDiscount?: number;
+  discountCodeId?: number | null;
 
   estimatedReadyAt: Date;
   status: string;

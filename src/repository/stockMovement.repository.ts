@@ -49,15 +49,30 @@ export class StockMovementRepository extends GenericRepositoryImpl<
     type: MovementType | string,
     tx?: any,
     createdAt?: Date | null,
+    note?: string | null,
   ): Promise<number> {
+    const db = tx ?? this.prisma;
     const rows = await this.callSp<{ stock: number }[]>(
       "create_stock_movement",
-      (db) =>
+      (client) =>
         createdAt
-          ? db.$queryRaw`SELECT public.create_stock_movement(${Number(variantId)}::INT, ${Math.round(Number(delta))}::INT, ${type}::TEXT, ${createdAt}::TIMESTAMPTZ) AS stock`
-          : db.$queryRaw`SELECT public.create_stock_movement(${Number(variantId)}::INT, ${Math.round(Number(delta))}::INT, ${type}::TEXT) AS stock`,
+          ? client.$queryRaw`SELECT public.create_stock_movement(${Number(variantId)}::INT, ${Math.round(Number(delta))}::INT, ${type}::TEXT, ${createdAt}::TIMESTAMPTZ) AS stock`
+          : client.$queryRaw`SELECT public.create_stock_movement(${Number(variantId)}::INT, ${Math.round(Number(delta))}::INT, ${type}::TEXT) AS stock`,
       tx,
     );
+    // La SP no recibe nota: se escribe después sobre el movimiento recién creado.
+    // La variante queda lockeada por la SP hasta el fin de la tx, así que el
+    // último movimiento de esa variante es el de esta llamada.
+    if (note) {
+      const latest = await db.stockMovement.findFirst({
+        where: { productVariantId: Number(variantId) },
+        orderBy: { id: "desc" },
+        select: { id: true },
+      });
+      if (latest) {
+        await db.stockMovement.update({ where: { id: latest.id }, data: { note } });
+      }
+    }
     return Number(rows?.[0]?.stock);
   }
 

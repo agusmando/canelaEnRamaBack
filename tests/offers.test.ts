@@ -119,6 +119,47 @@ describe("PricingService.quote", () => {
   });
 });
 
+describe("PricingService.lineDiscountForQuantity", () => {
+  // Caso reportado: 3 unidades con 3x2 ($5100 c/u) → descuento $5100.
+  // Al devolver una queda cantidad 2: ya no alcanza el 3x2 y el descuento es 0
+  // (el prorrateo lineal daba $3400, que era el bug).
+  const threeXTwo = {
+    discountType: "BUY_MORE_GET_MORE",
+    discountValue: null,
+    discountQuantity: 3,
+    quantityToGet: 2,
+  };
+  const line = {
+    unitPriceSnapshot: 5100,
+    quantity: 3,
+    selectedBulkOption: null,
+    productVariant: { contentMeasure: "U" },
+  };
+
+  it("3x2: al bajar a 2 unidades el descuento desaparece", () => {
+    const d = pricing.lineDiscountForQuantity({ ...line, discountAppliedSnapshot: 5100, offerParams: threeXTwo }, 2);
+    expect(d).toBe(0);
+  });
+
+  it("3x2: al bajar a 3→2 con otra oferta, respeta los tramos", () => {
+    // "Lleva 3 paga 2" con cantidad 4 original (descuento $5100 por el paquete gratis)
+    const d = pricing.lineDiscountForQuantity({ ...line, quantity: 4, discountAppliedSnapshot: 5100, offerParams: threeXTwo }, 3);
+    // 3 unidades: se pagan 2 → descuento = 1 × 5100
+    expect(d).toBe(5100);
+  });
+
+  it("porcentaje: recotiza igual que el prorrateo", () => {
+    const pct = { discountType: "PERCENTAGE", discountValue: 20, discountQuantity: null, quantityToGet: null };
+    const d = pricing.lineDiscountForQuantity({ ...line, discountAppliedSnapshot: 3060, offerParams: pct }, 2);
+    expect(d).toBe(2040);
+  });
+
+  it("sin snapshot (orden vieja) prorratea linealmente", () => {
+    const d = pricing.lineDiscountForQuantity({ ...line, discountAppliedSnapshot: 5100, offerParams: null }, 2);
+    expect(d).toBe(3400);
+  });
+});
+
 describe("PricingService.lineTotal", () => {
   it("líneas canceladas o devueltas no suman", () => {
     const base = { unitPriceSnapshot: 1000, quantity: 1, productVariant: { contentMeasure: "U" } };

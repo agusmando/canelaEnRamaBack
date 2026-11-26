@@ -16,7 +16,7 @@ API Express + Prisma + SuperTokens. Ver también `../canelaEnRamaWeb` (tienda) y
 - **Rate limiting**: `src/middleware/security.ts` tiene limiters en memoria por IP (auth 20/15min, writes 120/10min, API 600/min). Correcto para UNA instancia (Render); si se escala a varias hay que moverlos a un store compartido (Redis) o cada instancia cuenta por separado.
 - **Webhooks de Mercado Pago**: firma HMAC obligatoria en producción (`MP_WEBHOOK_SECRET`); el pago siempre se re-consulta a la API de MP, nunca se confía en la notificación. `applyPayment` es idempotente y maneja pagos duplicados/fuera de término (`paid_after_cancel`, `amount_mismatch` quedan para revisión manual).
 - **Stock**: `placeOrder` bloquea las variantes con `stockRepository.lockVariants` dentro de la transacción — no quitar ese lock o hay sobreventa. `computeFulfillment` ajusta cantidades al stock y marca `OUT_OF_STOCK`/`PARTIALLY_RETURNED`.
-- **Uploads**: `fileUploader` valida mimetype y tamaño, pero el mimetype lo declara el cliente — si se endurece, verificar magic bytes. SVG está excluido a propósito (XSS).
+- **Uploads**: `fileUploader` valida mimetype declarado, tamaño y magic bytes del contenido (`src/utils/imageSignature.ts`) antes de subir a Cloudinary. SVG está excluido a propósito (XSS).
 - **Colores de banner**: `backgroundColor`/`textColor` se validan con regex `CSS_COLOR` (sin `;` ni `url()`) — mantener esa validación si se agregan campos de estilo nuevos.
 - **Reintegros MP**: idempotency key por orden+monto; `refundFullOrder` y `refund` ya manejan duplicados. No saltear el `FOR UPDATE` del pedido.
 - **Dependencias**: correr `npm audit` periódicamente; preferir versiones publicadas hace +7 días.

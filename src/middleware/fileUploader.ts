@@ -3,6 +3,7 @@ import { ImageService } from "../services/image.service.js";
 import { errInfo, getLogger } from "../config/logger.js";
 import { BadRequestError } from "../errors/application/BadRequestError.js";
 import { ExternalServiceError } from "../errors/infra/ExternalServiceError.js";
+import { assertImageBuffer } from "../utils/imageSignature.js";
 
 const log = getLogger("upload");
 
@@ -66,6 +67,7 @@ const translateCloudinary = (err: any): Error => {
  * subieron (para no dejar huérfanos) y tira el error traducido.
  */
 async function uploadAll(files: any[], folder?: string) {
+  for (const file of files) assertImageBuffer(file);
   const results = await Promise.allSettled(
     files.map((f: any) => imageService.uploadBuffer(f.buffer, f.mimetype, folder)),
   );

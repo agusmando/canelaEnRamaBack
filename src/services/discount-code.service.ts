@@ -10,6 +10,10 @@ export const COUPON_TYPES = ["PERCENTAGE", "FIXED"] as const;
 const round2 = (n: number) => Math.round(n * 100) / 100;
 const CODE_RE = /^[A-Z0-9][A-Z0-9_-]{2,39}$/;
 
+// Mensaje genérico cuando el código existe pero ya no se puede usar:
+// no le interesa al cliente el motivo (agotado, vencido, inactivo, etc.).
+const CODE_UNAVAILABLE_MSG = "Este código de descuento ya no está vigente";
+
 /** Lo que devuelve la validación pública de un código. */
 export type CouponPreview = {
   code: string;
@@ -127,9 +131,9 @@ export class DiscountCodeService extends GenericServiceImpl<
     if (!dc) throw new ValidationError("El código de descuento no es válido");
 
     const now = new Date();
-    if (!dc.active) throw new ValidationError("Este código de descuento ya no está vigente");
+    if (!dc.active) throw new ValidationError(CODE_UNAVAILABLE_MSG);
     if (new Date(dc.startTime) > now || new Date(dc.finishTime) < now) {
-      throw new ValidationError("Este código de descuento no está vigente en este momento");
+      throw new ValidationError(CODE_UNAVAILABLE_MSG);
     }
     const base = Math.max(0, Number(subtotal) || 0);
     if (base <= 0) throw new ValidationError("El código se aplica sobre el total de productos");
@@ -139,14 +143,14 @@ export class DiscountCodeService extends GenericServiceImpl<
       );
     }
     if (dc.usageLimit != null && Number(dc.usedCount) >= Number(dc.usageLimit)) {
-      throw new ValidationError("Este código de descuento alcanzó su límite de usos");
+      throw new ValidationError(CODE_UNAVAILABLE_MSG);
     }
     if (dc.perUserLimit != null && userId) {
       const used = await client.order.count({
         where: { couponCode: code, userSuperTokensId: userId, status: { not: "CANCELLED" } },
       });
       if (used >= Number(dc.perUserLimit)) {
-        throw new ValidationError("Ya usaste este código de descuento el máximo de veces permitido");
+        throw new ValidationError(CODE_UNAVAILABLE_MSG);
       }
     }
     return dc;

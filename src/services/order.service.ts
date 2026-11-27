@@ -17,10 +17,12 @@ import { DiscountCodeService } from "./discount-code.service.js";
 import { ShipmentRepository } from "../repository/shipment.repository.js";
 import { isMercadoPagoConfigured } from "../config/mercadopago.js";
 import { streetLine, ShippingQuoteService, type ShippingQuote } from "./shipping-quote.service.js";
+import { createHash } from "node:crypto";
 import { orderMails, type OrderMailKind } from "./order-mail.service.js";
 import { orderChargeTotal } from "../utils/pricing.js";
 import { newTrackingCode } from "../utils/trackingCode.js";
 import { getLogger } from "../config/logger.js";
+import { prisma as sharedPrisma } from "../config/prisma/client.js";
 
 const log = getLogger("order");
 
@@ -188,6 +190,85 @@ export class OrderService extends GenericServiceImpl<OrderDto, CreateOrderDto, U
       this.mailReceived(order);
       return order;
     });
+  }
+
+  /**
+   * Checkout de invitado (POST /order/guest, público): compra sin cuenta.
+   *
+   * El invitado se persiste como un User interno con supertokensId
+   * "guest:<hash del email>" — no puede loguearse (no existe en SuperTokens)
+   * pero la orden queda asociada a un email real para los mails y para el
+   * staff. Solo retiro en el local con pago en el local (Efectivo /
+   * Transferencia): el envío a domicilio y Mercado Pago siguen pidiendo login.
+   * Se crea un envío PICKUP con los datos de contacto para que el cliente
+   * pueda seguir el pedido con el código de seguimiento público.
+   */
+  async createGuestOrder(data: any) {
+    const guest = data?.guest ?? {};
+    const email = String(guest.email ?? "").trim().toLowerCase();
+    const name = String(guest.name ?? "").trim().slice(0, 120);
+    const phone = String(guest.phone ?? "").trim().slice(0, 40);
+    const sessionId = String(data?.sessionId ?? "").trim();
+    if (!sessionId) throw new ValidationError("No encontramos tu carrito. Volvé a armarlo.");
+    if (!name) throw new ValidationError("Ingresá tu nombre");
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new ValidationError("Ingresá un email válido");
+    if (phone.replace(/\D/g, "").length < 8) throw new ValidationError("Ingresá un teléfono válido");
+
+    const method = String(data?.shippingMethod ?? "PICKUP").toUpperCase();
+    if (method !== "PICKUP") {
+      throw new ValidationError("El envío a domicilio requiere iniciar sesión. Como invitado podés retirar tu pedido en el local.");
+    }
+    // Solo pago en el local: Mercado Pago necesita sesión para la preferencia.
+    const paymentType = this.parsePaymentType(data?.paymentType);
+    if (paymentType !== "CASH") {
+      throw new ValidationError("Como invitado podés pagar en efectivo o transferencia al retirar. Para pagar online iniciá sesión.");
+    }
+
+    const guestId = `guest:${createHash("sha256").update(email).digest("hex").slice(0, 24)}`;
+    await sharedPrisma.user.upsert({
+      where: { supertokensId: guestId },
+      update: { email, name },
+      create: { supertokensId: guestId, email, name, role: "CONSUMER" },
+    });
+
+    const order = await this.orderRepository.withTransaction(async (tx) => {
+      const { cartId, items } = await this.cartService.itemsForCheckout(sessionId, tx);
+      const created = await this.placeOrder(
+        { ...data, orderItems: items as any },
+        paymentType,
+        guestId,
+        tx,
+        { method: "PICKUP" },
+      );
+      await this.cartService.clearCart(cartId, tx);
+
+      // Envío de retiro con los datos de contacto del invitado: le da código
+      // de seguimiento público y al staff nombre/teléfono para coordinar.
+      let trackingCode = newTrackingCode();
+      while (await this.shipmentRepository.trackingCodeExists(trackingCode, tx)) trackingCode = newTrackingCode();
+      await this.shipmentRepository.createShipment(
+        {
+          orderId: created.id,
+          trackingCode,
+          method: "PICKUP",
+          status: "PENDING",
+          recipientName: name,
+          phone,
+          cost: 0,
+        },
+        { status: "PENDING", description: "Recibimos tu pedido" },
+        tx,
+      );
+      return this.orderRepository.getOrder(created.id, tx);
+    });
+
+    this.logCreated(order, guestId, true);
+    this.mailReceived(order);
+    log.info(
+      { orderId: order?.id, userId: guestId, fromCart: true, guest: true, paymentType, event: "guest_order_created" },
+      `Pedido de invitado ${order?.id} creado`,
+    );
+    return order;
   }
 
   /**

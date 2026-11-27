@@ -28,6 +28,27 @@ const log = getLogger("users");
 const TENANT = "public";
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PAGE_SIZE_MAX = 100;
+const PREFS_MAX_FAVORITES = 300;
+const PREFS_MAX_RECENT = 50;
+
+const idList = (v: unknown, max: number) => {
+  if (!Array.isArray(v)) return [];
+  const seen = new Set<number>();
+  for (const n of v) {
+    if (typeof n === "number" && Number.isInteger(n) && n > 0) seen.add(n);
+    if (seen.size >= max) break;
+  }
+  return [...seen];
+};
+
+/** Normaliza el JSON de preferencias del comprador: { favorites: number[], recent: number[] }. */
+function sanitizePrefs(raw: any) {
+  const src = raw && typeof raw === "object" ? raw : {};
+  return {
+    favorites: idList(src.favorites, PREFS_MAX_FAVORITES),
+    recent: idList(src.recent ?? src.recentlyViewed, PREFS_MAX_RECENT),
+  };
+}
 
 export type UserListParams = { search?: string; role?: string; page?: number; perPage?: number };
 
@@ -50,6 +71,24 @@ export class UserService {
 
   findOneBySupertokensId(supertokensId: string) {
     return this.userRepository.findOneBySupertokensId(supertokensId);
+  }
+
+  /** Preferencias del comprador (favoritos, vistos recientemente). Se guardan como JSON en User.prefs. */
+  async getPrefs(supertokensId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { supertokensId },
+      select: { prefs: true },
+    });
+    return sanitizePrefs(user?.prefs);
+  }
+
+  async savePrefs(supertokensId: string, body: any) {
+    const prefs = sanitizePrefs(body);
+    await this.prisma.user.update({
+      where: { supertokensId },
+      data: { prefs: { favorites: prefs.favorites, recent: prefs.recent } },
+    });
+    return prefs;
   }
 
   roleCatalog() {
@@ -112,6 +151,10 @@ export class UserService {
       where.supertokensId = { in: [...map.keys()] };
     }
 
+    // Los compradores anónimos (checkout sin cuenta) no son clientes registrables
+    const notGuest = { supertokensId: { not: { startsWith: "guest:" } } };
+    where.AND = [...(Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : []), notGuest];
+
     const [rows, total] = await Promise.all([
       this.prisma.user.findMany({
         where,
@@ -127,7 +170,10 @@ export class UserService {
       where: { supertokensId: { in: [...map.keys()] } },
       select: { supertokensId: true },
     });
-    const counts: Record<string, number> = { total: await this.prisma.user.count(), STAFF: known.length };
+    const counts: Record<string, number> = {
+      total: await this.prisma.user.count({ where: { supertokensId: { not: { startsWith: "guest:" } } } }),
+      STAFF: known.length,
+    };
     for (const { supertokensId } of known) {
       const currentRole = primaryRole(map.get(supertokensId) ?? []);
       if (currentRole) counts[currentRole] = (counts[currentRole] ?? 0) + 1;

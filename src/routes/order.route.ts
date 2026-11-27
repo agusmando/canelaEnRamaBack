@@ -15,6 +15,7 @@ router
   .route("/")
   .get(...requirePermission("orders.manage"), orderController.findAll.bind(orderController))
   .post(...user, orderController.create.bind(orderController));
+router.post("/guest", orderController.createGuest.bind(orderController));
 router.post(
   "/counter",
   ...requirePermission("orders.manage"),

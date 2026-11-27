@@ -145,6 +145,57 @@ export class CatalogService {
     return { content: result.entityList, totalElements: result.totalElements || matched.length, facets };
   }
 
+  /**
+   * "Los más pedidos": productos ordenados por cantidad de órdenes distintas en
+   * las que aparecieron (órdenes y líneas no canceladas de los últimos `days`).
+   * Devuelve productos completos en ese orden; se cachea 10 minutos.
+   */
+  private bestSellersCache: { key: string; at: number; data: any } | null = null;
+
+  async bestSellers(query: any) {
+    const days = Math.min(365, Math.max(7, Number(query?.days) || 90));
+    const limit = Math.min(48, Math.max(4, Number(query?.limit) || 24));
+    const key = `${days}:${limit}`;
+    if (this.bestSellersCache?.key === key && Date.now() - this.bestSellersCache.at < 10 * 60 * 1000) {
+      return this.bestSellersCache.data;
+    }
+
+    const since = new Date(Date.now() - days * 86400e3);
+    const items = await this.prisma.orderItem.findMany({
+      where: {
+        productVariantId: { not: null },
+        status: { notIn: ["CANCELLED", "RETURNED"] },
+        Order: { status: { not: "CANCELLED" }, createdAt: { gte: since } },
+      },
+      select: { orderId: true, productVariant: { select: { productId: true } } },
+    });
+
+    const ordersByProduct = new Map<number, Set<number>>();
+    for (const it of items as any[]) {
+      const pid = it.productVariant?.productId;
+      if (!pid) continue;
+      const set = ordersByProduct.get(pid) ?? new Set<number>();
+      set.add(it.orderId);
+      ordersByProduct.set(pid, set);
+    }
+
+    // Solo productos vendibles en la web (mismo criterio que el índice del catálogo).
+    const { entries } = await this.getIndex();
+    const sellable = new Set(entries.map((e) => e.id));
+    const ranked = [...ordersByProduct.entries()]
+      .filter(([pid]) => sellable.has(pid))
+      .sort((a, b) => b[1].size - a[1].size || a[0] - b[0])
+      .slice(0, limit)
+      .map(([pid]) => pid);
+
+    const result = ranked.length
+      ? await this.productRepository.searchRanked({}, ranked, false, 1, ranked.length, true)
+      : { entityList: [], currentPage: 1, amountPerPage: ranked.length, totalElements: 0 };
+    const data = { content: result.entityList, totalElements: result.totalElements };
+    this.bestSellersCache = { key, at: Date.now(), data };
+    return data;
+  }
+
   /** Conteos de los filtros sobre TODO el catálogo vendible (como hacía el front). */
   private facets(entries: CatalogEntry[]) {
     const categories: Record<string, number> = {};

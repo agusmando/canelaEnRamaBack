@@ -187,7 +187,14 @@ export function buildOrderMail(kind: OrderMailKind, order: any, extra: OrderMail
   const n = `#${order.id}`;
   const name = order.user?.name?.trim()?.split(/\s+/)[0];
   const hi = p(name ? `Hola ${escapeHtml(name)},` : "Hola,");
-  const orderLink = { label: "Ver mi pedido", href: `${webUrl()}/mi-cuenta/pedidos/${order.id}` };
+  // Los pedidos de invitado no tienen cuenta: el seguimiento es por código público.
+  const guestTracking =
+    order.user?.supertokensId?.startsWith("guest:") && order.shipment?.trackingCode
+      ? order.shipment.trackingCode
+      : null;
+  const orderLink = guestTracking
+    ? { label: "Seguir mi pedido", href: `${webUrl()}/seguimiento/${guestTracking}` }
+    : { label: "Ver mi pedido", href: `${webUrl()}/mi-cuenta/pedidos/${order.id}` };
   const payment = PAYMENT_LABEL[order.paymentType] ?? order.paymentType;
 
   switch (kind) {
@@ -338,7 +345,7 @@ export class OrderMailService {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
       include: {
-        user: { select: { email: true, name: true } },
+        user: { select: { email: true, name: true, supertokensId: true } },
         orderItems: { include: { productVariant: { select: { contentMeasure: true } } } },
         shipment: true,
       },

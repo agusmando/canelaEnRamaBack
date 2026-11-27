@@ -26,6 +26,27 @@ export class UserController {
     }
   }
 
+  /** GET /user/prefs — favoritos y vistos recientemente del comprador. */
+  async getPrefs(req: any, res: any, next: any) {
+    try {
+      const actor = getActor(req);
+      res.status(200).json(new BaseResponse(200, "Preferencias", await this.userService.getPrefs(actor.userId!)));
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /** PUT /user/prefs — guarda { favorites, recent } del comprador. */
+  async savePrefs(req: any, res: any, next: any) {
+    try {
+      const actor = getActor(req);
+      const prefs = await this.userService.savePrefs(actor.userId!, req.body ?? {});
+      res.status(200).json(new BaseResponse(200, "Preferencias guardadas", prefs));
+    } catch (error) {
+      next(error);
+    }
+  }
+
   /** GET /user/:supertokensId — el propio usuario o quien administra usuarios. */
   async getOneBySupertokensId(req: any, res: any, next: any) {
     try {

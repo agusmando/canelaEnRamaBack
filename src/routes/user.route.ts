@@ -15,6 +15,8 @@ router.put("/:supertokensId/role", ...manageUsers, userController.setRole.bind(u
 router.post("/:supertokensId/revoke-sessions", ...manageUsers, userController.revokeSessions.bind(userController));
 
 router.get("/me", isAuthenticated, attachRoles, userController.getMe.bind(userController));
+router.get("/prefs", isAuthenticated, userController.getPrefs.bind(userController));
+router.put("/prefs", isAuthenticated, userController.savePrefs.bind(userController));
 router.use(isAuthenticated, attachRoles);
 router.get("/:supertokensId", userController.getOneBySupertokensId.bind(userController));
 

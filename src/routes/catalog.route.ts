@@ -12,6 +12,22 @@ const router = express.Router();
  * cliente). Devuelve `{ content, totalElements, facets }`.
  */
 router.get(
+  "/best-sellers",
+  optionalSession,
+  attachRoles,
+  hideCostForPublic,
+  webOnlyForPublic("product"),
+  async (req, res, next) => {
+    try {
+      const data = await catalogService.bestSellers(req.query);
+      res.status(200).json(new BaseResponse(200, "Más pedidos", data));
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+
+router.get(
   "/",
   optionalSession,
   attachRoles,

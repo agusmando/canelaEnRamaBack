@@ -27,6 +27,16 @@ export class OrderController extends GenericControllerImpl<
     }
   }
 
+  /** POST /order/guest — checkout sin cuenta (público): retiro en el local, pago en el local. */
+  async createGuest(req: any, res: any, next: any) {
+    try {
+      const response = await this.orderService.createGuestOrder(req.body);
+      res.status(201).json(new BaseResponse(201, "Guest order created", response));
+    } catch (error) {
+      next(error);
+    }
+  }
+
   /** POST /order/counter — venta de mostrador (staff): queda entregada y cobrada. */
   async createCounterSale(req: any, res: any, next: any) {
     try {

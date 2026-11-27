@@ -46,9 +46,10 @@ export function normalizeHours(raw: unknown): BusinessHour[] {
     const day = Number((h as any)?.day);
     if (!Number.isInteger(day) || day < 0 || day > 6 || byDay.has(day)) continue;
     const closed = (h as any)?.closed === true;
-    const ranges = (Array.isArray((h as any)?.ranges) ? (h as any).ranges : [])
+    const rawRanges: unknown[] = Array.isArray((h as any)?.ranges) ? (h as any).ranges : [];
+    const ranges = rawRanges
       .map(validRange)
-      .filter(Boolean)
+      .filter((r): r is BusinessHourRange => r !== null)
       .slice(0, MAX_RANGES);
     // Día abierto sin rangos válidos → no lo guardamos (cae al default).
     if (!closed && !ranges.length) continue;
@@ -106,11 +107,11 @@ export class SettingsService {
       }
       seen.add(day);
       const closed = h?.closed === true;
-      const rawRanges = Array.isArray(h?.ranges) ? h.ranges : [];
+      const rawRanges: unknown[] = Array.isArray(h?.ranges) ? h.ranges : [];
       if (rawRanges.length > MAX_RANGES) throw new ValidationError(`Máximo ${MAX_RANGES} franjas por día`);
       const ranges = rawRanges
         .map(validRange)
-        .filter(Boolean)
+        .filter((r): r is BusinessHourRange => r !== null)
         .sort((a, b) => toMinutes(a.open) - toMinutes(b.open));
       if (!closed && !ranges.length) {
         throw new ValidationError(`El día ${day} está abierto pero no tiene franjas válidas (HH:MM, apertura < cierre)`);

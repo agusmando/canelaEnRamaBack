@@ -51,6 +51,17 @@ describe("mails de pedido", () => {
     expect(buildOrderMail("delivered", { ...order, shippingMethod: "PICKUP" }).subject).toContain("Retiraste");
   });
 
+  it("entregado con reviewUrl pide la reseña en Google y mantiene el link al pedido", () => {
+    const m = buildOrderMail("delivered", order, { reviewUrl: "https://search.google.com/local/writereview?placeid=abc" });
+    expect(m.html).toContain("writereview?placeid=abc");
+    expect(m.html).toContain("Calificar en Google");
+    expect(m.html).toContain("/mi-cuenta/pedidos/42");
+    const guest = { ...order, user: { ...order.user, supertokensId: "guest:x" }, shipment: { trackingCode: "CER-ABC123" } };
+    expect(buildOrderMail("delivered", guest, { reviewUrl: "https://g.page/r/abc" }).html).toContain("/seguimiento/CER-ABC123");
+    // Sin reviewUrl no hay CTA de Google
+    expect(buildOrderMail("delivered", order).html).not.toContain("writereview");
+  });
+
   it("cambios en el pedido lista lo que se sacó, lo devuelto y lo que espera reposición", () => {
     const m = buildOrderMail("updated", {
       ...order,

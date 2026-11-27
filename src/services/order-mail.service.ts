@@ -31,7 +31,7 @@ export type OrderMailKind =
   | "cancelled";
 
 /** Datos extra de algunos mails (p. ej. el monto reintegrado o los ítems tocados). */
-export type OrderMailExtra = { amount?: number; itemIds?: number[] };
+export type OrderMailExtra = { amount?: number; itemIds?: number[]; reviewUrl?: string | null };
 
 const PAYMENT_LABEL: Record<string, string> = {
   DEBIT: "Tarjeta de débito",
@@ -74,6 +74,12 @@ export const itemTotal = (it: any) => {
 };
 
 const webUrl = () => (process.env.WEB_URL || "https://canelaenrama.com.ar").replace(/\/+$/, "");
+
+/**
+ * Link "escribir reseña" de Google (el de "pedir reseñas" de la ficha de
+ * Google Business). Sin GOOGLE_REVIEW_URL el mail de entregado no muestra el CTA.
+ */
+const GOOGLE_REVIEW_URL = (process.env.GOOGLE_REVIEW_URL ?? "").trim() || null;
 
 const p = (html: string) => `<p style="margin:0 0 16px;font-size:15px;line-height:1.5">${html}</p>`;
 
@@ -208,7 +214,10 @@ export function buildOrderMail(kind: OrderMailKind, order: any, extra: OrderMail
             p("Ya lo estamos preparando. Te avisamos por mail cuando esté listo.") +
             stockChanges(order) +
             itemsTable(order) +
-            p(`<strong>Pago:</strong> ${escapeHtml(payment)}.<br><strong>Entrega:</strong> ${deliveryText(order)}`),
+            p(`<strong>Pago:</strong> ${escapeHtml(payment)}.<br><strong>Entrega:</strong> ${deliveryText(order)}`) +
+            (order.estimatedReadyAt
+              ? p(`Fecha estimada para tenerlo listo: <strong>${escapeHtml(dateLabel(order.estimatedReadyAt))}</strong>.`)
+              : ""),
           button: orderLink,
         }),
       };
@@ -222,12 +231,16 @@ export function buildOrderMail(kind: OrderMailKind, order: any, extra: OrderMail
             p("Mercado Pago nos confirmó el pago. Ya estamos preparando tu pedido y te avisamos cuando esté listo.") +
             stockChanges(order) +
             itemsTable(order) +
-            p(`<strong>Entrega:</strong> ${deliveryText(order)}`),
+            p(`<strong>Entrega:</strong> ${deliveryText(order)}`) +
+            (order.estimatedReadyAt
+              ? p(`Fecha estimada para tenerlo listo: <strong>${escapeHtml(dateLabel(order.estimatedReadyAt))}</strong>.`)
+              : ""),
           button: orderLink,
         }),
       };
     case "ready": {
       const pickup = pickupInfo();
+      const wa = `https://wa.me/${String(pickup.phone).replace(/\D/g, "")}`;
       return {
         subject: `Tu pedido ${n} está listo para retirar`,
         html: emailLayout({
@@ -237,6 +250,11 @@ export function buildOrderMail(kind: OrderMailKind, order: any, extra: OrderMail
             p(
               `Ya podés pasar a buscarlo por <strong>${escapeHtml(pickup.address.street)}, ${escapeHtml(pickup.address.city)}</strong>.` +
                 (order.paymentStatus === "APPROVED" ? " El pedido ya está pago." : ` Forma de pago: ${escapeHtml(payment)}.`),
+            ) +
+            p(
+              `Horario: lunes a sábado en horario comercial.<br>` +
+                `Cualquier consulta: <a href="tel:${escapeHtml(pickup.phone)}" style="color:#cc3b1d">${escapeHtml(pickup.phone)}</a> o ` +
+                `<a href="${wa}" style="color:#cc3b1d">WhatsApp</a>.`,
             ),
           button: orderLink,
         }),
@@ -257,7 +275,8 @@ export function buildOrderMail(kind: OrderMailKind, order: any, extra: OrderMail
         }),
       };
     }
-    case "failedAttempt":
+    case "failedAttempt": {
+      const wa = `https://wa.me/${String(pickupInfo().phone).replace(/\D/g, "")}`;
       return {
         subject: `No pudimos entregar tu pedido ${n}`,
         html: emailLayout({
@@ -265,12 +284,15 @@ export function buildOrderMail(kind: OrderMailKind, order: any, extra: OrderMail
           body:
             hi +
             p("Pasamos a entregarlo pero no lo pudimos dejar. Escribinos para coordinar un nuevo horario o cambiar la dirección.") +
-            p(`<strong>Entrega:</strong> ${deliveryText(order)}`),
-          button: orderLink,
+            p(`<strong>Entrega:</strong> ${deliveryText(order)}`) +
+            p(`<a href="${escapeHtml(orderLink.href)}" style="color:#666">${escapeHtml(orderLink.label)}</a>`),
+          button: { label: "Escribinos por WhatsApp", href: wa },
         }),
       };
+    }
     case "delivered": {
       const pickup = order.shippingMethod !== "DELIVERY";
+      const review = extra.reviewUrl ?? null;
       return {
         subject: pickup ? `Retiraste tu pedido ${n} · ¡Gracias!` : `Entregamos tu pedido ${n} · ¡Gracias!`,
         html: emailLayout({
@@ -278,8 +300,11 @@ export function buildOrderMail(kind: OrderMailKind, order: any, extra: OrderMail
           body:
             hi +
             p("Esperamos que lo disfrutes. Si algo no llegó como esperabas, respondé este mail y lo resolvemos.") +
-            p("Nos ayuda muchísimo que dejes tu opinión de los productos en la tienda."),
-          button: orderLink,
+            (review
+              ? p(`¿Nos contás cómo fue tu compra? <a href="${escapeHtml(review)}" style="color:#cc3b1d;font-weight:bold">Dejanos tu reseña en Google</a> — nos ayuda un montón.`)
+              : p("Nos ayuda muchísimo que dejes tu opinión de los productos en la tienda.")) +
+            p(`<a href="${escapeHtml(orderLink.href)}" style="color:#666">${escapeHtml(orderLink.label)}</a>`),
+          button: review ? { label: "Calificar en Google", href: review } : orderLink,
         }),
       };
     }
@@ -356,7 +381,8 @@ export class OrderMailService {
       return false;
     }
     log.info({ orderId, kind }, `Mandando el mail "${kind}" de la orden ${orderId}`);
-    const { subject, html } = buildOrderMail(kind, order, extra);
+    const mailExtra = kind === "delivered" ? { ...extra, reviewUrl: extra?.reviewUrl ?? GOOGLE_REVIEW_URL } : extra;
+    const { subject, html } = buildOrderMail(kind, order, mailExtra);
     return sendMail({ to, subject, html });
   }
 }

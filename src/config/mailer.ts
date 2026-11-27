@@ -165,6 +165,10 @@ export async function checkMail(): Promise<void> {
   }
 }
 
+/** Marca del mail: logo alojado en la tienda (WEB_URL) si está configurada; si no, texto. */
+const STORE_URL = (process.env.WEB_URL || "").replace(/\/+$/, "");
+const LOGO_URL = STORE_URL ? `${STORE_URL}/logo-email.png` : null;
+
 /** Plantilla común: encabezado con la marca, contenido y pie. `body` ya es HTML. */
 export function emailLayout(opts: { title: string; body: string; button?: { label: string; href: string }; footer?: string }) {
   const button = opts.button
@@ -174,6 +178,9 @@ export function emailLayout(opts: { title: string; body: string; button?: { labe
               </a>
             </p>`
     : "";
+  const brand = LOGO_URL
+    ? `<img src="${LOGO_URL}" width="170" alt="Canela en Rama" style="display:block;border:0;height:auto;margin:0 0 20px">`
+    : `<p style="margin:0 0 24px;font-size:22px;font-weight:bold;color:#cc3b1d">Canela en Rama</p>`;
   return `<!doctype html>
 <html lang="es">
   <body style="margin:0;padding:0;background:#faebe8;font-family:Arial,Helvetica,sans-serif;color:#282828">
@@ -181,7 +188,7 @@ export function emailLayout(opts: { title: string; body: string; button?: { labe
       <tr><td align="center">
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border-radius:16px;padding:32px">
           <tr><td>
-            <p style="margin:0 0 24px;font-size:22px;font-weight:bold;color:#cc3b1d">Canela en Rama</p>
+            ${brand}
             <h1 style="margin:0 0 12px;font-size:20px">${escapeHtml(opts.title)}</h1>
             ${opts.body}
             ${button}

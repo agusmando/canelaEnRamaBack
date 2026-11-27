@@ -1,6 +1,7 @@
 import { prisma as sharedPrisma } from "../config/prisma/client.js";
 import { emailLayout, escapeHtml, sendMail } from "../config/mailer.js";
 import { pickupInfo } from "./shipping-quote.service.js";
+import { formatHoursText, SettingsService } from "./settings.service.js";
 import { getLogger, errInfo } from "../config/logger.js";
 
 const log = getLogger("mail");
@@ -31,7 +32,7 @@ export type OrderMailKind =
   | "cancelled";
 
 /** Datos extra de algunos mails (p. ej. el monto reintegrado o los ítems tocados). */
-export type OrderMailExtra = { amount?: number; itemIds?: number[]; reviewUrl?: string | null };
+export type OrderMailExtra = { amount?: number; itemIds?: number[]; reviewUrl?: string | null; hoursText?: string | null };
 
 const PAYMENT_LABEL: Record<string, string> = {
   DEBIT: "Tarjeta de débito",
@@ -252,7 +253,7 @@ export function buildOrderMail(kind: OrderMailKind, order: any, extra: OrderMail
                 (order.paymentStatus === "APPROVED" ? " El pedido ya está pago." : ` Forma de pago: ${escapeHtml(payment)}.`),
             ) +
             p(
-              `Horario: lunes a sábado en horario comercial.<br>` +
+              `Horarios: ${escapeHtml(extra.hoursText ?? "lunes a sábado en horario comercial")}<br>` +
                 `Cualquier consulta: <a href="tel:${escapeHtml(pickup.phone)}" style="color:#cc3b1d">${escapeHtml(pickup.phone)}</a> o ` +
                 `<a href="${wa}" style="color:#cc3b1d">WhatsApp</a>.`,
             ),
@@ -381,7 +382,13 @@ export class OrderMailService {
       return false;
     }
     log.info({ orderId, kind }, `Mandando el mail "${kind}" de la orden ${orderId}`);
-    const mailExtra = kind === "delivered" ? { ...extra, reviewUrl: extra?.reviewUrl ?? GOOGLE_REVIEW_URL } : extra;
+    let mailExtra = kind === "delivered" ? { ...extra, reviewUrl: extra?.reviewUrl ?? GOOGLE_REVIEW_URL } : extra;
+    if (kind === "ready") {
+      const { hours } = await new SettingsService(this.prisma)
+        .getHours()
+        .catch(() => ({ hours: null as any }));
+      mailExtra = { ...mailExtra, hoursText: hours ? formatHoursText(hours) : null };
+    }
     const { subject, html } = buildOrderMail(kind, order, mailExtra);
     return sendMail({ to, subject, html });
   }

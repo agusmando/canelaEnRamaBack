@@ -248,6 +248,15 @@ model GooglePlace {
   lastError       String?
 }
 
+// Configuración general del comercio (fila única id=1). `hours` es un array de
+// 7 entradas { day: 0-6 (0=lunes), closed: bool, ranges: [{open:"HH:MM",close:"HH:MM"}] }
+// — hasta 2 franjas por día (corrimiento partido).
+model StoreSettings {
+  id        Int      @id @default(1)
+  hours     Json?
+  updatedAt DateTime @updatedAt
+}
+
 model Banner {
   id                   Int             @id @default(autoincrement())
   placement            BannerPlacement

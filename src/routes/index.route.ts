@@ -15,6 +15,7 @@ import orderRoutes from "./order.route.js";
 import orderItemRoutes from "./order-item.route.js";
 import userRoutes from "./user.route.js";
 import shipmentRoutes from "./shipment.route.js";
+import settingsRoutes from "./settings.route.js";
 import reviewRoutes from "./review.route.js";
 import googleReviewRoutes from "./google-review.route.js";
 import bannerRoutes from "./banner.route.js";
@@ -67,5 +68,6 @@ router.use("/roles", rolesRoutes);
 router.use("/shipping", shippingRoutes);
 router.use("/discount-code", discountCodeRoutes);
 router.use("/shipment", shipmentRoutes);
+router.use("/settings", settingsRoutes);
 
 export default router;

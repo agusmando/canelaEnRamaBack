@@ -24,6 +24,8 @@ export class OrderDto {
   refundEmailId?: string | null;
   refundEmailSentAt?: Date | null;
   shippingMethod?: "DELIVERY" | "PICKUP" | null;
+  /** WEB = tienda online; COUNTER = venta de mostrador cargada desde el panel. */
+  channel?: "WEB" | "COUNTER";
   shippingCost?: number;
   shippingProvider?: string | null;
   shippingZone?: string | null;

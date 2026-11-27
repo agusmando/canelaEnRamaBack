@@ -55,6 +55,7 @@ export class OrderMapper {
     dto.refundEmailId = dbOrder.refundEmailId;
     dto.refundEmailSentAt = dbOrder.refundEmailSentAt;
     dto.shippingMethod = dbOrder.shippingMethod;
+    dto.channel = dbOrder.channel;
     dto.shippingCost = dbOrder.shippingCost;
     dto.shippingProvider = dbOrder.shippingProvider;
     dto.shippingZone = dbOrder.shippingZone;

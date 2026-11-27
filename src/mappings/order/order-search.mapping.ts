@@ -19,6 +19,7 @@ export const orderSearchQueryMapping = {
   updatedAt: { field: "updatedAt", type: "date", operation: "gte" },
   status: { field: "status", type: "enum" },
   shippingMethod: { field: "shippingMethod", type: "enum" },
+  channel: { field: "channel", type: "enum" },
   paymentType: { field: "paymentType", type: "string" },
   paymentStatus: { field: "paymentStatus", type: "enum" },
   totalPrice: { field: "totalPrice", type: "number", operation: "gte" },
